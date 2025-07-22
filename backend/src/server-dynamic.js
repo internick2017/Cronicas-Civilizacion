@@ -12,6 +12,7 @@ import playerRoutes from './routes/playerRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import resourceRoutes from './routes/resourceRoutes.js';
 import cityRoutes from './routes/cityRoutes.js';
+import militaryRoutes from './routes/militaryRoutes.js';
 
 // Import socket handlers
 import { handleGameSocket } from './sockets/gameSocket.js';
@@ -66,6 +67,7 @@ app.use('/api/games', gameRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/cities', cityRoutes);
+app.use('/api/military', militaryRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
