@@ -1,0 +1,53 @@
+{
+  "name": "cronicas-civilizacion-backend",
+  "version": "1.0.0",
+  "description": "Backend para el juego Crónicas de Civilización",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/server-dynamic.js",
+    "dev-postgres": "set DATABASE_TYPE=postgresql && nodemon src/server-dynamic.js",
+    "dev-sqlite": "set DATABASE_TYPE=sqlite && nodemon src/server-dynamic.js",
+    "dev-neon": "set DATABASE_TYPE=postgresql && nodemon src/server-dynamic.js",
+    "start": "node src/server-dynamic.js",
+    "start-postgres": "set DATABASE_TYPE=postgresql && node src/server-dynamic.js",
+    "start-sqlite": "set DATABASE_TYPE=sqlite && node src/server-dynamic.js",
+    "start-neon": "set DATABASE_TYPE=postgresql && node src/server-dynamic.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test-connections": "node test-connections.js",
+    "setup-local": "setup-local.bat",
+    "setup-sqlite": "setup-sqlite.bat",
+    "setup-neon": "setup-neon.bat",
+    "migrate-neon": "node migrate-neon.js"
+  },
+  "keywords": [
+    "game",
+    "strategy",
+    "civilization",
+    "ai",
+    "narrative"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.5.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.14.2",
+    "openai": "^4.104.0",
+    "pg": "^8.16.3",
+    "redis": "^4.7.1",
+    "socket.io": "^4.8.1",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Backend API with Neon Database
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cronicas_backend_neon
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Neon Database - Set your actual DATABASE_URL
+      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_TYPE=postgresql
+      # Redis (optional - can use memory cache)
+      - REDIS_HOST=${REDIS_HOST:-localhost}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      # Other configurations
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET:-cronicas_jwt_secret_2024_neon}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - cronicas_network
+    command: npm start
+
+  # Frontend Development Server
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: cronicas_frontend_neon
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3000}
+      - VITE_SOCKET_URL=${VITE_SOCKET_URL:-http://localhost:3000}
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - cronicas_network
+    command: npm run dev
+
+  # Redis (Optional - for production caching)
+  redis:
+    image: redis:6-alpine
+    container_name: cronicas_redis_neon
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cronicas_network
+    profiles:
+      - cache
+
+volumes:
+  redis_data:
+
+networks:
+  cronicas_network:
+    driver: bridge 

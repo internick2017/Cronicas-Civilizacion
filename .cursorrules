@@ -1,0 +1,205 @@
+# Cronicas de Civilizacion - Cursor Rules
+
+## Project Overview
+This is a civilization strategy game with AI narrative features, built with Node.js backend and Vue.js frontend.
+
+## Architecture
+- **Backend**: Node.js + Express + Socket.IO
+- **Frontend**: Vue.js 3 + Vite
+- **Database**: PostgreSQL (Neon) / SQLite (development)
+- **Cache**: Redis / In-memory
+- **AI**: OpenAI GPT-4 for narrative generation
+
+## Code Style & Conventions
+
+### Backend (Node.js)
+- Use ES6 modules (import/export)
+- Follow RESTful API conventions
+- Use async/await for database operations
+- Implement proper error handling
+- Use JWT for authentication
+- Follow the existing service pattern (AuthService, GameService, etc.)
+
+### Frontend (Vue.js)
+- Use Composition API
+- Follow Vue 3 best practices
+- Use TypeScript-style JSDoc comments
+- Implement reactive data patterns
+- Use Pinia for state management (if needed)
+
+### Database
+- Use PostgreSQL for production (Neon)
+- Use SQLite for development
+- Follow the existing schema in `database/init.sql`
+- Use parameterized queries to prevent SQL injection
+
+## File Structure
+```
+backend/
+├── src/
+│   ├── config/          # Database and app configuration
+│   ├── middleware/      # Express middleware
+│   ├── models/          # Database models
+│   ├── routes/          # API routes
+│   ├── services/        # Business logic
+│   ├── sockets/         # Socket.IO handlers
+│   └── utils/           # Utility functions
+├── data/                # SQLite database files
+└── docs/                # Documentation
+
+frontend/
+├── src/
+│   ├── components/      # Vue components
+│   ├── composables/     # Vue composables
+│   └── assets/          # Static assets
+```
+
+## Development Guidelines
+
+### Database Configuration
+- Use `DATABASE_URL` for Neon PostgreSQL
+- Use individual env vars for local development
+- Always use SSL for production connections
+- Implement connection pooling
+
+### Environment Variables
+- Never commit `.env` files
+- Use `env.example` as template
+- Document all required variables
+
+### API Design
+- Use descriptive endpoint names
+- Implement proper HTTP status codes
+- Return consistent JSON responses
+- Include error messages for debugging
+
+### Game Logic
+- Implement turn-based mechanics
+- Use UUIDs for game entities
+- Maintain game state consistency
+- Implement proper validation
+
+### AI Integration
+- Use OpenAI API for narrative generation
+- Implement rate limiting
+- Cache AI responses when appropriate
+- Handle API failures gracefully
+
+## Security Considerations
+- Validate all user inputs
+- Use parameterized queries
+- Implement proper authentication
+- Sanitize data before storage
+- Use HTTPS in production
+
+## Performance Guidelines
+- Use database indexes appropriately
+- Implement caching strategies
+- Optimize database queries
+- Use connection pooling
+- Monitor memory usage
+
+## Testing
+- Write unit tests for services
+- Test API endpoints
+- Validate database operations
+- Test game logic thoroughly
+
+## Deployment
+- Use Docker for containerization
+- Configure environment variables
+- Set up proper logging
+- Monitor application health
+
+## Documentation
+- Keep README files updated
+- Document API endpoints
+- Maintain setup guides
+- Include troubleshooting steps
+
+## Common Patterns
+
+### Database Queries
+```javascript
+// Use parameterized queries
+const result = await pool.query(
+  'SELECT * FROM players WHERE id = $1',
+  [playerId]
+);
+```
+
+### Error Handling
+```javascript
+try {
+  // Database operation
+} catch (error) {
+  console.error('Database error:', error);
+  throw new Error('Failed to perform operation');
+}
+```
+
+### API Responses
+```javascript
+// Success response
+res.json({
+  success: true,
+  data: result,
+  message: 'Operation completed successfully'
+});
+
+// Error response
+res.status(400).json({
+  success: false,
+  error: 'Invalid input',
+  message: 'Please check your data'
+});
+```
+
+## Game-Specific Rules
+- Players have civilizations with unique names
+- Games are turn-based with multiple players
+- Map tiles have terrain and resources
+- Cities can be founded and developed
+- Armies can be created and moved
+- AI generates narrative for game events
+
+## AI Narrative Guidelines
+- Generate contextual stories based on game events
+- Use the civilization theme and historical references
+- Keep narratives engaging but not too long
+- Include player actions and consequences
+- Maintain consistency with game state
+
+## Socket.IO Usage
+- Use rooms for game-specific communication
+- Implement proper event handling
+- Manage player connections/disconnections
+- Broadcast game updates to all players
+
+## Code Quality
+- Use meaningful variable names
+- Write self-documenting code
+- Add comments for complex logic
+- Follow consistent formatting
+- Use ESLint and Prettier
+
+## Git Workflow
+- Use descriptive commit messages
+- Create feature branches for new development
+- Test before merging
+- Keep commits atomic and focused
+
+## Troubleshooting
+- Check database connections first
+- Verify environment variables
+- Monitor application logs
+- Test API endpoints individually
+- Validate game state consistency
+
+## Future Considerations
+- Implement user authentication system
+- Add more game mechanics
+- Enhance AI narrative capabilities
+- Improve performance and scalability
+- Add multiplayer features
+- Implement game persistence 
