@@ -11,6 +11,7 @@ import gameRoutes from './routes/gameRoutes.js';
 import playerRoutes from './routes/playerRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import resourceRoutes from './routes/resourceRoutes.js';
+import cityRoutes from './routes/cityRoutes.js';
 
 // Import socket handlers
 import { handleGameSocket } from './sockets/gameSocket.js';
@@ -64,6 +65,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/resources', resourceRoutes);
+app.use('/api/cities', cityRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
