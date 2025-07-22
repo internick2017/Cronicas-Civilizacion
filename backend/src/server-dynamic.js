@@ -10,6 +10,7 @@ import compression from 'compression';
 import gameRoutes from './routes/gameRoutes.js';
 import playerRoutes from './routes/playerRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import resourceRoutes from './routes/resourceRoutes.js';
 
 // Import socket handlers
 import { handleGameSocket } from './sockets/gameSocket.js';
@@ -62,6 +63,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/players', playerRoutes);
+app.use('/api/resources', resourceRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
