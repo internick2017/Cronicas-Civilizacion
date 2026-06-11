@@ -1,247 +1,266 @@
 <template>
   <div class="story-lobby">
-    <div class="lobby-header">
-      <h1>📚 Crónicas de Civilización</h1>
-      <p class="subtitle">Crea historias épicas colaborativas con tu familia</p>
-    </div>
 
-    <div class="lobby-content">
-      <!-- Create Session Section -->
-      <div class="create-section">
-        <h2>🎭 Crear Nueva Historia</h2>
-        <div class="create-form">
-          <div class="form-group">
-            <label for="sessionTitle">Título de la Historia:</label>
-            <input
-              id="sessionTitle"
-              v-model="newSession.title"
-              type="text"
-              placeholder="Ej: La Búsqueda del Tesoro Perdido"
-              maxlength="100"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label for="sessionDescription">Descripción:</label>
-            <textarea
-              id="sessionDescription"
-              v-model="newSession.description"
-              placeholder="Describe brevemente el tema o ambientación de tu historia..."
-              rows="3"
-              maxlength="300"
-            ></textarea>
-          </div>
-          
-          <div class="form-row">
-            <div class="form-group">
-              <label for="maxPlayers">Máximo de Jugadores:</label>
-              <select id="maxPlayers" v-model="newSession.maxPlayers">
-                <option value="2">2 jugadores</option>
-                <option value="3">3 jugadores</option>
-                <option value="4">4 jugadores</option>
-                <option value="5">5 jugadores</option>
-                <option value="6">6 jugadores</option>
-              </select>
-            </div>
-            
-            <div class="form-group">
-              <label for="genre">Género:</label>
-              <select id="genre" v-model="newSession.genre">
-                <option value="fantasy">Fantasía</option>
-                <option value="historical">Histórico</option>
-                <option value="sci-fi">Ciencia Ficción</option>
-                <option value="mystery">Misterio</option>
-              </select>
-            </div>
-            
-            <div class="form-group">
-              <label for="gameType">Tipo de Juego:</label>
-              <select id="gameType" v-model="newSession.gameType">
-                <option value="character">👤 Personajes (Aventureros, Magos, etc.)</option>
-                <option value="country">🏛️ Países (Reinos, Imperios, etc.)</option>
-                <option value="world">🌍 Mundo (Civilizaciones, Continentes, etc.)</option>
-              </select>
-            </div>
-          </div>
-          
-          <button @click="createSession" :disabled="!canCreateSession || isCreating" class="create-btn">
-            <span v-if="!isCreating">🚀 Crear Historia</span>
-            <span v-else class="loading-text">Creando...</span>
-          </button>
-        </div>
+    <!-- ==================== WAITING ROOM VIEW ==================== -->
+    <div v-if="lobbyView === 'waiting'" class="waiting-room-view">
+      <div class="lobby-header">
+        <h1>📚 Crónicas de Civilización</h1>
+        <p class="subtitle">{{ hostedSession?.title }}</p>
       </div>
 
-      <!-- Join Session Section -->
-      <div class="join-section">
-        <h2>👥 Unirse a una Historia</h2>
-        
-        <!-- Active Sessions -->
-        <div v-if="activeSessions.length > 0" class="sessions-list">
-          <h3>Sesiones Activas</h3>
-          <div class="session-cards">
-            <div v-for="session in activeSessions" :key="session.id" class="session-card">
-              <div class="session-header">
-                <h4>{{ session.title }}</h4>
-                <div class="session-meta">
-                  <span class="player-count">{{ session.playerCount }}/{{ session.maxPlayers }} jugadores</span>
-                  <span class="turn-number">Turno {{ session.turnNumber }}</span>
-                </div>
-              </div>
-              
-              <p class="session-description">{{ session.description }}</p>
-              
-              <div class="session-stats">
-                <div class="stat">
-                  <span class="stat-label">Entradas:</span>
-                  <span class="stat-value">{{ session.storyLength }}</span>
-                </div>
-                <div class="stat">
-                  <span class="stat-label">Creada:</span>
-                  <span class="stat-value">{{ formatDate(session.createdAt) }}</span>
-                </div>
-              </div>
-              
-              <!-- Resume or Join button based on player status -->
-              <button 
-                v-if="isPlayerInSession(session.id)"
-                @click="resumeSession(session.id)" 
-                :disabled="isJoining"
-                class="resume-btn"
-              >
-                🔄 Reanudar
-              </button>
-              <button 
-                v-else
-                @click="joinSession(session.id)" 
-                :disabled="session.playerCount >= session.maxPlayers || isJoining"
-                class="join-btn"
-              >
-                {{ session.playerCount >= session.maxPlayers ? 'Llena' : 'Unirse' }}
-              </button>
+      <div class="waiting-content">
+        <!-- Room Code -->
+        <div class="room-code-panel">
+          <div class="room-code">
+            <p>Comparte este código:</p>
+            <strong class="code">{{ hostedSession?.code }}</strong>
+            <p class="hint">En el celular: http://{{ lanHint }}:5173 → "Unirse" → código</p>
+          </div>
+        </div>
+
+        <!-- Player list -->
+        <div class="waiting-players-panel">
+          <h3>👥 Jugadores ({{ hostedSession?.players?.length || 0 }}/{{ hostedSession?.maxPlayers }})</h3>
+          <div class="waiting-players-list">
+            <div
+              v-for="player in hostedSession?.players"
+              :key="player.id"
+              class="waiting-player-card"
+              :class="{ 'is-host': player.isHost }"
+            >
+              <span class="player-name-item">{{ player.name }}</span>
+              <span v-if="player.isHost" class="host-badge">Anfitrión</span>
+            </div>
+            <!-- Empty slots -->
+            <div
+              v-for="n in waitingEmptySlots"
+              :key="`empty-${n}`"
+              class="waiting-player-card empty-slot"
+            >
+              <span class="player-name-item">Esperando jugador...</span>
             </div>
           </div>
         </div>
-        
-        <!-- No active sessions -->
-        <div v-else class="no-sessions">
-          <div class="no-sessions-icon">📖</div>
-          <h3>No hay historias activas</h3>
-          <p>Crea la primera historia y comienza la aventura</p>
+
+        <!-- Start button -->
+        <div class="waiting-actions">
+          <div v-if="startError" class="start-error">⚠️ {{ startError }}</div>
+          <p v-if="(hostedSession?.players?.length || 0) < 2" class="start-hint">
+            Se necesitan al menos 2 jugadores para comenzar.
+          </p>
+          <button
+            @click="startSession"
+            :disabled="(hostedSession?.players?.length || 0) < 2 || isStarting"
+            class="create-btn"
+          >
+            <span v-if="!isStarting">🚀 Comenzar</span>
+            <span v-else class="loading-text">Iniciando...</span>
+          </button>
+          <button @click="cancelWaiting" class="cancel-btn" style="margin-top: 10px;">
+            ← Volver al lobby
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Join Session Modal -->
-    <div v-if="showJoinModal" class="modal-overlay" @click="showJoinModal = false">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>👤 Unirse a la Historia</h3>
-          <button @click="showJoinModal = false" class="close-btn">✕</button>
+    <!-- ==================== NON-HOST WAITING VIEW ==================== -->
+    <div v-else-if="lobbyView === 'waiting-guest'" class="waiting-room-view">
+      <div class="lobby-header">
+        <h1>📚 Crónicas de Civilización</h1>
+        <p class="subtitle">{{ guestSession?.title }}</p>
+      </div>
+
+      <div class="waiting-content">
+        <div class="room-code-panel">
+          <div class="room-code">
+            <p>Sala unida — código:</p>
+            <strong class="code">{{ guestSession?.code }}</strong>
+            <p class="hint">Esperando que el anfitrión comience la partida...</p>
+          </div>
         </div>
-        
-        <div class="modal-body">
-          <div class="form-group">
-            <label for="playerName">Tu Nombre:</label>
-            <input
-              id="playerName"
-              v-model="joinData.name"
-              type="text"
-              placeholder="Ej: María"
-              maxlength="50"
-            />
-          </div>
-          
-          <!-- Character Type Fields -->
-          <div v-if="selectedSessionGameType === 'character'">
-            <div class="form-group">
-              <label for="characterName">Nombre del Personaje:</label>
-              <input
-                id="characterName"
-                v-model="joinData.characterName"
-                type="text"
-                placeholder="Ej: Aria la Valiente"
-                maxlength="50"
-              />
+
+        <div class="waiting-players-panel">
+          <h3>👥 Jugadores ({{ guestSession?.players?.length || 0 }}/{{ guestSession?.maxPlayers }})</h3>
+          <div class="waiting-players-list">
+            <div
+              v-for="player in guestSession?.players"
+              :key="player.id"
+              class="waiting-player-card"
+              :class="{ 'is-host': player.isHost, 'is-me': player.id === guestPlayer?.id }"
+            >
+              <span class="player-name-item">{{ player.name }}</span>
+              <span v-if="player.isHost" class="host-badge">Anfitrión</span>
+              <span v-if="player.id === guestPlayer?.id" class="you-badge">Tú</span>
             </div>
-            
-            <div class="form-group">
-              <label for="characterClass">Clase del Personaje:</label>
-              <select id="characterClass" v-model="joinData.characterClass">
-                <option value="Aventurero">🗡️ Aventurero</option>
-                <option value="Mago">🔮 Mago</option>
-                <option value="Guerrero">⚔️ Guerrero</option>
-                <option value="Arquero">🏹 Arquero</option>
-                <option value="Hechicero">✨ Hechicero</option>
-                <option value="Caballero">🛡️ Caballero</option>
-                <option value="Mercader">💰 Mercader</option>
-                <option value="Explorador">🗺️ Explorador</option>
-              </select>
-            </div>
-          </div>
-          
-          <!-- Country Type Fields -->
-          <div v-if="selectedSessionGameType === 'country'">
-            <div class="form-group">
-              <label for="countryName">Nombre del País:</label>
-              <input
-                id="countryName"
-                v-model="joinData.countryName"
-                type="text"
-                placeholder="Ej: Reino de Eldoria"
-                maxlength="50"
-              />
-            </div>
-            
-            <div class="form-group">
-              <label for="countryType">Tipo de País:</label>
-              <select id="countryType" v-model="joinData.countryType">
-                <option value="Reino">👑 Reino</option>
-                <option value="Imperio">🏛️ Imperio</option>
-                <option value="República">⚖️ República</option>
-                <option value="Principado">👑 Principado</option>
-                <option value="Confederación">🤝 Confederación</option>
-                <option value="Ciudad-Estado">🏙️ Ciudad-Estado</option>
-                <option value="Tribu">🏹 Tribu</option>
-                <option value="Orden">⚔️ Orden</option>
-              </select>
-            </div>
-          </div>
-          
-          <!-- World Type Fields -->
-          <div v-if="selectedSessionGameType === 'world'">
-            <div class="form-group">
-              <label for="worldRole">Rol en el Mundo:</label>
-              <input
-                id="worldRole"
-                v-model="joinData.worldRole"
-                type="text"
-                placeholder="Ej: Continente de Atheria"
-                maxlength="50"
-              />
-            </div>
-            
-            <div class="form-group">
-              <label for="worldType">Tipo de Entidad:</label>
-              <select id="worldType" v-model="joinData.worldType">
-                <option value="Continente">🗺️ Continente</option>
-                <option value="Civilización">🏛️ Civilización</option>
-                <option value="Reino">👑 Reino</option>
-                <option value="Imperio">🏛️ Imperio</option>
-                <option value="Federación">🤝 Federación</option>
-                <option value="Alianza">⚔️ Alianza</option>
-                <option value="Gremio">💰 Gremio</option>
-                <option value="Orden">⚔️ Orden</option>
-              </select>
+            <div
+              v-for="n in guestEmptySlots"
+              :key="`empty-${n}`"
+              class="waiting-player-card empty-slot"
+            >
+              <span class="player-name-item">Esperando jugador...</span>
             </div>
           </div>
         </div>
-        
-        <div class="modal-footer">
-          <button @click="confirmJoin" :disabled="!canJoin || isJoining" class="confirm-btn">
-            <span v-if="!isJoining">🎯 Unirse</span>
-            <span v-else class="loading-text">Uniéndose...</span>
-          </button>
-          <button @click="showJoinModal = false" class="cancel-btn">❌ Cancelar</button>
+
+        <div class="waiting-actions">
+          <p class="start-hint">El anfitrión iniciará la partida cuando todos estén listos.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MAIN LOBBY VIEW ==================== -->
+    <div v-else>
+      <div class="lobby-header">
+        <h1>📚 Crónicas de Civilización</h1>
+        <p class="subtitle">Crea historias épicas colaborativas con tu familia</p>
+      </div>
+
+      <div class="lobby-content">
+        <!-- Create Session Section -->
+        <div class="create-section">
+          <h2>🎭 Crear Nueva Historia</h2>
+          <div class="create-form">
+            <div class="form-group">
+              <label for="sessionTitle">Título de la Historia:</label>
+              <input
+                id="sessionTitle"
+                v-model="newSession.title"
+                type="text"
+                placeholder="Ej: La Búsqueda del Tesoro Perdido"
+                maxlength="100"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="sessionDescription">Descripción:</label>
+              <textarea
+                id="sessionDescription"
+                v-model="newSession.description"
+                placeholder="Describe brevemente el tema o ambientación de tu historia..."
+                rows="3"
+                maxlength="300"
+              ></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="maxPlayers">Máximo de Jugadores:</label>
+                <select id="maxPlayers" v-model="newSession.maxPlayers">
+                  <option value="2">2 jugadores</option>
+                  <option value="3">3 jugadores</option>
+                  <option value="4">4 jugadores</option>
+                  <option value="5">5 jugadores</option>
+                  <option value="6">6 jugadores</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="genre">Género:</label>
+                <select id="genre" v-model="newSession.settings.genre">
+                  <option value="fantasy">Fantasía</option>
+                  <option value="historical">Histórico</option>
+                  <option value="sci-fi">Ciencia Ficción</option>
+                  <option value="mystery">Misterio</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="language">Idioma de la narración</label>
+                <select id="language" v-model="newSession.settings.language">
+                  <option value="es">Español</option>
+                  <option value="pt">Português</option>
+                </select>
+              </div>
+            </div>
+
+            <button @click="createSession" :disabled="!canCreateSession || isCreating" class="create-btn">
+              <span v-if="!isCreating">🚀 Crear Historia</span>
+              <span v-else class="loading-text">Creando...</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Join Section -->
+        <div class="join-section">
+          <h2>👥 Unirse a una Historia</h2>
+
+          <!-- Join by code -->
+          <div class="join-by-code">
+            <h3>Unirse por código</h3>
+            <div class="form-group">
+              <label for="joinCode">Código de sala (5 letras):</label>
+              <input
+                id="joinCode"
+                v-model="joinCode"
+                type="text"
+                placeholder="ABCDE"
+                maxlength="5"
+                @input="joinCode = joinCode.toUpperCase()"
+                class="code-input"
+              />
+            </div>
+            <div class="form-group">
+              <label for="playerName">Tu nombre:</label>
+              <input
+                id="playerName"
+                v-model="joinName"
+                type="text"
+                placeholder="Ej: María"
+                maxlength="50"
+              />
+            </div>
+            <div v-if="joinError" class="join-error">⚠️ {{ joinError }}</div>
+            <button
+              @click="joinByCode"
+              :disabled="!canJoinByCode || isJoining"
+              class="create-btn"
+            >
+              <span v-if="!isJoining">🎯 Unirse</span>
+              <span v-else class="loading-text">Uniéndose...</span>
+            </button>
+          </div>
+
+          <!-- Active Sessions (secondary display) -->
+          <div v-if="activeSessions.length > 0" class="sessions-list">
+            <h3>Historias activas</h3>
+            <div class="session-cards">
+              <div v-for="session in activeSessions" :key="session.id" class="session-card">
+                <div class="session-header">
+                  <h4>{{ session.title }}</h4>
+                  <div class="session-meta">
+                    <span class="player-count">{{ session.playerCount }}/{{ session.maxPlayers }} jugadores</span>
+                    <span class="turn-number">Turno {{ session.turnNumber }}</span>
+                  </div>
+                </div>
+                <p class="session-description">{{ session.description }}</p>
+                <div class="session-stats">
+                  <div class="stat">
+                    <span class="stat-label">Entradas:</span>
+                    <span class="stat-value">{{ session.storyLength }}</span>
+                  </div>
+                  <div class="stat">
+                    <span class="stat-label">Creada:</span>
+                    <span class="stat-value">{{ formatDate(session.createdAt) }}</span>
+                  </div>
+                </div>
+                <button
+                  v-if="isPlayerInSession(session.id)"
+                  @click="resumeSession(session.id)"
+                  :disabled="isJoining"
+                  class="resume-btn"
+                >
+                  🔄 Reanudar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- No active sessions -->
+          <div v-else class="no-sessions">
+            <div class="no-sessions-icon">📖</div>
+            <h3>No hay historias activas</h3>
+            <p>Crea la primera historia o únete con un código</p>
+          </div>
         </div>
       </div>
     </div>
@@ -260,266 +279,84 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 const emit = defineEmits(['session-created', 'session-joined', 'error'])
 
-// Refs
+// ── view state ──────────────────────────────────────────────────────────────
+// 'lobby' | 'waiting' (host) | 'waiting-guest' (non-host)
+const lobbyView = ref('lobby')
+
+// ── shared refs ──────────────────────────────────────────────────────────────
 const activeSessions = ref([])
 const isCreating = ref(false)
 const isJoining = ref(false)
-const showJoinModal = ref(false)
+const isStarting = ref(false)
 const errorMessage = ref('')
-const selectedSessionId = ref('')
 
+// ── create form ──────────────────────────────────────────────────────────────
 const newSession = ref({
   title: '',
   description: '',
   maxPlayers: 4,
-  genre: 'fantasy',
-  gameType: 'character'
-})
-
-const joinData = ref({
-  name: '',
-  characterName: '',
-  characterClass: 'Aventurero',
-  countryName: '',
-  countryType: 'Reino',
-  worldRole: '',
-  worldType: 'Continente'
-})
-
-const selectedSessionGameType = ref('character')
-
-// Computed
-const canCreateSession = computed(() => {
-  return newSession.value.title.trim().length > 0 &&
-         newSession.value.description.trim().length > 0
-})
-
-const canJoin = computed(() => {
-  const hasName = joinData.value.name.trim().length > 0
-  
-  if (selectedSessionGameType.value === 'character') {
-    return hasName && joinData.value.characterName.trim().length > 0
-  } else if (selectedSessionGameType.value === 'country') {
-    return hasName && joinData.value.countryName.trim().length > 0
-  } else if (selectedSessionGameType.value === 'world') {
-    return hasName && joinData.value.worldRole.trim().length > 0
+  settings: {
+    genre: 'fantasy',
+    language: 'es'
   }
-  
-  return hasName
 })
 
-// Methods
+// ── host waiting room ─────────────────────────────────────────────────────────
+const hostedSession = ref(null)   // session object returned by POST /sessions
+const hostedPlayer = ref(null)    // host player (from join after create)
+const startError = ref('')
+
+// ── guest waiting room ────────────────────────────────────────────────────────
+const guestSession = ref(null)
+const guestPlayer = ref(null)
+
+// ── join by code ──────────────────────────────────────────────────────────────
+const joinCode = ref('')
+const joinName = ref('')
+const joinError = ref('')
+
+// ── LAN hint ─────────────────────────────────────────────────────────────────
+const lanHint = window.location.hostname
+
+// ── polling ───────────────────────────────────────────────────────────────────
+let pollInterval = null
+let waitingPollInterval = null
+
+// ── computed ─────────────────────────────────────────────────────────────────
+const canCreateSession = computed(() =>
+  newSession.value.title.trim().length > 0 &&
+  newSession.value.description.trim().length > 0
+)
+
+const canJoinByCode = computed(() =>
+  joinCode.value.trim().length === 5 && joinName.value.trim().length > 0
+)
+
+const waitingEmptySlots = computed(() => {
+  const current = hostedSession.value?.players?.length || 0
+  const max = hostedSession.value?.maxPlayers || 4
+  return Math.max(0, max - current)
+})
+
+const guestEmptySlots = computed(() => {
+  const current = guestSession.value?.players?.length || 0
+  const max = guestSession.value?.maxPlayers || 4
+  return Math.max(0, max - current)
+})
+
+// ── helpers ───────────────────────────────────────────────────────────────────
 const isPlayerInSession = (sessionId) => {
   try {
     const savedPlayer = localStorage.getItem('cronicas-player')
     const savedSession = localStorage.getItem('cronicas-session')
-    
     if (!savedPlayer || !savedSession) return false
-    
     const player = JSON.parse(savedPlayer)
     const session = JSON.parse(savedSession)
-    
-    // Check if the saved session matches this specific session ID and has valid player data
     return session.id === sessionId && player.id && player.name
-  } catch (error) {
-    console.warn('Error checking player in session:', error)
-    // Clear invalid localStorage data
+  } catch {
     localStorage.removeItem('cronicas-player')
     localStorage.removeItem('cronicas-session')
     return false
-  }
-}
-
-const resumeSession = async (sessionId) => {
-  try {
-    isJoining.value = true
-    errorMessage.value = ''
-    
-    const savedPlayer = localStorage.getItem('cronicas-player')
-    const savedSession = localStorage.getItem('cronicas-session')
-    
-    if (!savedPlayer || !savedSession) {
-      throw new Error('No se encontraron datos de sesión guardados')
-    }
-    
-    const player = JSON.parse(savedPlayer)
-    const session = JSON.parse(savedSession)
-    
-    if (session.id !== sessionId) {
-      throw new Error('La sesión guardada no coincide')
-    }
-    
-    // Verify the session still exists and player is still in it
-    const response = await fetch(`/api/narrative/sessions/${sessionId}`)
-    const result = await response.json()
-    
-    if (!result.success) {
-      throw new Error(result.message || 'Sesión no encontrada')
-    }
-    
-    // Check if player is still in the session
-    const playerInSession = result.data.players && result.data.players.some(p => p.id === player.id)
-    
-    if (!playerInSession) {
-      // Clear invalid saved data
-      localStorage.removeItem('cronicas-player')
-      localStorage.removeItem('cronicas-session')
-      throw new Error('Ya no eres parte de esta sesión')
-    }
-    
-    // Emit event to resume the session
-    emit('session-joined', {
-      session: result.data,
-      player: player
-    })
-    
-  } catch (error) {
-    console.error('Error resuming session:', error)
-    errorMessage.value = error.message || 'Error al reanudar la sesión'
-    emit('error', error.message)
-  } finally {
-    isJoining.value = false
-  }
-}
-
-const createSession = async () => {
-  if (!canCreateSession.value) return
-  
-  try {
-    isCreating.value = true
-    errorMessage.value = ''
-    
-    const response = await fetch('/api/narrative/sessions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        title: newSession.value.title.trim(),
-        description: newSession.value.description.trim(),
-        maxPlayers: parseInt(newSession.value.maxPlayers),
-        settings: {
-          genre: newSession.value.genre,
-          gameType: newSession.value.gameType
-        }
-      })
-    })
-
-    const result = await response.json()
-    
-    if (!result.success) {
-      throw new Error(result.message || 'Error al crear la sesión')
-    }
-
-    // Reset form
-    newSession.value = {
-      title: '',
-      description: '',
-      maxPlayers: 4,
-      genre: 'fantasy',
-      gameType: 'character'
-    }
-    
-    // Reload sessions
-    await loadActiveSessions()
-    
-    // Emit event
-    emit('session-created', result.data)
-    
-  } catch (error) {
-    console.error('Error creating session:', error)
-    errorMessage.value = error.message || 'Error al crear la sesión'
-    emit('error', error.message)
-  } finally {
-    isCreating.value = false
-  }
-}
-
-const joinSession = (sessionId) => {
-  selectedSessionId.value = sessionId
-  showJoinModal.value = true
-  
-  // Find the session to get its game type
-  const session = activeSessions.value.find(s => s.id === sessionId)
-  selectedSessionGameType.value = session?.settings?.gameType || 'character'
-  
-  // Reset join data
-  joinData.value = {
-    name: '',
-    characterName: '',
-    characterClass: 'Aventurero',
-    countryName: '',
-    countryType: 'Reino',
-    worldRole: '',
-    worldType: 'Continente'
-  }
-}
-
-const confirmJoin = async () => {
-  if (!canJoin.value) return
-  
-  try {
-    isJoining.value = true
-    errorMessage.value = ''
-    
-    const response = await fetch(`/api/narrative/sessions/${selectedSessionId.value}/join`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: joinData.value.name.trim(),
-        characterName: joinData.value.characterName.trim(),
-        characterClass: joinData.value.characterClass,
-        countryName: joinData.value.countryName.trim(),
-        countryType: joinData.value.countryType,
-        worldRole: joinData.value.worldRole.trim(),
-        worldType: joinData.value.worldType
-      })
-    })
-
-    const result = await response.json()
-    
-    if (!result.success) {
-      throw new Error(result.message || 'Error al unirse a la sesión')
-    }
-
-    showJoinModal.value = false
-    
-    // Emit event with session and player data
-    emit('session-joined', {
-      session: result.data.session,
-      player: result.data.player
-    })
-    
-  } catch (error) {
-    console.error('Error joining session:', error)
-    errorMessage.value = error.message || 'Error al unirse a la sesión'
-    emit('error', error.message)
-  } finally {
-    isJoining.value = false
-  }
-}
-
-const loadActiveSessions = async () => {
-  try {
-    const response = await fetch('/api/narrative/sessions')
-    
-    if (response.status === 429) {
-      console.warn('Rate limit exceeded, slowing down polling')
-      return
-    }
-    
-    const result = await response.json()
-    
-    if (result.success) {
-      activeSessions.value = result.data
-    } else {
-      throw new Error(result.message)
-    }
-  } catch (error) {
-    console.error('Error loading sessions:', error)
-    errorMessage.value = 'Error al cargar las sesiones'
   }
 }
 
@@ -533,27 +370,278 @@ const formatDate = (dateString) => {
   })
 }
 
-const clearError = () => {
-  errorMessage.value = ''
+const clearError = () => { errorMessage.value = '' }
+
+// ── poll helpers ──────────────────────────────────────────────────────────────
+const stopWaitingPoll = () => {
+  if (waitingPollInterval) {
+    clearInterval(waitingPollInterval)
+    waitingPollInterval = null
+  }
 }
 
-// Load sessions on mount
-let pollInterval = null
+// ── create session ────────────────────────────────────────────────────────────
+const createSession = async () => {
+  if (!canCreateSession.value) return
 
+  try {
+    isCreating.value = true
+    errorMessage.value = ''
+
+    const response = await fetch('/api/narrative/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: newSession.value.title.trim(),
+        description: newSession.value.description.trim(),
+        maxPlayers: parseInt(newSession.value.maxPlayers),
+        settings: {
+          genre: newSession.value.settings.genre,
+          language: newSession.value.settings.language
+        }
+      })
+    })
+
+    const result = await response.json()
+    if (!result.success) throw new Error(result.message || 'Error al crear la sesión')
+
+    const createdSession = result.data
+
+    // Auto-join the creator as host
+    const joinResponse = await fetch(`/api/narrative/sessions/${createdSession.id}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newSession.value.title.trim().split(' ')[0] || 'Anfitrión' })
+    })
+    const joinResult = await joinResponse.json()
+
+    // Whether join succeeded or not, proceed to waiting room with session data
+    // Refresh session to get updated players list
+    const refreshed = await fetchSession(createdSession.id)
+    hostedSession.value = refreshed || createdSession
+
+    if (joinResult.success) {
+      hostedPlayer.value = joinResult.data.player
+      // Save to localStorage
+      localStorage.setItem('cronicas-session', JSON.stringify(hostedSession.value))
+      localStorage.setItem('cronicas-player', JSON.stringify(hostedPlayer.value))
+    }
+
+    // Reset form
+    newSession.value = {
+      title: '',
+      description: '',
+      maxPlayers: 4,
+      settings: { genre: 'fantasy', language: 'es' }
+    }
+
+    lobbyView.value = 'waiting'
+    startWaitingPoll('host')
+    emit('session-created', createdSession)
+
+  } catch (error) {
+    console.error('Error creating session:', error)
+    errorMessage.value = error.message || 'Error al crear la sesión'
+    emit('error', error.message)
+  } finally {
+    isCreating.value = false
+  }
+}
+
+// ── fetch single session ──────────────────────────────────────────────────────
+const fetchSession = async (sessionId) => {
+  try {
+    const response = await fetch(`/api/narrative/sessions/${sessionId}`)
+    const result = await response.json()
+    return result.success ? result.data : null
+  } catch {
+    return null
+  }
+}
+
+// ── poll waiting room ─────────────────────────────────────────────────────────
+const startWaitingPoll = (role) => {
+  stopWaitingPoll()
+  waitingPollInterval = setInterval(async () => {
+    if (role === 'host' && hostedSession.value) {
+      const updated = await fetchSession(hostedSession.value.id)
+      if (updated) hostedSession.value = updated
+    } else if (role === 'guest' && guestSession.value) {
+      const updated = await fetchSession(guestSession.value.id)
+      if (updated) {
+        guestSession.value = updated
+        // Auto-navigate when host starts the session
+        if (updated.isActive) {
+          stopWaitingPoll()
+          localStorage.setItem('cronicas-session', JSON.stringify(updated))
+          emit('session-joined', { session: updated, player: guestPlayer.value })
+        }
+      }
+    }
+  }, 3000)
+}
+
+// ── start session (host) ──────────────────────────────────────────────────────
+const startSession = async () => {
+  if ((hostedSession.value?.players?.length || 0) < 2) return
+
+  try {
+    isStarting.value = true
+    startError.value = ''
+
+    const response = await fetch(`/api/narrative/sessions/${hostedSession.value.id}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    const result = await response.json()
+
+    if (!result.success) {
+      startError.value = result.message || 'No se pudo iniciar la sesión'
+      return
+    }
+
+    stopWaitingPoll()
+    const updated = result.data || hostedSession.value
+    localStorage.setItem('cronicas-session', JSON.stringify(updated))
+    emit('session-joined', { session: updated, player: hostedPlayer.value })
+
+  } catch (error) {
+    console.error('Error starting session:', error)
+    startError.value = error.message || 'Error al iniciar la sesión'
+  } finally {
+    isStarting.value = false
+  }
+}
+
+// ── cancel waiting (go back to lobby) ─────────────────────────────────────────
+const cancelWaiting = () => {
+  stopWaitingPoll()
+  hostedSession.value = null
+  hostedPlayer.value = null
+  startError.value = ''
+  lobbyView.value = 'lobby'
+}
+
+// ── join by code ──────────────────────────────────────────────────────────────
+const joinByCode = async () => {
+  if (!canJoinByCode.value) return
+
+  try {
+    isJoining.value = true
+    joinError.value = ''
+
+    // Step 1: look up session by code
+    const lookupResponse = await fetch(`/api/narrative/sessions/code/${joinCode.value.trim()}`)
+    if (lookupResponse.status === 404) {
+      joinError.value = 'Sala no encontrada'
+      return
+    }
+    const lookupResult = await lookupResponse.json()
+    if (!lookupResult.success) {
+      joinError.value = lookupResult.message || 'Sala no encontrada'
+      return
+    }
+    const foundSession = lookupResult.data
+
+    // Step 2: join
+    const joinResponse = await fetch(`/api/narrative/sessions/${foundSession.id}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: joinName.value.trim() })
+    })
+    const joinResult = await joinResponse.json()
+
+    if (!joinResult.success) {
+      joinError.value = joinResult.message || 'Error al unirse'
+      return
+    }
+
+    const player = joinResult.data.player
+    const session = joinResult.data.session || foundSession
+
+    // Step 3: persist to localStorage
+    localStorage.setItem('cronicas-session', JSON.stringify(session))
+    localStorage.setItem('cronicas-player', JSON.stringify(player))
+
+    // Step 4: go to guest waiting room (poll until isActive)
+    guestSession.value = session
+    guestPlayer.value = player
+    joinCode.value = ''
+    joinName.value = ''
+
+    if (session.isActive) {
+      // Session already active — go straight to story
+      emit('session-joined', { session, player })
+    } else {
+      lobbyView.value = 'waiting-guest'
+      startWaitingPoll('guest')
+    }
+
+  } catch (error) {
+    console.error('Error joining by code:', error)
+    joinError.value = error.message || 'Error al unirse'
+  } finally {
+    isJoining.value = false
+  }
+}
+
+// ── resume existing session ───────────────────────────────────────────────────
+const resumeSession = async (sessionId) => {
+  try {
+    isJoining.value = true
+    errorMessage.value = ''
+
+    const savedPlayer = localStorage.getItem('cronicas-player')
+    const savedSession = localStorage.getItem('cronicas-session')
+    if (!savedPlayer || !savedSession) throw new Error('No se encontraron datos de sesión guardados')
+
+    const player = JSON.parse(savedPlayer)
+    const session = JSON.parse(savedSession)
+    if (session.id !== sessionId) throw new Error('La sesión guardada no coincide')
+
+    const response = await fetch(`/api/narrative/sessions/${sessionId}`)
+    const result = await response.json()
+    if (!result.success) throw new Error(result.message || 'Sesión no encontrada')
+
+    const playerInSession = result.data.players?.some(p => p.id === player.id)
+    if (!playerInSession) {
+      localStorage.removeItem('cronicas-player')
+      localStorage.removeItem('cronicas-session')
+      throw new Error('Ya no eres parte de esta sesión')
+    }
+
+    emit('session-joined', { session: result.data, player })
+
+  } catch (error) {
+    console.error('Error resuming session:', error)
+    errorMessage.value = error.message || 'Error al reanudar la sesión'
+    emit('error', error.message)
+  } finally {
+    isJoining.value = false
+  }
+}
+
+// ── load active sessions (lobby list) ────────────────────────────────────────
+const loadActiveSessions = async () => {
+  try {
+    const response = await fetch('/api/narrative/sessions')
+    if (response.status === 429) return
+    const result = await response.json()
+    if (result.success) activeSessions.value = result.data
+  } catch (error) {
+    console.error('Error loading sessions:', error)
+  }
+}
+
+// ── lifecycle ─────────────────────────────────────────────────────────────────
 onMounted(async () => {
   await loadActiveSessions()
-  
-  // Set up polling for new sessions
-  pollInterval = setInterval(async () => {
-    await loadActiveSessions()
-  }, 30000) // Poll every 30 seconds
+  pollInterval = setInterval(loadActiveSessions, 30000)
 })
 
-// Clean up interval on unmount
 onUnmounted(() => {
-  if (pollInterval) {
-    clearInterval(pollInterval)
-  }
+  if (pollInterval) clearInterval(pollInterval)
+  stopWaitingPoll()
 })
 </script>
 
@@ -565,6 +653,7 @@ onUnmounted(() => {
   padding: 20px;
 }
 
+/* ── header ───────────────────────────────────────────────────── */
 .lobby-header {
   text-align: center;
   margin-bottom: 40px;
@@ -588,6 +677,7 @@ onUnmounted(() => {
   font-style: italic;
 }
 
+/* ── lobby layout ─────────────────────────────────────────────── */
 .lobby-content {
   max-width: 1200px;
   margin: 0 auto;
@@ -613,6 +703,7 @@ onUnmounted(() => {
   padding-bottom: 15px;
 }
 
+/* ── form elements ────────────────────────────────────────────── */
 .form-group {
   margin-bottom: 20px;
 }
@@ -636,6 +727,7 @@ onUnmounted(() => {
   color: white;
   font-size: 1em;
   transition: all 0.3s ease;
+  box-sizing: border-box;
 }
 
 .form-group input:focus,
@@ -660,10 +752,20 @@ onUnmounted(() => {
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 20px;
 }
 
+/* code input bigger */
+.code-input {
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  font-size: 1.4em !important;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* ── buttons ──────────────────────────────────────────────────── */
 .create-btn {
   width: 100%;
   padding: 15px;
@@ -690,6 +792,23 @@ onUnmounted(() => {
   transform: none;
 }
 
+.cancel-btn {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #bdc3c7;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
 .loading-text {
   display: flex;
   align-items: center;
@@ -712,6 +831,33 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 
+/* ── join section ─────────────────────────────────────────────── */
+.join-by-code {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 25px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.join-by-code h3 {
+  margin: 0 0 18px 0;
+  color: #ecf0f1;
+  font-size: 1.1em;
+}
+
+.join-error,
+.start-error {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  font-size: 0.95em;
+}
+
+/* ── sessions list ────────────────────────────────────────────── */
 .sessions-list h3 {
   margin: 0 0 20px 0;
   color: #ecf0f1;
@@ -788,40 +934,8 @@ onUnmounted(() => {
   gap: 2px;
 }
 
-.stat-label {
-  font-size: 0.8em;
-  color: #7f8c8d;
-}
-
-.stat-value {
-  font-size: 0.9em;
-  color: #ecf0f1;
-  font-weight: bold;
-}
-
-.join-btn {
-  width: 100%;
-  padding: 10px;
-  background: linear-gradient(45deg, #3498db, #2980b9);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.join-btn:hover:not(:disabled) {
-  background: linear-gradient(45deg, #2980b9, #3498db);
-  transform: translateY(-1px);
-}
-
-.join-btn:disabled {
-  background: rgba(231, 76, 60, 0.3);
-  color: #e74c3c;
-  cursor: not-allowed;
-  transform: none;
-}
+.stat-label { font-size: 0.8em; color: #7f8c8d; }
+.stat-value { font-size: 0.9em; color: #ecf0f1; font-weight: bold; }
 
 .resume-btn {
   width: 100%;
@@ -853,126 +967,143 @@ onUnmounted(() => {
   color: #bdc3c7;
 }
 
-.no-sessions-icon {
-  font-size: 3em;
-  margin-bottom: 20px;
+.no-sessions-icon { font-size: 3em; margin-bottom: 20px; }
+.no-sessions h3 { margin: 0 0 10px 0; color: #ecf0f1; }
+.no-sessions p { margin: 0; font-style: italic; }
+
+/* ── waiting room ─────────────────────────────────────────────── */
+.waiting-room-view {
+  min-height: 100vh;
 }
 
-.no-sessions h3 {
-  margin: 0 0 10px 0;
-  color: #ecf0f1;
+.waiting-content {
+  max-width: 700px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
 }
 
-.no-sessions p {
-  margin: 0;
+.room-code-panel,
+.waiting-players-panel {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.room-code {
+  text-align: center;
+}
+
+.room-code p {
+  margin: 0 0 12px 0;
+  color: #bdc3c7;
+  font-size: 1em;
+}
+
+.room-code .code {
+  display: block;
+  font-size: 3.5em;
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  color: #F5DEB3;
+  text-shadow: 0 0 30px rgba(245, 222, 179, 0.4);
+  margin: 10px 0;
+}
+
+.room-code .hint {
+  margin: 14px 0 0 0;
+  color: #7f8c8d;
+  font-size: 0.85em;
   font-style: italic;
 }
 
-/* Modal styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+.waiting-players-panel h3 {
+  margin: 0 0 20px 0;
+  color: #ecf0f1;
+  font-size: 1.2em;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 12px;
 }
 
-.modal-content {
-  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+.waiting-players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.waiting-player-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  border-left: 3px solid #3498db;
+}
+
+.waiting-player-card.is-host {
+  border-left-color: #f39c12;
+}
+
+.waiting-player-card.is-me {
+  border-left-color: #2ecc71;
+}
+
+.waiting-player-card.empty-slot {
+  opacity: 0.4;
+  border-style: dashed;
+  border-left-color: rgba(255, 255, 255, 0.2);
+}
+
+.player-name-item {
+  flex: 1;
+  color: #ecf0f1;
+  font-size: 1em;
+}
+
+.waiting-player-card.empty-slot .player-name-item {
+  font-style: italic;
+  color: #7f8c8d;
+}
+
+.host-badge {
+  background: rgba(243, 156, 18, 0.2);
+  color: #f39c12;
+  border: 1px solid rgba(243, 156, 18, 0.4);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.you-badge {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.4);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.waiting-actions {
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   padding: 25px;
-  max-width: 500px;
-  width: 90%;
-  color: white;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.modal-header h3 {
-  margin: 0;
-  color: #ecf0f1;
-}
-
-.close-btn {
-  background: none;
-  border: none;
+.start-hint {
   color: #bdc3c7;
-  font-size: 1.5em;
-  cursor: pointer;
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.3s ease;
+  font-size: 0.9em;
+  font-style: italic;
+  margin-bottom: 12px;
+  text-align: center;
 }
 
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-.modal-footer {
-  display: flex;
-  gap: 15px;
-  justify-content: flex-end;
-  margin-top: 25px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.confirm-btn,
-.cancel-btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: all 0.3s ease;
-}
-
-.confirm-btn {
-  background: linear-gradient(45deg, #27ae60, #2ecc71);
-  color: white;
-}
-
-.confirm-btn:hover:not(:disabled) {
-  background: linear-gradient(45deg, #2ecc71, #27ae60);
-  transform: translateY(-1px);
-}
-
-.confirm-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.cancel-btn {
-  background: rgba(231, 76, 60, 0.2);
-  color: #e74c3c;
-  border: 1px solid rgba(231, 76, 60, 0.3);
-}
-
-.cancel-btn:hover {
-  background: rgba(231, 76, 60, 0.3);
-  border-color: rgba(231, 76, 60, 0.5);
-}
-
-/* Error toast */
+/* ── error toast ──────────────────────────────────────────────── */
 .error-toast {
   position: fixed;
   top: 20px;
@@ -989,14 +1120,8 @@ onUnmounted(() => {
 }
 
 @keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
 }
 
 .close-error {
@@ -1013,34 +1138,26 @@ onUnmounted(() => {
   justify-content: center;
 }
 
+/* ── responsive ───────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .lobby-content {
     grid-template-columns: 1fr;
     gap: 20px;
   }
-  
+
   .form-row {
     grid-template-columns: 1fr;
   }
-  
+
   .session-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
   }
-  
-  .session-meta {
-    align-items: flex-start;
-  }
-  
-  .session-stats {
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .modal-content {
-    width: 95%;
-    margin: 20px;
-  }
+
+  .session-meta { align-items: flex-start; }
+  .session-stats { flex-direction: column; gap: 10px; }
+
+  .room-code .code { font-size: 2.5em; }
 }
-</style> 
+</style>
