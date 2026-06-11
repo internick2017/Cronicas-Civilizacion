@@ -43,7 +43,9 @@ Campos nuevos en `settings`: `mode` ('narrador-activo' | 'colaborativo', default
 `maxRounds` (number | null, null = Libre). Campo nuevo de sesión: `summary` (string,
 persistido en story_sessions — columna nueva con migración idempotente como se hizo con `code`).
 `toJSON()` expone `summary`, `mode` y `maxRounds` (vía settings) y un derivado
-`roundsRemaining` (null si Libre).
+`roundsRemaining = maxRounds - turnNumber + 1` (null si Libre): es la cantidad de rondas que
+faltan por JUGARSE contando la actual (ej.: maxRounds=8, turnNumber=7 → quedan 2 → la IA ya
+recibe la instrucción de cerrar arcos; al cerrarse la ronda 8 se dispara el epílogo).
 
 ### 2. Prompts por modo (narrativePrompts.js)
 
