@@ -122,6 +122,23 @@ export class StorySession {
   }
 
   /**
+   * Returns true when the round is stuck: all players have acted (currentPlayerIndex === 0)
+   * but no ai_narrative was generated AFTER the last player_action of this turn.
+   * Uses index comparison so an opening narrative (added before any actions) doesn't
+   * falsely satisfy the "already narrated" check.
+   */
+  isRoundPending() {
+    if (!this.isActive || this.currentPlayerIndex !== 0) return false;
+    const lastActionIdx = this.storyHistory.reduce((maxIdx, e, i) =>
+      (e.type === 'player_action' && e.turnNumber === this.turnNumber) ? i : maxIdx, -1);
+    if (lastActionIdx === -1) return false; // no actions this turn yet
+    const hasNarrativeAfterActions = this.storyHistory.slice(lastActionIdx + 1).some(
+      e => e.type === 'ai_narrative' && e.turnNumber === this.turnNumber
+    );
+    return !hasNarrativeAfterActions;
+  }
+
+  /**
    * Get current player
    */
   getCurrentPlayer() {
@@ -197,7 +214,8 @@ export class StorySession {
       players: this.players,
       storyHistory: this.storyHistory,
       worldContext: this.worldContext,
-      settings: this.settings
+      settings: this.settings,
+      roundPending: this.isRoundPending()
     };
   }
 
