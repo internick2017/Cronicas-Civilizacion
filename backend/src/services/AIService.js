@@ -1,5 +1,6 @@
 import { GeminiClient } from './GeminiClient.js';
 import config from '../config/index.js';
+import { getNarratorSystemPrompt } from './narrativePrompts.js';
 
 export class AIService {
   constructor() {
@@ -40,6 +41,29 @@ export class AIService {
       console.log('🤖 Falling back to generic narrative');
       return this.getFallbackNarrative(actionData);
     }
+  }
+
+  /**
+   * Generate story narrative for the narrative/collaborative mode.
+   * Uses language- and genre-aware system prompts.
+   * @param {string} prompt - The assembled story prompt
+   * @param {Object} [options]
+   * @param {string} [options.language='es'] - 'es' | 'pt'
+   * @param {string} [options.genre='fantasy']
+   * @returns {Promise<string>} Generated narrative text
+   */
+  async generateStoryNarrative(prompt, { language = 'es', genre = 'fantasy' } = {}) {
+    if (!this.gemini.isConfigured()) {
+      return null; // caller must handle fallback
+    }
+
+    const systemPrompt = getNarratorSystemPrompt(language, genre);
+
+    return await this.gemini.generate(prompt, {
+      systemPrompt,
+      temperature: 0.8,
+      maxOutputTokens: 500,
+    });
   }
 
   /**
