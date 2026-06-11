@@ -154,7 +154,7 @@
           :current-player="currentPlayer"
           :is-my-turn="isMyTurn"
           :is-submitting="isGenerating"
-          :next-player-name="nextPlayerName"
+          :next-player-name="currentActorName"
           :session-id="sessionId"
           :game-type="session?.settings?.gameType || 'character'"
           @submit-action="handleSubmitAction"
@@ -288,15 +288,15 @@ const isMyTurn = computed(() => {
   return currentPlayerIndex === playerIndex
 })
 
-const nextPlayerName = computed(() => {
+const currentActorName = computed(() => {
   if (!session.value || !Array.isArray(session.value.players) || session.value.players.length === 0) return ''
-  const nextIndex = (session.value.currentPlayerIndex + 1) % session.value.players.length
-  const nextPlayer = session.value.players[nextIndex]
-  if (!nextPlayer) return 'Siguiente jugador'
+  const actorIndex = session.value.currentPlayerIndex % session.value.players.length
+  const actorPlayer = session.value.players[actorIndex]
+  if (!actorPlayer) return 'Jugador actual'
   const gameType = session.value.settings?.gameType || 'character'
-  if (gameType === 'country') return nextPlayer.countryName || nextPlayer.name || 'Siguiente jugador'
-  if (gameType === 'world') return nextPlayer.worldRole || nextPlayer.name || 'Siguiente jugador'
-  return nextPlayer.characterName || nextPlayer.name || 'Siguiente jugador'
+  if (gameType === 'country') return actorPlayer.countryName || actorPlayer.name || 'Jugador actual'
+  if (gameType === 'world') return actorPlayer.worldRole || actorPlayer.name || 'Jugador actual'
+  return actorPlayer.characterName || actorPlayer.name || 'Jugador actual'
 })
 
 // Host = players[0]

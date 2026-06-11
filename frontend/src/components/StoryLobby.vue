@@ -548,7 +548,7 @@ const startSession = async () => {
     }
 
     stopWaitingPoll()
-    const updated = result.data || hostedSession.value
+    const updated = result.data?.session || hostedSession.value
     localStorage.setItem('cronicas-session', JSON.stringify(updated))
     emit('session-joined', { session: updated, player: hostedPlayer.value })
 
