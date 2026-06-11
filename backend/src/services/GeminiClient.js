@@ -35,7 +35,11 @@ export class GeminiClient {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (!res.ok) { lastError = new Error(`Gemini HTTP ${res.status}`); continue; }
+        if (!res.ok) {
+          lastError = new Error(`Gemini HTTP ${res.status}`);
+          if ([400, 401, 403, 404].includes(res.status)) break; // no-retryable
+          continue;
+        }
         const data = await res.json();
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!text) { lastError = new Error('Gemini: respuesta vacía'); continue; }

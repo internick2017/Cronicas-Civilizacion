@@ -29,6 +29,13 @@ describe('GeminiClient', () => {
     expect(fetch).toHaveBeenCalledTimes(3); // 1 intento + 2 reintentos
   });
 
+  it('no reintenta ante errores no recuperables (403)', async () => {
+    fetch.mockResolvedValue({ ok: false, status: 403, json: async () => ({}) });
+    const client = new GeminiClient({ apiKey: 'k', retryDelayMs: 1 });
+    await expect(client.generate('x')).rejects.toThrow(/Gemini HTTP 403/);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('isConfigured refleja la presencia de la API key', () => {
     expect(new GeminiClient({ apiKey: '' }).isConfigured()).toBe(false);
     expect(new GeminiClient({ apiKey: 'k' }).isConfigured()).toBe(true);
