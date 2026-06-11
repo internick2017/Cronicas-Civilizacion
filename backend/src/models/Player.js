@@ -1,12 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
 
 export class Player {
-  constructor({ name, civilizationName, avatar = null, socketId = null }) {
-    this.id = uuidv4();
+  constructor({ id, name, civilizationName, avatar = null, socketId = null, role = 'player' }) {
+    this.id = id || uuidv4();
     this.name = name;
     this.civilizationName = civilizationName;
     this.avatar = avatar;
     this.socketId = socketId;
+    this.role = role; // 'player', 'admin', 'moderator'
     this.resources = {
       food: 0,
       gold: 0,

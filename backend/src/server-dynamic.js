@@ -13,12 +13,18 @@ import authRoutes from './routes/authRoutes.js';
 import resourceRoutes from './routes/resourceRoutes.js';
 import cityRoutes from './routes/cityRoutes.js';
 import militaryRoutes from './routes/militaryRoutes.js';
+import narrativeRoutes from './routes/narrativeRoutes.js';
 
 // Import socket handlers
 import { handleGameSocket } from './sockets/gameSocket.js';
 
 // Import dynamic configuration
 import config, { getDatabaseConnection, getCacheConnection } from './config/index.js';
+import logger from './utils/logger.js';
+import { errorHandler, AppError } from './utils/errors.js';
+import { generalLimiter, apiLimiter, narrativeLimiter } from './middleware/rateLimiter.js';
+import aiService from './services/AIService.js';
+import { GameService } from './services/GameService.js';
 
 const app = express();
 const server = createServer(app);
@@ -36,19 +42,23 @@ async function initializeConnections() {
   try {
     // Initialize database
     pool = await getDatabaseConnection();
-    console.log(`✅ Database initialized: ${config.database.type.toUpperCase()}`);
+    logger.info(`✅ Database initialized: ${config.database.type.toUpperCase()}`);
     
     // Initialize cache
     redisClient = await getCacheConnection();
-    console.log(`✅ Cache initialized: ${config.database.type === 'sqlite' ? 'MEMORY' : 'REDIS'}`);
+    logger.info(`✅ Cache initialized: ${config.database.type === 'sqlite' ? 'MEMORY' : 'REDIS'}`);
     
     // Make connections available globally
     app.locals.pool = pool;
     app.locals.redisClient = redisClient;
     
+    // Initialize GameService with cache client
+    const gameService = GameService.getInstance();
+    gameService.setCacheClient(redisClient);
+    
     return true;
   } catch (error) {
-    console.error('❌ Failed to initialize connections:', error);
+    logger.error('❌ Failed to initialize connections:', error);
     return false;
   }
 }
@@ -58,8 +68,12 @@ app.use(helmet());
 app.use(cors());
 app.use(compression());
 app.use(morgan('combined'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Rate limiting
+app.use(generalLimiter);
+app.use('/api/', apiLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -68,6 +82,8 @@ app.use('/api/players', playerRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/cities', cityRoutes);
 app.use('/api/military', militaryRoutes);
+// Use special rate limiter for narrative routes during development
+app.use('/api/narrative', narrativeLimiter, narrativeRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -128,34 +144,43 @@ app.get('/config', (req, res) => {
     cache: {
       type: config.database.type === 'sqlite' ? 'memory' : 'redis'
     },
+    ai: aiService.getStatus(),
     game: config.game
   });
 });
 
+// Debug endpoint to check player status
+app.get('/debug/players', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, name, civilization_name, is_online, socket_id, last_seen, updated_at 
+      FROM players 
+      ORDER BY updated_at DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
-  console.log(`Player connected: ${socket.id}`);
+  logger.info(`Player connected: ${socket.id}`);
   
   // Handle game-related socket events
   handleGameSocket(socket, io);
   
   socket.on('disconnect', () => {
-    console.log(`Player disconnected: ${socket.id}`);
+    logger.info(`Player disconnected: ${socket.id}`);
   });
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    error: 'Something went wrong!',
-    message: config.server.nodeEnv === 'development' ? err.message : 'Internal server error'
-  });
-});
+app.use(errorHandler);
 
 // 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+app.use('*', (req, res, next) => {
+  next(new AppError('Route not found', 404, 'ROUTE_NOT_FOUND'));
 });
 
 // Start server
@@ -163,29 +188,29 @@ async function startServer() {
   const connectionsOK = await initializeConnections();
   
   if (!connectionsOK) {
-    console.error('❌ Failed to start server due to connection issues');
+    logger.error('❌ Failed to start server due to connection issues');
     process.exit(1);
   }
 
   const PORT = config.server.port;
 
   server.listen(PORT, () => {
-    console.log('\n==========================================');
-    console.log('🚀 Crónicas de Civilización Backend');
-    console.log('==========================================');
-    console.log(`📡 Server: http://localhost:${PORT}`);
-    console.log(`🏥 Health: http://localhost:${PORT}/health`);
-    console.log(`⚙️  Config: http://localhost:${PORT}/config`);
-    console.log(`🗃️  Database: ${config.database.type.toUpperCase()}`);
-    console.log(`💾 Cache: ${config.database.type === 'sqlite' ? 'MEMORY' : 'REDIS'}`);
-    console.log(`🌐 Environment: ${config.server.nodeEnv}`);
-    console.log('==========================================\n');
+    logger.info('\n==========================================');
+    logger.info('🚀 Crónicas de Civilización Backend');
+    logger.info('==========================================');
+    logger.info(`📡 Server: http://localhost:${PORT}`);
+    logger.info(`🏥 Health: http://localhost:${PORT}/health`);
+    logger.info(`⚙️  Config: http://localhost:${PORT}/config`);
+    logger.info(`🗃️  Database: ${config.database.type.toUpperCase()}`);
+    logger.info(`💾 Cache: ${config.database.type === 'sqlite' ? 'MEMORY' : 'REDIS'}`);
+    logger.info(`🌐 Environment: ${config.server.nodeEnv}`);
+    logger.info('==========================================\n');
   });
 }
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down server...');
+  logger.info('\n🛑 Shutting down server...');
   
   if (redisClient) {
     await redisClient.disconnect();
@@ -196,11 +221,11 @@ process.on('SIGINT', async () => {
   }
   
   server.close(() => {
-    console.log('✅ Server shut down gracefully');
+    logger.info('✅ Server shut down gracefully');
     process.exit(0);
   });
 });
 
-startServer().catch(console.error);
+startServer().catch(err => logger.error('Failed to start server:', err));
 
 export { io }; 

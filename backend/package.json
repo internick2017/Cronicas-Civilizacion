@@ -2,7 +2,7 @@
   "name": "cronicas-civilizacion-backend",
   "version": "1.0.0",
   "description": "Backend para el juego Crónicas de Civilización",
-  "main": "src/server.js",
+  "main": "src/server-dynamic.js",
   "type": "module",
   "scripts": {
     "dev": "nodemon src/server-dynamic.js",
@@ -13,7 +13,10 @@
     "start-postgres": "set DATABASE_TYPE=postgresql && node src/server-dynamic.js",
     "start-sqlite": "set DATABASE_TYPE=sqlite && node src/server-dynamic.js",
     "start-neon": "set DATABASE_TYPE=postgresql && node src/server-dynamic.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui",
     "test-connections": "node test-connections.js",
     "setup-local": "setup-local.bat",
     "setup-sqlite": "setup-sqlite.bat",
@@ -36,6 +39,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.0.1",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
@@ -47,7 +51,10 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.9",
+    "vitest": "^2.1.5",
+    "@vitest/coverage-v8": "^2.1.5",
+    "@vitest/ui": "^2.1.5"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
