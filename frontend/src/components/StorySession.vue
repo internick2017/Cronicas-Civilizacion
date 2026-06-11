@@ -8,10 +8,19 @@
         <div class="session-meta">
           <span class="game-type">{{ getGameTypeLabel(session?.settings?.gameType) }}</span>
           <span class="turn-info">Turno {{ session?.turnNumber || 1 }}</span>
+          <span
+            v-if="session?.roundsRemaining !== null && session?.settings?.maxRounds"
+            class="rounds-badge"
+          >
+            Ronda {{ session.turnNumber }} de {{ session.settings.maxRounds }}
+          </span>
           <span class="player-count">{{ session?.players?.length || 0 }} jugadores</span>
         </div>
       </div>
       <div class="session-controls">
+        <button @click="showSummary = true" class="summary-btn" title="Ver resumen de la historia">
+          📖
+        </button>
         <button v-if="session?.isActive" @click="showSettings = !showSettings" class="settings-btn" title="Configuración">
           ⚙️
         </button>
@@ -157,6 +166,7 @@
             :next-player-name="currentActorName"
             :session-id="sessionId"
             :game-type="session?.settings?.gameType || 'character'"
+            :mode="session?.settings?.mode || 'colaborativo'"
             @submit-action="handleSubmitAction"
             @clear-error="clearError"
           />
@@ -191,6 +201,16 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Summary Modal -->
+    <div v-if="showSummary" class="summary-modal" @click.self="showSummary = false">
+      <div class="summary-content">
+        <h3>📖 ¿Qué ha pasado hasta ahora?</h3>
+        <p v-if="session?.summary">{{ session.summary }}</p>
+        <p v-else class="empty">Aún no hay resumen — se genera al cerrar la primera ronda.</p>
+        <button class="close-btn" @click="showSummary = false">Cerrar</button>
       </div>
     </div>
 
@@ -267,6 +287,7 @@ const emit = defineEmits(['session-ended', 'error'])
 const storyContent = ref(null)
 const autoScroll = ref(true)
 const showSettings = ref(false)
+const showSummary = ref(false)
 const isGenerating = ref(false)
 const isSkipping = ref(false)
 const isRetrying = ref(false)
@@ -485,8 +506,8 @@ const handleSubmitAction = async (action) => {
       throw new Error(result.message || 'Error al enviar la acción')
     }
 
-    // If round is complete, refresh immediately; otherwise let the poll handle it
-    if (result.data?.roundComplete) {
+    // If session ended (auto-epilogue) or round is complete, refresh immediately
+    if (result.data?.sessionEnded || result.data?.roundComplete) {
       await loadSession()
       await loadHistory()
     } else {
@@ -783,6 +804,15 @@ onUnmounted(() => {
   padding: 4px 8px;
   border-radius: 12px;
   border: 1px solid rgba(52, 152, 219, 0.3);
+}
+
+.rounds-badge {
+  background: rgba(243, 156, 18, 0.2);
+  padding: 4px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(243, 156, 18, 0.4);
+  color: #f39c12;
+  font-weight: bold;
 }
 
 .session-controls {
@@ -1398,6 +1428,51 @@ onUnmounted(() => {
   border-color: rgba(231, 76, 60, 0.5);
 }
 
+/* Summary modal */
+.summary-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.summary-content {
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 540px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.summary-content h3 {
+  margin: 0;
+  color: #F5DEB3;
+  font-size: 1.2em;
+}
+
+.summary-content p {
+  margin: 0;
+  line-height: 1.7;
+  color: #ecf0f1;
+}
+
+.summary-content .empty {
+  color: #7f8c8d;
+  font-style: italic;
+}
+
 /* Reconnect banner — non-blocking, sits at top center */
 .reconnect-banner {
   position: fixed;
@@ -1586,6 +1661,21 @@ onUnmounted(() => {
     width: 95%;
     margin: 10px;
     max-height: 90vh;
+  }
+
+  /* Summary modal: full screen on mobile */
+  .summary-modal {
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .summary-content {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    margin: 0;
+    padding: 20px;
   }
 }
 </style>
