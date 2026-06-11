@@ -67,6 +67,22 @@ router.post('/sessions', async (req, res) => {
 });
 
 /**
+ * GET /api/narrative/sessions/code/:code
+ * Get a specific story session by room code
+ */
+router.get('/sessions/code/:code', async (req, res) => {
+  try {
+    const session = await NarrativeService.getSessionByCode(req.params.code);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+    res.json({ success: true, data: session.toJSON(), message: 'OK' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
  * GET /api/narrative/sessions/:sessionId
  * Get a specific story session
  */

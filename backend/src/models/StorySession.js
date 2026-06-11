@@ -168,6 +168,7 @@ export class StorySession {
   getSummary() {
     return {
       id: this.id,
+      code: this.code || null,
       title: this.title,
       playerCount: this.players.length,
       turnNumber: this.turnNumber,
@@ -185,6 +186,7 @@ export class StorySession {
   toJSON() {
     return {
       id: this.id,
+      code: this.code || null,
       title: this.title,
       description: this.description,
       createdAt: this.createdAt,
