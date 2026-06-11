@@ -121,6 +121,17 @@
           <h2>🎭 Crear Nueva Historia</h2>
           <div class="create-form">
             <div class="form-group">
+              <label for="hostNameInput">Tu nombre:</label>
+              <input
+                id="hostNameInput"
+                v-model="hostName"
+                type="text"
+                placeholder="¿Cómo te llamas?"
+                maxlength="30"
+              />
+            </div>
+
+            <div class="form-group">
               <label for="sessionTitle">Título de la Historia:</label>
               <input
                 id="sessionTitle"
@@ -291,6 +302,8 @@ const isStarting = ref(false)
 const errorMessage = ref('')
 
 // ── create form ──────────────────────────────────────────────────────────────
+const hostName = ref('')
+
 const newSession = ref({
   title: '',
   description: '',
@@ -324,8 +337,8 @@ let waitingPollInterval = null
 
 // ── computed ─────────────────────────────────────────────────────────────────
 const canCreateSession = computed(() =>
-  newSession.value.title.trim().length > 0 &&
-  newSession.value.description.trim().length > 0
+  hostName.value.trim().length > 0 &&
+  newSession.value.title.trim().length > 0
 )
 
 const canJoinByCode = computed(() =>
@@ -411,7 +424,7 @@ const createSession = async () => {
     const joinResponse = await fetch(`/api/narrative/sessions/${createdSession.id}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newSession.value.title.trim().split(' ')[0] || 'Anfitrión' })
+      body: JSON.stringify({ name: hostName.value.trim() })
     })
     const joinResult = await joinResponse.json()
 
@@ -428,6 +441,7 @@ const createSession = async () => {
     }
 
     // Reset form
+    hostName.value = ''
     newSession.value = {
       title: '',
       description: '',
