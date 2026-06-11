@@ -100,7 +100,7 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  nextPlayerName: {
+  nextPlayerName: {        // current acting player's display name (used in waiting banner)
     type: String,
     default: ''
   },
