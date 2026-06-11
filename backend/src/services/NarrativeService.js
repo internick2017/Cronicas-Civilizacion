@@ -1,6 +1,6 @@
 import { StorySession } from '../models/StorySession.js';
 import AIService from './AIService.js';
-import { normalizeLanguage } from './narrativePrompts.js';
+import { normalizeLanguage, getClosingArcsInstruction } from './narrativePrompts.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getDatabaseConnection } from '../config/index.js';
 import logger from '../utils/logger.js';
@@ -426,6 +426,7 @@ export class NarrativeService {
     const aiOpening = await this.aiService.generateOpening({
       language: session.settings.language,
       genre: session.settings.genre,
+      mode: session.settings.mode,
     });
     const opening = aiOpening ?? this.getFallbackNarrative({ characterName: 'los héroes' });
 
@@ -452,11 +453,12 @@ export class NarrativeService {
     const prompt = this.buildRoundPrompt(session, roundActions);
     const language = (session.settings && session.settings.language) || 'es';
     const genre = (session.settings && session.settings.genre) || 'fantasy';
+    const mode = (session.settings && session.settings.mode) || 'colaborativo';
 
     // Throws → propagates with AI_NARRATION_FAILED marker; turnNumber is NOT incremented yet
     let aiText;
     try {
-      aiText = await this.aiService.generateStoryNarrative(prompt, { language, genre });
+      aiText = await this.aiService.generateStoryNarrative(prompt, { language, genre, mode });
     } catch (err) {
       err.code = 'AI_NARRATION_FAILED';
       throw err;
@@ -467,6 +469,15 @@ export class NarrativeService {
 
     const aiEntry = session.addAINarrative(narrative);
     if (!this.skipDatabase) await this.saveStoryEntryToDatabase(session.id, aiEntry);
+
+    // Resumen acumulativo — NUNCA bloquea la ronda
+    try {
+      const updated = await this.aiService.generateSummary(session.summary, narrative, { language });
+      if (updated) session.summary = updated;
+    } catch (err) {
+      logger.warn('No se pudo actualizar el resumen; se conserva el anterior:', err.message);
+    }
+
     session.turnNumber += 1;
     if (!this.skipDatabase) await this.saveSessionToDatabase(session);
     return narrative;
@@ -502,12 +513,19 @@ export class NarrativeService {
     const roundComplete = session.currentPlayerIndex === 0;
 
     let narrative = null;
+    let sessionEnded;
     if (roundComplete) {
       // Persist advanced index before the AI call so a crash re-hydrates consistent turn state
       if (!this.skipDatabase) await this.saveSessionToDatabase(session);
 
       // closeRound throws → propagate (action+index already mutated; turnNumber not yet incremented)
       narrative = await this.closeRound(session);
+
+      // Auto-epilogue when last round completed (turnNumber was already incremented by closeRound)
+      if (session.settings.maxRounds && session.turnNumber > session.settings.maxRounds) {
+        await this.endSession(session.id);
+        sessionEnded = true;
+      }
     }
 
     if (!this.skipDatabase) await this.saveSessionToDatabase(session);
@@ -517,6 +535,7 @@ export class NarrativeService {
       nextPlayer: session.players[session.currentPlayerIndex],
       turnNumber: session.turnNumber,
       roundComplete,
+      ...(sessionEnded && { sessionEnded }),
     };
   }
 
@@ -557,6 +576,7 @@ export class NarrativeService {
     if (!this.skipDatabase) await this.saveSessionToDatabase(session);
 
     let narrative = null;
+    let sessionEnded;
     if (roundComplete) {
       const roundActions = session.storyHistory.filter(
         e => e.type === 'player_action' && e.turnNumber === session.turnNumber
@@ -564,6 +584,12 @@ export class NarrativeService {
       if (roundActions.length > 0) {
         // There are actions this round — generate AI narrative
         narrative = await this.closeRound(session);
+
+        // Auto-epilogue when last round completed (turnNumber was already incremented by closeRound)
+        if (session.settings.maxRounds && session.turnNumber > session.settings.maxRounds) {
+          await this.endSession(session.id);
+          sessionEnded = true;
+        }
       } else {
         // Nobody acted this round — just advance turnNumber without narrating
         session.turnNumber += 1;
@@ -576,37 +602,49 @@ export class NarrativeService {
       narrative,
       nextPlayer: session.players[session.currentPlayerIndex],
       turnNumber: session.turnNumber,
+      ...(sessionEnded && { sessionEnded }),
     };
   }
 
   /**
    * Build a prompt summarising all actions of a round for the AI narrator.
-   * Includes the opening narrative (world anchor) + the last 4 ai_narrative entries
-   * for coherence, deduplicating overlap between them.
+   *
+   * With summary: uses "[RESUMEN DE LA HISTORIA] + [ÚLTIMAS RONDAS] (last 3, excluding opening)".
+   * Without summary: original M1 behaviour — opening + last 4 (deduplicating overlap).
+   *
+   * Also appends closing-arcs instruction when roundsRemaining <= 2.
    */
   buildRoundPrompt(session, roundActions) {
     const allNarratives = session.storyHistory.filter(e => e.type === 'ai_narrative');
-    const opening = allNarratives[0] ?? null;
-    const recent = allNarratives.slice(-4);
-
     const actions = roundActions
       .map(e => `${e.playerName ?? '?'}: ${e.action}`)
       .join('\n');
+    const task = `\n\nACCIONES DE ESTA RONDA:\n${actions}\n\nTu tarea: continúa la historia narrando SOLO el resultado de las acciones de esta ronda (100-180 palabras), como si fuera el siguiente párrafo del libro.`;
 
-    if (!opening) {
-      // No narratives yet — story is just beginning
-      return `ACCIONES DE ESTA RONDA:\n${actions}\n\nTu tarea: continúa la historia narrando SOLO el resultado de las acciones de esta ronda (100-180 palabras), como si fuera el siguiente párrafo del libro.`;
+    let context = '';
+    if (session.summary) {
+      // Summary path: resumen reemplaza al inicio; últimas 3 EXCLUYENDO la primera narración
+      const recent = allNarratives.slice(1).slice(-3).map(e => e.narrative).join('\n');
+      context = `CONTEXTO — YA NARRADO ANTES (solo para tu memoria, NO lo repitas):\n[RESUMEN DE LA HISTORIA]\n${session.summary}`;
+      if (recent) context += `\n[ÚLTIMAS RONDAS]\n${recent}`;
+    } else if (allNarratives.length > 0) {
+      // M1 fallback: sesiones sin resumen aún — opening + últimas 4
+      const opening = allNarratives[0];
+      const recentWithoutOpening = allNarratives.slice(-4).filter(e => e !== opening);
+      const recentText = recentWithoutOpening.map(e => e.narrative).join('\n');
+      context = `CONTEXTO — YA NARRADO ANTES (solo para tu memoria, NO lo repitas):\n[INICIO DE LA HISTORIA]\n${opening.narrative}`;
+      if (recentText) context += `\n[ÚLTIMAS RONDAS]\n${recentText}`;
     }
 
-    // Deduplicate: if the opening is already within the recent slice, avoid repeating it
-    const recentWithoutOpening = recent.filter(e => e !== opening);
-    const recentText = recentWithoutOpening.map(e => e.narrative).join('\n');
+    let prompt = context ? context + task : task.trimStart();
 
-    let prompt = `CONTEXTO — YA NARRADO ANTES (solo para tu memoria, NO lo repitas):\n[INICIO DE LA HISTORIA]\n${opening.narrative}`;
-    if (recentText) {
-      prompt += `\n[ÚLTIMAS RONDAS]\n${recentText}`;
+    // Cierre de arcos cuando se acerca el final
+    const remaining = session.settings.maxRounds
+      ? Math.max(0, session.settings.maxRounds - session.turnNumber + 1) : null;
+    if (remaining !== null && remaining <= 2) {
+      prompt += `\n\n${getClosingArcsInstruction(session.settings.language, remaining)}`;
     }
-    prompt += `\n\nACCIONES DE ESTA RONDA:\n${actions}\n\nTu tarea: continúa la historia narrando SOLO el resultado de las acciones de esta ronda (100-180 palabras), como si fuera el siguiente párrafo del libro.`;
+
     return prompt;
   }
 
