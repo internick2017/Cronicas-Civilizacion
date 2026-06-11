@@ -59,4 +59,11 @@ describe('narración por cierre de ronda', () => {
     expect(prompt).toContain('Ana: Exploro');
     expect(prompt).not.toContain('undefined');
   });
+
+  it('una falla de la IA al cerrar ronda lleva el codigo AI_NARRATION_FAILED', async () => {
+    svc.aiService.generateStoryNarrative.mockRejectedValueOnce(new Error('boom'));
+    await svc.submitAction(session.id, ana.id, 'a1');
+    await expect(svc.submitAction(session.id, beto.id, 'a2'))
+      .rejects.toMatchObject({ code: 'AI_NARRATION_FAILED' });
+  });
 });

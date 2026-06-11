@@ -246,6 +246,14 @@ router.post('/sessions/:sessionId/action', async (req, res) => {
         : 'Action submitted successfully',
     });
   } catch (error) {
+    if (error.code === 'AI_NARRATION_FAILED') {
+      console.error('AI narration failed on round close:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'ai_narration_failed',
+        message: 'La IA no pudo narrar la ronda. La acción quedó guardada — reintenta la narración.',
+      });
+    }
     console.error('Error submitting action:', error);
     res.status(400).json({
       success: false,

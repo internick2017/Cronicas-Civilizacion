@@ -12,7 +12,7 @@
         </div>
       </div>
       <div class="session-controls">
-        <button @click="showSettings = !showSettings" class="settings-btn" title="Configuración">
+        <button v-if="session?.isActive" @click="showSettings = !showSettings" class="settings-btn" title="Configuración">
           ⚙️
         </button>
         <button @click="exportStory" class="export-btn" title="Exportar historia">
@@ -56,7 +56,7 @@
 
           <!-- Story entries -->
           <div
-            v-for="(entry, index) in storyHistory"
+            v-for="entry in storyHistory"
             :key="entry.id"
             class="story-entry"
             :class="entry.type"
@@ -137,10 +137,10 @@
           </button>
         </div>
 
-        <!-- Retry narrative alert (host only, shown after AI failure on round close) -->
-        <div v-if="showRetryAlert && isHost" class="retry-alert">
+        <!-- Retry narrative alert (shown to the player who hit the AI failure) -->
+        <div v-if="showRetryAlert" class="retry-alert">
           <div class="retry-alert-text">
-            ⚠️ La IA no pudo generar la narrativa al cerrar la ronda.
+            ⚠️ {{ retryAlertMessage }}
           </div>
           <button @click="retryNarrative" class="retry-btn" :disabled="isRetrying">
             <span v-if="!isRetrying">🔄 Reintentar narración</span>
@@ -265,6 +265,7 @@ const isGenerating = ref(false)
 const isSkipping = ref(false)
 const isRetrying = ref(false)
 const showRetryAlert = ref(false)
+const retryAlertMessage = ref('')
 const errorMessage = ref('')
 const storyHistory = ref([])
 const session = ref(null)
@@ -291,7 +292,11 @@ const nextPlayerName = computed(() => {
   if (!session.value || !Array.isArray(session.value.players) || session.value.players.length === 0) return ''
   const nextIndex = (session.value.currentPlayerIndex + 1) % session.value.players.length
   const nextPlayer = session.value.players[nextIndex]
-  return nextPlayer?.characterName || 'Siguiente jugador'
+  if (!nextPlayer) return 'Siguiente jugador'
+  const gameType = session.value.settings?.gameType || 'character'
+  if (gameType === 'country') return nextPlayer.countryName || nextPlayer.name || 'Siguiente jugador'
+  if (gameType === 'world') return nextPlayer.worldRole || nextPlayer.name || 'Siguiente jugador'
+  return nextPlayer.characterName || nextPlayer.name || 'Siguiente jugador'
 })
 
 // Host = players[0]
@@ -454,9 +459,10 @@ const handleSubmitAction = async (action) => {
 
     const result = await response.json()
 
-    if (response.status === 500) {
+    if (response.status === 500 || result.error === 'ai_narration_failed') {
       // AI failed while closing a round — actions are saved, retry available
       showRetryAlert.value = true
+      retryAlertMessage.value = result.message || 'La IA no pudo generar la narrativa al cerrar la ronda.'
       await loadSession()
       await loadHistory()
       return
