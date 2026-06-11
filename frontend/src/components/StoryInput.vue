@@ -36,6 +36,9 @@
           class="action-textarea"
           maxlength="280"
           rows="3"
+          autocapitalize="sentences"
+          autocomplete="off"
+          autocorrect="on"
         ></textarea>
 
         <div class="input-controls">
@@ -397,7 +400,7 @@ watch(() => props.isMyTurn, () => {
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   color: white;
-  font-size: 1em;
+  font-size: 16px; /* prevents iOS/Android zoom-on-focus */
   line-height: 1.5;
   resize: vertical;
   transition: all 0.3s ease;
@@ -549,23 +552,55 @@ watch(() => props.isMyTurn, () => {
 
 @media (max-width: 768px) {
   .story-input {
-    padding: 15px;
+    padding: 12px;
+    border-radius: 0; /* edge-to-edge when docked at bottom */
+  }
+
+  .input-header {
+    margin-bottom: 12px;
   }
 
   .player-info {
     flex-direction: column;
     text-align: center;
-    gap: 10px;
+    gap: 8px;
+  }
+
+  .action-textarea {
+    min-height: 80px;
+    padding: 12px;
   }
 
   .input-controls {
-    flex-direction: column;
-    gap: 10px;
-    align-items: stretch;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .input-buttons {
-    justify-content: center;
+    flex: 1;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* Touch targets ≥44px */
+  .clear-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px 14px;
+    font-size: 1em;
+  }
+
+  .submit-btn {
+    min-height: 44px;
+    padding: 10px 20px;
+    font-size: 1em;
+  }
+
+  /* Hide tips on mobile to reduce dead space */
+  .input-help {
+    display: none;
   }
 }
 </style>
