@@ -228,20 +228,25 @@ router.post('/sessions/:sessionId/action', async (req, res) => {
       });
     }
 
-    if (action.trim().length > 500) {
+    if (action.trim().length > 280) {
       return res.status(400).json({
         success: false,
         error: 'Action too long',
-        message: 'Please keep your action description under 500 characters'
+        message: 'Please keep your action description under 280 characters'
       });
     }
 
     const result = await NarrativeService.submitAction(sessionId, playerId, action.trim());
-    
+
     res.json({
       success: true,
-      data: result,
-      message: 'Action submitted successfully'
+      data: {
+        ...result,
+        roundComplete: result.roundComplete,
+      },
+      message: result.roundComplete
+        ? 'Round complete — narrative generated'
+        : 'Action submitted successfully',
     });
   } catch (error) {
     console.error('Error submitting action:', error);

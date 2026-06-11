@@ -387,81 +387,70 @@ export class NarrativeService {
   }
 
   /**
-   * Submit a player action and generate narrative
+   * Submit a player action.
+   * Saves the action and advances turn order. Only when the LAST player of the round
+   * submits does the service call the AI ONCE with ALL the round's actions.
    */
   async submitAction(sessionId, playerId, actionText) {
-    const session = this.getSession(sessionId);
-    if (!session) {
-      throw new Error('Session not found');
+    const session = await this.getSession(sessionId);
+    if (!session || !session.isActive) throw new Error('Sesión no activa');
+
+    const text = String(actionText || '').trim();
+    if (!text) throw new Error('La acción no puede estar vacía');
+    if (text.length > 280) throw new Error('La acción supera los 280 caracteres');
+
+    const current = session.players[session.currentPlayerIndex];
+    if (!current || current.id !== playerId) {
+      throw new Error(`No es tu turno — le toca a ${current?.name ?? 'otro jugador'}`);
     }
 
-    // Check if it's the player's turn
-    const currentPlayer = session.getCurrentPlayer();
-    if (!currentPlayer || currentPlayer.id !== playerId) {
-      throw new Error('Not your turn');
+    const entry = session.addPlayerAction(playerId, text);
+    if (!this.skipDatabase) await this.saveStoryEntryToDatabase(sessionId, entry);
+
+    session.currentPlayerIndex = (session.currentPlayerIndex + 1) % session.players.length;
+    const roundComplete = session.currentPlayerIndex === 0;
+
+    let narrative = null;
+    if (roundComplete) {
+      const roundActions = session.storyHistory.filter(
+        e => e.type === 'player_action' && e.turnNumber === session.turnNumber
+      );
+      const prompt = this.buildRoundPrompt(session, roundActions);
+      const language = (session.settings && session.settings.language) || 'es';
+      const genre = (session.settings && session.settings.genre) || 'fantasy';
+
+      // generateStoryNarrative throws → propagate (action+index already mutated; turnNumber not yet incremented)
+      const aiText = await this.aiService.generateStoryNarrative(prompt, { language, genre });
+
+      // null means unconfigured — use local fallback so the round always gets some narrative
+      narrative = aiText ?? this.getFallbackNarrative({ characterName: 'los héroes' });
+
+      const aiEntry = session.addAINarrative(narrative);
+      if (!this.skipDatabase) await this.saveStoryEntryToDatabase(sessionId, aiEntry);
+      session.turnNumber += 1;
     }
 
-    // Add the action to the story
-    const storyEntry = session.addStoryAction(playerId, actionText);
-    
-    // Generate AI narrative response
-    const narrative = await this.generateNarrativeResponse(session, storyEntry);
-    
-    // Add the narrative to the story
-    const narrativeEntry = session.addNarrativeResponse(narrative.narrative, narrative.context);
-
-    console.log(`📝 ${currentPlayer.characterName}: "${actionText}" -> AI generated narrative`);
-
+    if (!this.skipDatabase) await this.saveSessionToDatabase(session);
     return {
-      action: storyEntry,
-      narrative: narrativeEntry,
-      nextPlayer: session.getCurrentPlayer(),
-      turnNumber: session.turnNumber
+      action: entry,
+      narrative,
+      nextPlayer: session.players[session.currentPlayerIndex],
+      turnNumber: session.turnNumber,
+      roundComplete,
     };
   }
 
   /**
-   * Generate AI narrative response for an action
+   * Build a prompt summarising all actions of a round for the AI narrator.
    */
-  async generateNarrativeResponse(session, storyEntry) {
-    const prompt = this.buildNarrativePrompt(session, storyEntry);
-    const language = (session.settings && session.settings.language) || 'es';
-    const genre = (session.settings && session.settings.genre) || 'fantasy';
-
-    try {
-      // Use the language-aware narrative path
-      const narrativeText = await this.aiService.generateStoryNarrative(prompt, { language, genre });
-
-      if (narrativeText) {
-        return {
-          narrative: narrativeText,
-          context: {
-            worldContext: session.worldContext,
-            recentHistory: session.getRecentHistory(5)
-          }
-        };
-      }
-
-      // AI not configured — use legacy path which handles its own fallback
-      const response = await this.aiService.generateActionNarrative(
-        { action: { type: 'story_action', description: storyEntry.action }, player: { name: storyEntry.characterName } },
-        { currentTurn: session.turnNumber, storyLength: session.storyHistory.length }
-      );
-
-      return {
-        narrative: response.narrative,
-        context: {
-          worldContext: session.worldContext,
-          recentHistory: session.getRecentHistory(5)
-        }
-      };
-    } catch (error) {
-      console.error('Error generating narrative:', error);
-      return {
-        narrative: this.getFallbackNarrative(storyEntry),
-        context: {}
-      };
-    }
+  buildRoundPrompt(session, roundActions) {
+    const lastNarratives = session.storyHistory
+      .filter(e => e.type === 'ai_narrative').slice(-2)
+      .map(e => e.narrative).join('\n');
+    const actions = roundActions
+      .map(e => `${session.players.find(p => p.id === e.playerId)?.name}: ${e.action}`)
+      .join('\n');
+    return `HISTORIA RECIENTE:\n${lastNarratives || '(la historia recién comienza)'}\n\nACCIONES DE ESTA RONDA:\n${actions}\n\nNarra el resultado de la ronda.`;
   }
 
   /**
