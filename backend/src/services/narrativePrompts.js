@@ -73,6 +73,41 @@ const OPENING = {
     `os protagonistas a agir.`,
 };
 
+const ACTIVE_NARRATOR_EXTRA = {
+  es: ` Además, en este modo TÚ llevas la iniciativa de la historia: termina SIEMPRE tu ` +
+    `narración planteando el siguiente evento, peligro o situación que exija una reacción ` +
+    `(una pregunta abierta, una amenaza inminente, un descubrimiento). Varía entre eventos ` +
+    `globales que afectan a todos y eventos dirigidos a un personaje específico por su nombre, ` +
+    `rotando el protagonismo entre los jugadores a lo largo de las rondas para que cada uno ` +
+    `tenga su momento.`,
+  pt: ` Além disso, neste modo VOCÊ conduz a iniciativa da história: termine SEMPRE a sua ` +
+    `narração propondo o próximo evento, perigo ou situação que exija uma reação ` +
+    `(uma pergunta aberta, uma ameaça iminente, uma descoberta). Varie entre eventos globais ` +
+    `que afetam a todos e eventos dirigidos a um personagem específico pelo nome, ` +
+    `alternando o protagonismo entre os jogadores ao longo das rodadas.`,
+};
+
+const ACTIVE_OPENING_EXTRA = {
+  es: ` Termina la introducción planteando el primer evento de la historia: una situación ` +
+    `concreta que exija la reacción inmediata de los protagonistas.`,
+  pt: ` Termine a introdução propondo o primeiro evento da história: uma situação concreta ` +
+    `que exija a reação imediata dos protagonistas.`,
+};
+
+const CLOSING_ARCS = {
+  es: (n) => `ATENCIÓN: quedan solo ${n} ronda(s) para el final de la historia. Empieza a ` +
+    `cerrar los arcos de los personajes y encamina los hechos hacia un desenlace.`,
+  pt: (n) => `ATENÇÃO: faltam apenas ${n} rodada(s) para o final da história. Comece a ` +
+    `fechar os arcos dos personagens e encaminhe os fatos para um desfecho.`,
+};
+
+const SUMMARY_PROMPT = {
+  es: `Actualiza la sinopsis de la historia incorporando los hechos nuevos. Conserva nombres, ` +
+    `lugares y hechos clave ya establecidos. Máximo 150 palabras, en español, en tercera persona.`,
+  pt: `Atualize a sinopse da história incorporando os fatos novos. Conserve nomes, lugares e ` +
+    `fatos-chave já estabelecidos. Máximo de 150 palavras, em português, na terceira pessoa.`,
+};
+
 /**
  * Normalize language code: only 'es' and 'pt' are supported; everything else → 'es'.
  * @param {string} language
@@ -86,12 +121,13 @@ export function normalizeLanguage(language) {
  * Build the system prompt for the narrator AI.
  * @param {string} language - 'es' | 'pt' (unknown → 'es')
  * @param {string} [genre='fantasy']
+ * @param {string} [mode='colaborativo']
  * @returns {string}
  */
-export function getNarratorSystemPrompt(language, genre = 'fantasy') {
+export function getNarratorSystemPrompt(language, genre = 'fantasy', mode = 'colaborativo') {
   const l = normalizeLanguage(language);
-  const translatedGenre = GENRES[l][genre] || genre;
-  return NARRATOR[l](translatedGenre);
+  const base = NARRATOR[l](GENRES[l][genre] || genre);
+  return mode === 'narrador-activo' ? base + ACTIVE_NARRATOR_EXTRA[l] : base;
 }
 
 /**
@@ -107,10 +143,30 @@ export function getEpiloguePrompt(language) {
  * Build the opening/introduction prompt for a new story.
  * @param {string} language - 'es' | 'pt' (unknown → 'es')
  * @param {string} [genre='fantasy']
+ * @param {string} [mode='colaborativo']
  * @returns {string}
  */
-export function getOpeningPrompt(language, genre = 'fantasy') {
+export function getOpeningPrompt(language, genre = 'fantasy', mode = 'colaborativo') {
   const l = normalizeLanguage(language);
-  const translatedGenre = GENRES[l][genre] || genre;
-  return OPENING[l](translatedGenre);
+  const base = OPENING[l](GENRES[l][genre] || genre);
+  return mode === 'narrador-activo' ? base + ACTIVE_OPENING_EXTRA[l] : base;
+}
+
+/**
+ * Build the closing-arcs instruction when the story is near its end.
+ * @param {string} language - 'es' | 'pt' (unknown → 'es')
+ * @param {number} roundsRemaining
+ * @returns {string}
+ */
+export function getClosingArcsInstruction(language, roundsRemaining) {
+  return CLOSING_ARCS[normalizeLanguage(language)](roundsRemaining);
+}
+
+/**
+ * Build the summary/synopsis update prompt.
+ * @param {string} language - 'es' | 'pt' (unknown → 'es')
+ * @returns {string}
+ */
+export function getSummaryPrompt(language) {
+  return SUMMARY_PROMPT[normalizeLanguage(language)];
 }
