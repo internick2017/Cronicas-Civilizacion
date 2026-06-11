@@ -20,13 +20,17 @@ const createRateLimiter = (options) => {
 };
 
 /**
- * General rate limiter for all requests
+ * General rate limiter for all requests.
+ * GETs are skipped: the narrative game polls every 3s per client, and all LAN
+ * clients arrive as 127.0.0.1 through the Vite proxy — write-only counting
+ * prevents the shared IP from burning through the window during a playtest.
  */
 export const generalLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Limit each IP to 200 requests per windowMs (increased for development)
+  max: 600, // write requests only (GETs skipped — see skip below)
   message: 'Too many requests from this IP',
   skipSuccessfulRequests: false,
+  skip: (req) => req.method === 'GET',
 });
 
 /**
@@ -58,21 +62,26 @@ export const gameActionLimiter = createRateLimiter({
 });
 
 /**
- * Rate limiter for API endpoints
+ * Rate limiter for API endpoints.
+ * GETs skipped for the same LAN-proxy reason as generalLimiter.
  */
 export const apiLimiter = createRateLimiter({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 120, // Limit each IP to 120 API requests per minute (increased for development)
+  max: 120, // POST/PUT/DELETE only — generous for human interactions
   message: 'Too many API requests',
+  skip: (req) => req.method === 'GET',
 });
 
 /**
- * Development-friendly rate limiter for narrative endpoints
+ * Rate limiter for narrative endpoints.
+ * GETs skipped: session/history polls run every 3s per client through a single
+ * proxy IP — only AI-triggering writes count toward this limit.
  */
 export const narrativeLimiter = createRateLimiter({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 300, // Very permissive for development
+  max: 300, // POSTs/writes only (GETs skipped — see skip below)
   message: 'Too many narrative requests',
+  skip: (req) => req.method === 'GET',
 });
 
 /**

@@ -231,6 +231,11 @@
       </div>
     </div>
 
+    <!-- Reconnect Banner (non-blocking, shown after 3+ consecutive poll failures) -->
+    <div v-if="showReconnectBanner" class="reconnect-banner">
+      🔌 Reconectando...
+    </div>
+
     <!-- Error Toast -->
     <div v-if="errorMessage" class="error-toast">
       <div class="error-icon">⚠️</div>
@@ -274,6 +279,12 @@ const localSettings = ref({
   storyLength: 'medium',
   aiCreativity: 0.8
 })
+
+// Poll resilience state
+const pollConsecutiveFailures = ref(0)
+const showReconnectBanner = ref(false)
+const POLL_FAILURE_BANNER_THRESHOLD = 3  // show banner after this many consecutive failures
+let currentPollIntervalMs = 3000         // starts at 3s, backs off to 15s on 429
 
 // Computed
 const currentPlayer = computed(() => {
@@ -538,35 +549,47 @@ const skipTurn = async () => {
   }
 }
 
-const loadSession = async () => {
+// Resilient load helpers used both imperatively (after actions) and by the poll.
+// On failure they preserve existing state so the story stays visible.
+// 429 triggers poll backoff; genuine errors count toward the reconnect banner.
+const loadSession = async ({ isPoll = false } = {}) => {
   try {
     const response = await fetch(`/api/narrative/sessions/${props.sessionId}`)
+    if (isPoll && response.status === 429) {
+      // Back off poll interval on rate-limit; state is preserved
+      currentPollIntervalMs = Math.min(currentPollIntervalMs * 2, 15000)
+      console.warn('Poll rate-limited (429) — backing off to', currentPollIntervalMs, 'ms')
+      return false
+    }
     const result = await response.json()
-
     if (result.success) {
       session.value = result.data
-    } else {
-      throw new Error(result.message)
+      return true
     }
+    throw new Error(result.message)
   } catch (error) {
     console.error('Error loading session:', error)
-    errorMessage.value = 'Error al cargar la sesión'
+    return false
   }
 }
 
-const loadHistory = async () => {
+const loadHistory = async ({ isPoll = false } = {}) => {
   try {
     const response = await fetch(`/api/narrative/sessions/${props.sessionId}/history?limit=50`)
+    if (isPoll && response.status === 429) {
+      currentPollIntervalMs = Math.min(currentPollIntervalMs * 2, 15000)
+      console.warn('Poll rate-limited (429) — backing off to', currentPollIntervalMs, 'ms')
+      return false
+    }
     const result = await response.json()
-
     if (result.success) {
       storyHistory.value = result.data
-    } else {
-      throw new Error(result.message)
+      return true
     }
+    throw new Error(result.message)
   } catch (error) {
     console.error('Error loading history:', error)
-    errorMessage.value = 'Error al cargar el historial'
+    return false
   }
 }
 
@@ -664,27 +687,44 @@ watch(isGenerating, (newValue) => {
   }
 })
 
-// Set up polling interval ref
+// Set up polling with adaptive interval and reconnect banner.
+// Failures never clear state or navigate away — the banner shows after 3 in a
+// row and clears on the next success.
 let pollInterval = null
+
+const schedulePoll = () => {
+  pollInterval = setTimeout(async () => {
+    if (session.value?.isActive) {
+      const sessionOk = await loadSession({ isPoll: true })
+      const historyOk = await loadHistory({ isPoll: true })
+      const bothOk = sessionOk && historyOk
+
+      if (bothOk) {
+        pollConsecutiveFailures.value = 0
+        showReconnectBanner.value = false
+        currentPollIntervalMs = 3000  // restore normal cadence on success
+      } else {
+        pollConsecutiveFailures.value++
+        if (pollConsecutiveFailures.value >= POLL_FAILURE_BANNER_THRESHOLD) {
+          showReconnectBanner.value = true
+        }
+      }
+    }
+    schedulePoll()  // always reschedule; interval adapts via currentPollIntervalMs
+  }, currentPollIntervalMs)
+}
 
 // Load data on mount
 onMounted(async () => {
   await loadSession()
   await loadHistory()
-
-  // Set up polling for updates
-  pollInterval = setInterval(async () => {
-    if (session.value?.isActive) {
-      await loadSession()
-      await loadHistory()
-    }
-  }, 3000) // Poll every 3 seconds
+  schedulePoll()
 })
 
 // Clean up on unmount
 onUnmounted(() => {
   if (pollInterval) {
-    clearInterval(pollInterval)
+    clearTimeout(pollInterval)
   }
 })
 </script>
@@ -1345,6 +1385,22 @@ onUnmounted(() => {
 .cancel-btn:hover {
   background: rgba(231, 76, 60, 0.3);
   border-color: rgba(231, 76, 60, 0.5);
+}
+
+/* Reconnect banner — non-blocking, sits at top center */
+.reconnect-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(52, 73, 94, 0.92);
+  color: #bdc3c7;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 0.9em;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  z-index: 1002;
+  pointer-events: none;
 }
 
 /* Error toast */
