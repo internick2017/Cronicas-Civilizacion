@@ -340,9 +340,9 @@ export class NarrativeService {
       throw new Error('Session not found');
     }
 
-    if (!session.isActive) {
-      throw new Error('Session is not active');
-    }
+    // Allow joining a lobby (isActive=false, not yet started) OR an active session for reconnects.
+    // Only block if the story is already in progress AND the player is not a known reconnect.
+    // (isActive=true + storyHistory has content = game running; checked after reconnect short-circuit)
 
     // Reconnect: if a player with the same name (case-insensitive) already exists, return them
     const existing = session.players.find(
@@ -393,6 +393,34 @@ export class NarrativeService {
       session: session.getSummary(),
       message: `${player.characterName} ha abandonado la historia.`
     };
+  }
+
+  /**
+   * Start a session: activates it (lobby → active), generates the AI opening narrative.
+   * Requires at least 2 players.
+   */
+  async startSession(sessionId) {
+    const session = await this.getSession(sessionId);
+    if (!session) throw new Error('Sesión no encontrada');
+    if (session.isActive) throw new Error('La sesión ya está en curso');
+    if (session.players.length < 2) throw new Error('Se necesitan al menos 2 jugadores');
+
+    const aiOpening = await this.aiService.generateOpening({
+      language: session.settings.language,
+      genre: session.settings.genre,
+    });
+    const opening = aiOpening ?? this.getFallbackNarrative({ characterName: 'los héroes' });
+
+    session.isActive = true;
+    session.currentPlayerIndex = 0;
+    const entry = session.addAINarrative(opening);
+
+    if (!this.skipDatabase) {
+      await this.saveStoryEntryToDatabase(sessionId, entry);
+      await this.saveSessionToDatabase(session);
+    }
+
+    return { session: session.toJSON(), opening };
   }
 
   /**
@@ -596,22 +624,42 @@ export class NarrativeService {
   }
 
   /**
-   * End a session
+   * End a session: generates an AI epilogue, records it, deactivates the session.
    */
   async endSession(sessionId) {
     const session = await this.getSession(sessionId);
     if (!session) {
-      throw new Error('Session not found');
+      throw new Error('Sesión no encontrada');
     }
+
+    const summary = session.storyHistory
+      .filter(e => e.type === 'ai_narrative')
+      .map(e => e.narrative)
+      .join('\n');
+
+    const aiEpilogue = await this.aiService.generateEpilogue(summary, {
+      language: session.settings.language,
+      genre: session.settings.genre,
+    });
+    const epilogue = aiEpilogue ?? this.getFallbackNarrative({ characterName: 'los héroes' });
+
+    const entry = session.addAINarrative(epilogue);
+    entry.type = 'ai_epilogue';
 
     session.isActive = false;
     session.updatedAt = new Date();
-    
+
+    if (!this.skipDatabase) {
+      await this.saveStoryEntryToDatabase(sessionId, entry);
+      await this.saveSessionToDatabase(session);
+    }
+
     console.log(`🏁 Session ${session.title} ended`);
-    
+
     return {
-      session: session.getSummary(),
-      message: 'La historia ha llegado a su fin.'
+      session: session.toJSON(),
+      epilogue,
+      message: 'Historia finalizada',
     };
   }
 
