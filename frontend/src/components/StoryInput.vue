@@ -114,6 +114,10 @@ const props = defineProps({
   gameType: {
     type: String,
     default: 'character'
+  },
+  mode: {
+    type: String,
+    default: 'colaborativo'
   }
 })
 
@@ -132,10 +136,14 @@ const canSubmit = computed(() => {
          actionText.value.length <= 280
 })
 
-// Methods
-const getPlaceholder = () => {
+// Computed placeholder reacts to mode and gameType changes
+const placeholder = computed(() => {
   if (!props.isMyTurn) {
     return `Esperando el turno de ${props.nextPlayerName}...`
+  }
+
+  if (props.mode === 'narrador-activo') {
+    return '¿Cómo reacciona tu personaje al evento? (ej: "Me escondo tras el árbol y observo...")'
   }
 
   const gameType = props.gameType
@@ -170,7 +178,10 @@ const getPlaceholder = () => {
   }
 
   return 'Describe tu acción...'
-}
+})
+
+// Keep getPlaceholder as a thin wrapper so the template binding stays simple
+const getPlaceholder = () => placeholder.value
 
 const getPlayerDisplayName = (player) => {
   if (!player) return ''
