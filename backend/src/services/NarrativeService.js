@@ -350,7 +350,7 @@ export class NarrativeService {
     );
     if (existing) {
       existing.isActive = true;
-      return { session, player: existing, message: 'Reconectado a la sesión' };
+      return { session: session.toJSON(), player: existing, message: 'Reconectado a la sesión' };
     }
 
     const player = session.addPlayer(playerData);
@@ -369,8 +369,8 @@ export class NarrativeService {
   /**
    * Leave a session
    */
-  leaveSession(sessionId, playerId) {
-    const session = this.getSession(sessionId);
+  async leaveSession(sessionId, playerId) {
+    const session = await this.getSession(sessionId);
     if (!session) {
       throw new Error('Session not found');
     }
@@ -558,8 +558,8 @@ export class NarrativeService {
   /**
    * Get session story history
    */
-  getSessionHistory(sessionId, limit = 20) {
-    const session = this.getSession(sessionId);
+  async getSessionHistory(sessionId, limit = 20) {
+    const session = await this.getSession(sessionId);
     if (!session) {
       throw new Error('Session not found');
     }
@@ -570,8 +570,8 @@ export class NarrativeService {
   /**
    * Update session settings
    */
-  updateSessionSettings(sessionId, newSettings) {
-    const session = this.getSession(sessionId);
+  async updateSessionSettings(sessionId, newSettings) {
+    const session = await this.getSession(sessionId);
     if (!session) {
       throw new Error('Session not found');
     }
@@ -585,8 +585,8 @@ export class NarrativeService {
   /**
    * Update world context
    */
-  updateWorldContext(sessionId, newContext) {
-    const session = this.getSession(sessionId);
+  async updateWorldContext(sessionId, newContext) {
+    const session = await this.getSession(sessionId);
     if (!session) {
       throw new Error('Session not found');
     }
@@ -598,8 +598,8 @@ export class NarrativeService {
   /**
    * End a session
    */
-  endSession(sessionId) {
-    const session = this.getSession(sessionId);
+  async endSession(sessionId) {
+    const session = await this.getSession(sessionId);
     if (!session) {
       throw new Error('Session not found');
     }
@@ -618,8 +618,8 @@ export class NarrativeService {
   /**
    * Get session statistics
    */
-  getSessionStats(sessionId) {
-    const session = this.getSession(sessionId);
+  async getSessionStats(sessionId) {
+    const session = await this.getSession(sessionId);
     if (!session) {
       throw new Error('Session not found');
     }
@@ -640,15 +640,15 @@ export class NarrativeService {
   /**
    * Export session data
    */
-  exportSession(sessionId) {
-    const session = this.getSession(sessionId);
+  async exportSession(sessionId) {
+    const session = await this.getSession(sessionId);
     if (!session) {
       throw new Error('Session not found');
     }
 
     return {
       session: session.toJSON(),
-      stats: this.getSessionStats(sessionId),
+      stats: await this.getSessionStats(sessionId),
       fullStory: session.getFullStory()
     };
   }
