@@ -794,7 +794,7 @@ onUnmounted(() => {
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   color: white;
-  font-size: 1em;
+  font-size: 16px; /* prevents iOS/Android zoom-on-focus */
   transition: all 0.3s ease;
   box-sizing: border-box;
 }

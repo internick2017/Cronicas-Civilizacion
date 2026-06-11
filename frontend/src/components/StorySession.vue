@@ -149,17 +149,18 @@
         </div>
 
         <!-- Story Input (only when active) -->
-        <StoryInput
-          v-if="session?.isActive"
-          :current-player="currentPlayer"
-          :is-my-turn="isMyTurn"
-          :is-submitting="isGenerating"
-          :next-player-name="currentActorName"
-          :session-id="sessionId"
-          :game-type="session?.settings?.gameType || 'character'"
-          @submit-action="handleSubmitAction"
-          @clear-error="clearError"
-        />
+        <div class="story-input-wrapper" v-if="session?.isActive">
+          <StoryInput
+            :current-player="currentPlayer"
+            :is-my-turn="isMyTurn"
+            :is-submitting="isGenerating"
+            :next-player-name="currentActorName"
+            :session-id="sessionId"
+            :game-type="session?.settings?.gameType || 'character'"
+            @submit-action="handleSubmitAction"
+            @clear-error="clearError"
+          />
+        </div>
 
         <!-- Ended session notice -->
         <div v-if="!session?.isActive" class="session-ended-notice">
@@ -1468,30 +1469,113 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
+  /* ── Header: compact on mobile ── */
+  .session-header {
+    padding: 12px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .session-title {
+    font-size: 1.3em;
+  }
+
+  .session-description {
+    font-size: 0.85em;
+    margin: 2px 0 0 0;
+  }
+
+  .session-meta {
+    gap: 8px;
+    font-size: 0.8em;
+    flex-wrap: wrap;
+  }
+
+  .session-controls button {
+    padding: 10px;          /* keep touch target ≥44px area via line-height */
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* ── Main layout: vertical stack ── */
   .session-content {
     flex-direction: column;
+    overflow: visible; /* let children control their own scroll */
+    height: auto;
+    flex: 1;
   }
 
+  /* Story history: top panel, fixed height with own scroll */
   .story-panel {
-    flex: 1;
+    flex: none;
+    height: 50vh;
     border-right: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden; /* inner .story-content scrolls */
   }
 
+  .story-content {
+    padding: 12px;
+  }
+
+  /* Player/input panel: fills remaining space, scrollable */
   .player-panel {
-    flex: none;
-    max-height: 40vh;
-  }
-
-  .session-header {
+    flex: 1;
+    max-height: none;
+    padding: 10px 10px 0 10px;
+    gap: 12px;
+    overflow-y: auto;
+    /* Push input area to bottom when panel is tall */
+    display: flex;
     flex-direction: column;
-    gap: 15px;
-    text-align: center;
   }
 
+  /* Make the player list collapsible-friendly: smaller on mobile */
+  .player-list {
+    padding: 10px;
+  }
+
+  .player-list h3 {
+    font-size: 0.95em;
+    margin: 0 0 8px 0;
+  }
+
+  .player-item {
+    padding: 8px;
+  }
+
+  .player-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 1.2em;
+  }
+
+  /* Skip / retry buttons: full touch targets */
+  .skip-btn,
+  .retry-btn {
+    min-height: 44px;
+    font-size: 0.95em;
+  }
+
+  /* StoryInput docks to bottom inside the scroll container:
+     sticky keeps it in view while scrolling the panel */
+  .story-input-wrapper {
+    position: sticky;
+    bottom: 0;
+    margin: 0 -10px;        /* cancel parent padding so it bleeds edge-to-edge */
+    z-index: 10;
+  }
+
+  /* Collapse session-info-panel on mobile — it duplicates header data */
+  .session-info-panel {
+    display: none;
+  }
+
+  /* Modal */
   .modal-content {
     width: 95%;
-    margin: 20px;
+    margin: 10px;
+    max-height: 90vh;
   }
 }
 </style>
