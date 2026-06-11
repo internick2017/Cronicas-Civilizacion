@@ -21,11 +21,19 @@ un prompt de "generar evento de ronda" en narrativePrompts.js, y que closeRound 
 resolución + evento siguiente. El frontend casi no cambia (el evento es una entrada ai_narrative
 al inicio de cada ronda).
 
-## 2. Resumen acumulativo de la historia (coherencia en partidas largas)
+## 2. Resumen acumulativo de la historia ⭐ confirmado por Nick (doble uso)
 
-El narrador hoy ve el inicio + las últimas 4 narraciones. En historias de 20+ rondas pierde
-el medio. Mejora: la IA mantiene una sinopsis comprimida que se actualiza cada N rondas y se
-inyecta siempre en el contexto.
+La IA mantiene una sinopsis comprimida que se actualiza cada N rondas. Sirve para DOS cosas:
+
+- **Para los jugadores** (el uso que pidió Nick): botón "📖 ¿Qué ha pasado hasta ahora?" en la
+  sesión — muestra el resumen para ponerse al día sin releer todos los mensajes. Ideal para
+  quien se reconecta, llega tarde a la partida o se distrajo.
+- **Para la IA** (coherencia): la sinopsis se inyecta siempre en el contexto del narrador, así
+  no pierde el hilo en historias de 20+ rondas (hoy solo ve inicio + últimas 4 narraciones).
+
+Implementación: tras cada cierre de ronda (o cada 3), una llamada extra a Gemini "actualiza
+esta sinopsis con lo nuevo" → se guarda en la sesión (campo summary, persistido) → UI la
+muestra bajo demanda y buildRoundPrompt la incluye. Costo: +1 llamada corta por ronda (free tier ok).
 
 ## 3. Otras ideas en el radar
 
