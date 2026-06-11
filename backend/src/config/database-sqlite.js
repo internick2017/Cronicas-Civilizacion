@@ -172,8 +172,13 @@ const initializeTables = () => {
       )
     `);
 
-    // Idempotent migration: add code column to existing DBs
-    try { db.exec(`ALTER TABLE story_sessions ADD COLUMN code TEXT UNIQUE`); } catch (e) { /* already exists */ }
+    // Migración: agregar columna sin constraint (SQLite no permite ADD COLUMN UNIQUE)
+    try {
+      db.exec(`ALTER TABLE story_sessions ADD COLUMN code TEXT`);
+    } catch (e) {
+      if (!/duplicate column name/i.test(e.message)) throw e;
+    }
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_sessions_code ON story_sessions(code) WHERE code IS NOT NULL`);
 
     // Story Session Players table
     db.exec(`
