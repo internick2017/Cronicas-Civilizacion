@@ -185,7 +185,7 @@ router.post('/sessions/:sessionId/leave', async (req, res) => {
       });
     }
 
-    const result = NarrativeService.leaveSession(sessionId, playerId);
+    const result = await NarrativeService.leaveSession(sessionId, playerId);
     
     res.json({
       success: true,
@@ -264,7 +264,7 @@ router.get('/sessions/:sessionId/history', async (req, res) => {
     const { sessionId } = req.params;
     const { limit = 20 } = req.query;
     
-    const history = NarrativeService.getSessionHistory(sessionId, parseInt(limit));
+    const history = await NarrativeService.getSessionHistory(sessionId, parseInt(limit));
     
     res.json({
       success: true,
@@ -288,7 +288,7 @@ router.get('/sessions/:sessionId/history', async (req, res) => {
 router.get('/sessions/:sessionId/stats', async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const stats = NarrativeService.getSessionStats(sessionId);
+    const stats = await NarrativeService.getSessionStats(sessionId);
     
     res.json({
       success: true,
@@ -322,7 +322,7 @@ router.put('/sessions/:sessionId/settings', async (req, res) => {
       });
     }
 
-    const updatedSettings = NarrativeService.updateSessionSettings(sessionId, settings);
+    const updatedSettings = await NarrativeService.updateSessionSettings(sessionId, settings);
     
     res.json({
       success: true,
@@ -356,7 +356,7 @@ router.put('/sessions/:sessionId/context', async (req, res) => {
       });
     }
 
-    const updatedContext = NarrativeService.updateWorldContext(sessionId, context);
+    const updatedContext = await NarrativeService.updateWorldContext(sessionId, context);
     
     res.json({
       success: true,
@@ -430,7 +430,7 @@ router.post('/sessions/:sessionId/skip-turn', async (req, res) => {
 router.post('/sessions/:sessionId/end', async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const result = NarrativeService.endSession(sessionId);
+    const result = await NarrativeService.endSession(sessionId);
     
     res.json({
       success: true,
@@ -454,7 +454,7 @@ router.post('/sessions/:sessionId/end', async (req, res) => {
 router.get('/sessions/:sessionId/export', async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const exportData = NarrativeService.exportSession(sessionId);
+    const exportData = await NarrativeService.exportSession(sessionId);
     
     res.json({
       success: true,
@@ -500,7 +500,7 @@ router.post('/clear-cache', async (req, res) => {
  */
 router.get('/status', async (req, res) => {
   try {
-    const activeSessions = NarrativeService.getAllSessions();
+    const activeSessions = await NarrativeService.getAllSessions();
     const aiStatus = NarrativeService.aiService.getStatus();
     
     res.json({
