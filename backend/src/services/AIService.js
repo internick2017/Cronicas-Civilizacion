@@ -1,18 +1,9 @@
-import OpenAI from 'openai';
+import { GeminiClient } from './GeminiClient.js';
 import config from '../config/index.js';
 
 export class AIService {
   constructor() {
-    this.isEnabled = !!config.openai.apiKey;
-    this.model = config.openai.model;
-    
-    if (this.isEnabled) {
-      this.openai = new OpenAI({
-        apiKey: config.openai.apiKey,
-      });
-    } else {
-      console.log('ℹ️ OpenAI API key not found. Using fallback narratives.');
-    }
+    this.gemini = new GeminiClient(config.gemini);
   }
 
   /**
@@ -22,37 +13,22 @@ export class AIService {
    * @returns {Promise<Object>} Generated narrative response
    */
   async generateActionNarrative(actionData, gameContext) {
-    console.log('🤖 AI Service - isEnabled:', this.isEnabled);
-    console.log('🤖 AI Service - hasOpenAI:', !!this.openai);
-    
-    if (!this.isEnabled) {
+    console.log('🤖 AI Service - isEnabled:', this.gemini.isConfigured());
+
+    if (!this.gemini.isConfigured()) {
       console.log('🤖 AI Service - Using fallback (not enabled)');
       return this.getFallbackNarrative(actionData);
     }
 
     try {
       const prompt = this.buildActionPrompt(actionData, gameContext);
-      
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
-          {
-            role: 'system',
-            content: this.getSystemPrompt()
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: 300,
+
+      const narrative = await this.gemini.generate(prompt, {
+        systemPrompt: this.getSystemPrompt(),
         temperature: 0.8,
-        presence_penalty: 0.1,
-        frequency_penalty: 0.1
+        maxOutputTokens: 400,
       });
 
-      const narrative = response.choices[0].message.content.trim();
-      
       return {
         success: true,
         narrative,
@@ -60,8 +36,7 @@ export class AIService {
         timestamp: new Date()
       };
     } catch (error) {
-      console.error('🔴 OpenAI API Error:', error.message);
-      console.error('🔴 Full error:', error);
+      console.error('🔴 Gemini API Error:', error.message);
       console.log('🤖 Falling back to generic narrative');
       return this.getFallbackNarrative(actionData);
     }
@@ -73,32 +48,19 @@ export class AIService {
    * @returns {Promise<Object>} Generated world event
    */
   async generateWorldEvent(gameState) {
-    if (!this.isEnabled) {
+    if (!this.gemini.isConfigured()) {
       return this.getFallbackWorldEvent();
     }
 
     try {
       const prompt = this.buildWorldEventPrompt(gameState);
-      
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
-          {
-            role: 'system',
-            content: this.getWorldEventSystemPrompt()
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: 200,
+
+      const event = await this.gemini.generate(prompt, {
+        systemPrompt: this.getWorldEventSystemPrompt(),
         temperature: 0.9,
-        presence_penalty: 0.2
+        maxOutputTokens: 400,
       });
 
-      const event = response.choices[0].message.content.trim();
-      
       return {
         success: true,
         event,
@@ -106,7 +68,7 @@ export class AIService {
         timestamp: new Date()
       };
     } catch (error) {
-      console.error('OpenAI World Event Error:', error);
+      console.error('Gemini World Event Error:', error);
       return this.getFallbackWorldEvent();
     }
   }
@@ -115,7 +77,7 @@ export class AIService {
    * Build system prompt for action narratives
    */
   getSystemPrompt() {
-    return `You are the narrator for "Crónicas de Civilización", a turn-based strategy game. 
+    return `You are the narrator for "Crónicas de Civilización", a turn-based strategy game.
 Your role is to create engaging, immersive narratives for player actions.
 
 Guidelines:
@@ -195,9 +157,9 @@ Guidelines:
   buildWorldEventPrompt(gameState) {
     const { currentTurn, players, mapSize } = gameState;
     const activePlayers = players.filter(p => p.isActive).length;
-    
+
     return `Turno ${currentTurn} en un mundo de ${mapSize}x${mapSize} con ${activePlayers} civilizaciones activas.
-    
+
 Estado del mundo:
 - Civilizaciones más poderosas: ${players.slice(0, 2).map(p => p.civilizationName).join(', ')}
 - Recursos escasos detectados en el mundo
@@ -219,22 +181,22 @@ Genera un evento mundial que afecte a todas las civilizaciones de manera interes
   }
 
   /**
-   * Fallback narrative when OpenAI is not available
+   * Fallback narrative when Gemini is not available
    */
   getFallbackNarrative(actionData) {
     const { action, player } = actionData;
     const playerName = player.civilizationName || player.characterName || player.name || 'El jugador';
-    
+
     // Enhanced fallback narratives with more variety
     const storyNarratives = [
       `Las palabras de ${playerName} resuenan por las tierras conocidas. Su declaración sobre el descubrimiento de América marca un punto de inflexión en la historia. Los vientos del océano parecen sussurrar secretos de nuevas tierras, mientras las estrellas brillan con promesas de aventuras épicas.`,
-      
+
       `${playerName}, el audaz explorador, proclama su hazaña ante el mundo. Sus ojos brillan con la fuerza de quien ha visto horizontes que otros solo pueden imaginar. Las crónicas de esta civilización ahora incluirán relatos de tierras más allá del gran mar.`,
-      
+
       `La historia se detiene un momento para escuchar las palabras de ${playerName}. El eco de su proclamación viajará de aldea en aldea, de reino en reino, llevando noticias de nuevos mundos y posibilidades infinitas. Los cronistas afilan sus plumas para registrar este momento trascendental.`,
-      
+
       `Con la determinación de los grandes navegantes, ${playerName} comparte su visión del mundo expandido. Las cartas geográficas deberán ser redibujadas, las concepciones del mundo replanteadas. Esta es la hora en que las leyendas nacen y los destinos se forjan.`,
-      
+
       `${playerName} se alza como una figura legendaria en los anales de la historia. Su proclamación sobre América reverberará a través de los siglos, inspirando a futuras generaciones de exploradores y soñadores. Los vientos del cambio soplan, llevando consigo el aroma de nuevas aventuras.`
     ];
 
@@ -253,7 +215,7 @@ Genera un evento mundial que afecte a todas las civilizaciones de manera interes
         free_action: `${playerName} toma una acción decisiva que resonará a través de la historia.`,
         story_action: storyNarratives[Math.floor(Math.random() * storyNarratives.length)]
       };
-      
+
       selectedNarrative = fallbackMessages[action.type] || `${playerName} ha realizado una acción significativa.`;
     }
 
@@ -267,7 +229,7 @@ Genera un evento mundial que afecte a todas las civilizaciones de manera interes
   }
 
   /**
-   * Fallback world event when OpenAI is not available
+   * Fallback world event when Gemini is not available
    */
   getFallbackWorldEvent() {
     const events = [
@@ -291,7 +253,7 @@ Genera un evento mundial que afecte a todas las civilizaciones de manera interes
    * Check if AI service is properly configured
    */
   isConfigured() {
-    return this.isEnabled;
+    return this.gemini.isConfigured();
   }
 
   /**
@@ -299,11 +261,11 @@ Genera un evento mundial que afecte a todas las civilizaciones de manera interes
    */
   getStatus() {
     return {
-      enabled: this.isEnabled,
-      model: this.model,
+      enabled: this.gemini.isConfigured(),
+      model: config.gemini.model,
       configured: this.isConfigured()
     };
   }
 }
 
-export default new AIService(); 
+export default new AIService();
