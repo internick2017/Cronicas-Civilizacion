@@ -1,59 +1,66 @@
 <template>
   <div class="story-input">
     <div class="input-header">
-             <div class="player-info" v-if="props.currentPlayer">
-                   <div class="player-avatar">{{ getPlayerAvatar(props.currentPlayer) }}</div>
-         <div class="player-details">
-           <div class="player-name">{{ getPlayerDisplayName(props.currentPlayer) }}</div>
-           <div class="player-class">{{ getPlayerDisplayClass(props.currentPlayer) }}</div>
-         </div>
-         <div class="turn-indicator" v-if="props.isMyTurn">
-           <span class="turn-badge">🎯 Tu turno</span>
-         </div>
-       </div>
-       <div class="waiting-message" v-else-if="!props.isMyTurn && props.currentPlayer">
-         <div class="waiting-icon">⏳</div>
-         <span>Esperando el turno de {{ props.nextPlayerName }}</span>
-       </div>
+      <!-- Turn banner: my turn -->
+      <div class="turn-banner my-turn" v-if="props.isMyTurn && props.currentPlayer">
+        <div class="player-info">
+          <div class="player-avatar">{{ getPlayerAvatar(props.currentPlayer) }}</div>
+          <div class="player-details">
+            <div class="player-name">{{ getPlayerDisplayName(props.currentPlayer) }}</div>
+            <div class="player-class">{{ getPlayerDisplayClass(props.currentPlayer) }}</div>
+          </div>
+          <div class="turn-indicator">
+            <span class="turn-badge">✍️ Es tu turno</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Turn banner: waiting -->
+      <div class="turn-banner waiting-turn" v-else-if="props.currentPlayer">
+        <div class="waiting-message">
+          <div class="waiting-icon">⏳</div>
+          <span>Le toca a <strong>{{ props.nextPlayerName }}</strong></span>
+        </div>
+      </div>
     </div>
 
-         <div class="input-area" :class="{ disabled: !props.isMyTurn }">
-       <div class="input-wrapper">
-         <textarea
-           ref="actionInput"
-           v-model="actionText"
-           :placeholder="getPlaceholder()"
-           :disabled="!props.isMyTurn || props.isSubmitting"
-           @keydown.ctrl.enter="submitAction"
-           @keydown.meta.enter="submitAction"
-           class="action-textarea"
-           maxlength="500"
-           rows="3"
-         ></textarea>
-        
+    <div class="input-area" :class="{ disabled: !props.isMyTurn }">
+      <div class="input-wrapper">
+        <textarea
+          ref="actionInput"
+          v-model="actionText"
+          :placeholder="getPlaceholder()"
+          :disabled="!props.isMyTurn || props.isSubmitting"
+          @keydown.ctrl.enter="submitAction"
+          @keydown.meta.enter="submitAction"
+          class="action-textarea"
+          maxlength="280"
+          rows="3"
+        ></textarea>
+
         <div class="input-controls">
-          <div class="char-counter" :class="{ warning: actionText.length > 400 }">
-            {{ actionText.length }}/500
+          <div class="char-counter" :class="{ warning: actionText.length > 250 }">
+            {{ actionText.length }}/280
           </div>
           <div class="input-buttons">
-                         <button
-               @click="clearInput"
-               class="clear-btn"
-               :disabled="!actionText.trim() || props.isSubmitting"
-               title="Limpiar"
-             >
-               🗑️
-             </button>
-             <button
-               @click="submitAction"
-               class="submit-btn"
-               :disabled="!canSubmit"
-               :class="{ loading: props.isSubmitting }"
-               title="Enviar acción (Ctrl+Enter)"
-             >
-               <span v-if="!props.isSubmitting">📤 Enviar</span>
-               <span v-else class="loading-text">Generando...</span>
-             </button>
+            <button
+              @click="clearInput"
+              class="clear-btn"
+              :disabled="!actionText.trim() || props.isSubmitting"
+              title="Limpiar"
+            >
+              🗑️
+            </button>
+            <button
+              @click="submitAction"
+              class="submit-btn"
+              :disabled="!canSubmit"
+              :class="{ loading: props.isSubmitting }"
+              title="Enviar acción (Ctrl+Enter)"
+            >
+              <span v-if="!props.isSubmitting">📤 Enviar</span>
+              <span v-else class="loading-text">Generando...</span>
+            </button>
           </div>
         </div>
       </div>
@@ -116,10 +123,10 @@ const errorMessage = ref('')
 
 // Computed
 const canSubmit = computed(() => {
-  return props.isMyTurn && 
-         actionText.value.trim().length > 0 && 
+  return props.isMyTurn &&
+         actionText.value.trim().length > 0 &&
          !props.isSubmitting &&
-         actionText.value.length <= 500
+         actionText.value.length <= 280
 })
 
 // Methods
@@ -127,10 +134,9 @@ const getPlaceholder = () => {
   if (!props.isMyTurn) {
     return `Esperando el turno de ${props.nextPlayerName}...`
   }
-  
-  // Get game type from props
+
   const gameType = props.gameType
-  
+
   if (gameType === 'character') {
     const placeholders = [
       '¿Qué hace tu personaje? (ej: "Me acerco sigilosamente al castillo...")',
@@ -159,13 +165,13 @@ const getPlaceholder = () => {
     ]
     return placeholders[Math.floor(Math.random() * placeholders.length)]
   }
-  
+
   return 'Describe tu acción...'
 }
 
 const getPlayerDisplayName = (player) => {
   if (!player) return ''
-  
+
   if (player.countryName) return player.countryName
   if (player.worldRole) return player.worldRole
   return player.characterName || player.name
@@ -173,7 +179,7 @@ const getPlayerDisplayName = (player) => {
 
 const getPlayerDisplayClass = (player) => {
   if (!player) return ''
-  
+
   if (player.countryType) return player.countryType
   if (player.worldType) return player.worldType
   return player.characterClass || 'Aventurero'
@@ -181,9 +187,9 @@ const getPlayerDisplayClass = (player) => {
 
 const getPlayerAvatar = (player) => {
   if (!player) return '👤'
-  
+
   const gameType = props.gameType
-  
+
   if (gameType === 'character') {
     const avatars = {
       'Aventurero': '🗡️',
@@ -221,16 +227,16 @@ const getPlayerAvatar = (player) => {
     }
     return avatars[player.worldType] || '🌍'
   }
-  
+
   return '👤'
 }
 
 const submitAction = async () => {
   if (!canSubmit.value) return
-  
+
   const action = actionText.value.trim()
   if (action.length === 0) return
-  
+
   try {
     errorMessage.value = ''
     emit('submit-action', action)
@@ -282,14 +288,26 @@ watch(() => props.isMyTurn, () => {
   margin-bottom: 20px;
 }
 
+/* Turn banners */
+.turn-banner {
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.turn-banner.my-turn {
+  background: rgba(46, 204, 113, 0.15);
+  border-left: 4px solid #2ecc71;
+}
+
+.turn-banner.waiting-turn {
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 4px solid #f39c12;
+}
+
 .player-info {
   display: flex;
   align-items: center;
   gap: 15px;
-  padding: 15px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  border-left: 4px solid #3498db;
 }
 
 .player-avatar {
@@ -345,10 +363,6 @@ watch(() => props.isMyTurn, () => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 15px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  border-left: 4px solid #f39c12;
   color: #bdc3c7;
 }
 
@@ -387,6 +401,7 @@ watch(() => props.isMyTurn, () => {
   line-height: 1.5;
   resize: vertical;
   transition: all 0.3s ease;
+  box-sizing: border-box;
 }
 
 .action-textarea:focus {
@@ -421,6 +436,7 @@ watch(() => props.isMyTurn, () => {
 
 .char-counter.warning {
   color: #f39c12;
+  font-weight: bold;
 }
 
 .input-buttons {
@@ -535,21 +551,21 @@ watch(() => props.isMyTurn, () => {
   .story-input {
     padding: 15px;
   }
-  
+
   .player-info {
     flex-direction: column;
     text-align: center;
     gap: 10px;
   }
-  
+
   .input-controls {
     flex-direction: column;
     gap: 10px;
     align-items: stretch;
   }
-  
+
   .input-buttons {
     justify-content: center;
   }
 }
-</style> 
+</style>

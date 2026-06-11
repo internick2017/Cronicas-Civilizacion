@@ -2,15 +2,15 @@
   <div class="story-session">
     <!-- Session Header -->
     <div class="session-header">
-              <div class="session-info">
-          <h1 class="session-title">{{ session?.title || 'Cargando...' }}</h1>
-          <p class="session-description">{{ session?.description || 'Una aventura épica colaborativa' }}</p>
-          <div class="session-meta">
-            <span class="game-type">{{ getGameTypeLabel(session?.settings?.gameType) }}</span>
-            <span class="turn-info">Turno {{ session?.turnNumber || 1 }}</span>
-            <span class="player-count">{{ session?.players?.length || 0 }} jugadores</span>
-          </div>
+      <div class="session-info">
+        <h1 class="session-title">{{ session?.title || 'Cargando...' }}</h1>
+        <p class="session-description">{{ session?.description || 'Una aventura épica colaborativa' }}</p>
+        <div class="session-meta">
+          <span class="game-type">{{ getGameTypeLabel(session?.settings?.gameType) }}</span>
+          <span class="turn-info">Turno {{ session?.turnNumber || 1 }}</span>
+          <span class="player-count">{{ session?.players?.length || 0 }} jugadores</span>
         </div>
+      </div>
       <div class="session-controls">
         <button @click="showSettings = !showSettings" class="settings-btn" title="Configuración">
           ⚙️
@@ -18,7 +18,13 @@
         <button @click="exportStory" class="export-btn" title="Exportar historia">
           📄
         </button>
-        <button @click="endSession" class="end-btn" title="Terminar sesión">
+        <!-- End button: only when active and only for host -->
+        <button
+          v-if="session?.isActive && isHost"
+          @click="endSession"
+          class="end-btn"
+          title="Terminar sesión"
+        >
           🏁
         </button>
       </div>
@@ -49,7 +55,12 @@
           </div>
 
           <!-- Story entries -->
-          <div v-for="(entry, index) in storyHistory" :key="entry.id" class="story-entry" :class="entry.type">
+          <div
+            v-for="(entry, index) in storyHistory"
+            :key="entry.id"
+            class="story-entry"
+            :class="entry.type"
+          >
             <div class="entry-header">
               <div class="entry-icon">{{ getEntryIcon(entry.type) }}</div>
               <div class="entry-meta">
@@ -58,7 +69,7 @@
                 <span v-if="entry.turnNumber" class="turn-badge">Turno {{ entry.turnNumber }}</span>
               </div>
             </div>
-            
+
             <div class="entry-content">
               <!-- Player action -->
               <div v-if="entry.type === 'player_action'" class="player-action">
@@ -68,10 +79,16 @@
                 </div>
                 <div class="action-text">{{ entry.action }}</div>
               </div>
-              
+
               <!-- AI narrative -->
               <div v-else-if="entry.type === 'ai_narrative'" class="ai-narrative">
                 <div class="narrative-text" v-html="formatNarrative(entry.narrative)"></div>
+              </div>
+
+              <!-- AI epilogue -->
+              <div v-else-if="entry.type === 'ai_epilogue'" class="ai-epilogue">
+                <div class="epilogue-label">📜 Epílogo</div>
+                <div class="epilogue-text" v-html="formatNarrative(entry.narrative)"></div>
               </div>
             </div>
           </div>
@@ -94,9 +111,9 @@
         <div class="player-list">
           <h3>👥 Jugadores</h3>
           <div class="players">
-            <div 
-              v-for="player in session?.players || []" 
-              :key="player.id" 
+            <div
+              v-for="player in session?.players || []"
+              :key="player.id"
               class="player-item"
               :class="{ current: isCurrentPlayer(player.id) }"
             >
@@ -112,17 +129,43 @@
           </div>
         </div>
 
-        <!-- Story Input -->
-                    <StoryInput
-              :current-player="currentPlayer"
-              :is-my-turn="isMyTurn"
-              :is-submitting="isGenerating"
-              :next-player-name="nextPlayerName"
-              :session-id="sessionId"
-              :game-type="session?.settings?.gameType || 'character'"
-              @submit-action="handleSubmitAction"
-              @clear-error="clearError"
-            />
+        <!-- Host action buttons (host only, active session) -->
+        <div v-if="isHost && session?.isActive" class="host-actions">
+          <button @click="skipTurn" class="skip-btn" :disabled="isSkipping" title="Saltar turno actual">
+            <span v-if="!isSkipping">⏭️ Saltar turno</span>
+            <span v-else>Saltando...</span>
+          </button>
+        </div>
+
+        <!-- Retry narrative alert (host only, shown after AI failure on round close) -->
+        <div v-if="showRetryAlert && isHost" class="retry-alert">
+          <div class="retry-alert-text">
+            ⚠️ La IA no pudo generar la narrativa al cerrar la ronda.
+          </div>
+          <button @click="retryNarrative" class="retry-btn" :disabled="isRetrying">
+            <span v-if="!isRetrying">🔄 Reintentar narración</span>
+            <span v-else>Reintentando...</span>
+          </button>
+        </div>
+
+        <!-- Story Input (only when active) -->
+        <StoryInput
+          v-if="session?.isActive"
+          :current-player="currentPlayer"
+          :is-my-turn="isMyTurn"
+          :is-submitting="isGenerating"
+          :next-player-name="nextPlayerName"
+          :session-id="sessionId"
+          :game-type="session?.settings?.gameType || 'character'"
+          @submit-action="handleSubmitAction"
+          @clear-error="clearError"
+        />
+
+        <!-- Ended session notice -->
+        <div v-if="!session?.isActive" class="session-ended-notice">
+          <div class="ended-icon">🏁</div>
+          <p>La sesión ha terminado. La historia completa se muestra arriba.</p>
+        </div>
 
         <!-- Session Info -->
         <div class="session-info-panel">
@@ -219,6 +262,9 @@ const storyContent = ref(null)
 const autoScroll = ref(true)
 const showSettings = ref(false)
 const isGenerating = ref(false)
+const isSkipping = ref(false)
+const isRetrying = ref(false)
+const showRetryAlert = ref(false)
 const errorMessage = ref('')
 const storyHistory = ref([])
 const session = ref(null)
@@ -248,6 +294,12 @@ const nextPlayerName = computed(() => {
   return nextPlayer?.characterName || 'Siguiente jugador'
 })
 
+// Host = players[0]
+const isHost = computed(() => {
+  if (!session.value?.players || !Array.isArray(session.value.players) || session.value.players.length === 0) return false
+  return session.value.players[0].id === props.currentPlayerId
+})
+
 // Methods
 const isCurrentPlayer = (playerId) => {
   if (!session.value) return false
@@ -260,6 +312,7 @@ const getEntryIcon = (type) => {
   const icons = {
     'player_action': '👤',
     'ai_narrative': '🤖',
+    'ai_epilogue': '📜',
     'system': '⚙️'
   }
   return icons[type] || '📝'
@@ -269,6 +322,7 @@ const getEntryTypeLabel = (type) => {
   const labels = {
     'player_action': 'Acción del Jugador',
     'ai_narrative': 'Narrativa IA',
+    'ai_epilogue': 'Epílogo',
     'system': 'Sistema'
   }
   return labels[type] || 'Entrada'
@@ -276,7 +330,7 @@ const getEntryTypeLabel = (type) => {
 
 const getPlayerAvatar = (player, session) => {
   const gameType = session?.settings?.gameType || 'character'
-  
+
   if (gameType === 'character') {
     const avatars = {
       'Aventurero': '🗡️',
@@ -314,13 +368,13 @@ const getPlayerAvatar = (player, session) => {
     }
     return avatars[player.worldType] || '🌍'
   }
-  
+
   return '👤'
 }
 
 const getPlayerDisplayName = (player) => {
   const gameType = session.value?.settings?.gameType || 'character'
-  
+
   if (gameType === 'character') {
     return player.characterName || player.name
   } else if (gameType === 'country') {
@@ -328,13 +382,13 @@ const getPlayerDisplayName = (player) => {
   } else if (gameType === 'world') {
     return player.worldRole || player.name
   }
-  
+
   return player.name
 }
 
 const getPlayerDisplayClass = (player) => {
   const gameType = session.value?.settings?.gameType || 'character'
-  
+
   if (gameType === 'character') {
     return player.characterClass || 'Aventurero'
   } else if (gameType === 'country') {
@@ -342,7 +396,7 @@ const getPlayerDisplayClass = (player) => {
   } else if (gameType === 'world') {
     return player.worldType || 'Continente'
   }
-  
+
   return 'Jugador'
 }
 
@@ -357,9 +411,9 @@ const getGameTypeLabel = (gameType) => {
 
 const formatTime = (timestamp) => {
   const date = new Date(timestamp)
-  return date.toLocaleTimeString('es-ES', { 
-    hour: '2-digit', 
-    minute: '2-digit' 
+  return date.toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit'
   })
 }
 
@@ -385,7 +439,8 @@ const handleSubmitAction = async (action) => {
   try {
     isGenerating.value = true
     errorMessage.value = ''
-    
+    showRetryAlert.value = false
+
     const response = await fetch(`/api/narrative/sessions/${props.sessionId}/action`, {
       method: 'POST',
       headers: {
@@ -398,15 +453,27 @@ const handleSubmitAction = async (action) => {
     })
 
     const result = await response.json()
-    
+
+    if (response.status === 500) {
+      // AI failed while closing a round — actions are saved, retry available
+      showRetryAlert.value = true
+      await loadSession()
+      await loadHistory()
+      return
+    }
+
     if (!result.success) {
       throw new Error(result.message || 'Error al enviar la acción')
     }
 
-    // Update session and history
-    await loadSession()
-    await loadHistory()
-    
+    // If round is complete, refresh immediately; otherwise let the poll handle it
+    if (result.data?.roundComplete) {
+      await loadSession()
+      await loadHistory()
+    } else {
+      await loadSession()
+    }
+
   } catch (error) {
     console.error('Error submitting action:', error)
     errorMessage.value = error.message || 'Error al enviar la acción'
@@ -416,11 +483,60 @@ const handleSubmitAction = async (action) => {
   }
 }
 
+const retryNarrative = async () => {
+  try {
+    isRetrying.value = true
+    const response = await fetch(`/api/narrative/sessions/${props.sessionId}/retry-narrative`, {
+      method: 'POST'
+    })
+    const result = await response.json()
+
+    // 400 "No hay ronda pendiente" → clear alert and refresh (round may have resolved already)
+    showRetryAlert.value = false
+    await loadSession()
+    await loadHistory()
+
+    if (!result.success && response.status !== 400) {
+      errorMessage.value = result.message || 'Error al reintentar la narración'
+    }
+  } catch (error) {
+    console.error('Error retrying narrative:', error)
+    errorMessage.value = 'Error al reintentar la narración'
+  } finally {
+    isRetrying.value = false
+  }
+}
+
+const skipTurn = async () => {
+  try {
+    isSkipping.value = true
+    errorMessage.value = ''
+
+    const response = await fetch(`/api/narrative/sessions/${props.sessionId}/skip-turn`, {
+      method: 'POST'
+    })
+    const result = await response.json()
+
+    if (!result.success) {
+      throw new Error(result.message || 'Error al saltar el turno')
+    }
+
+    // Skip may close the round and return a narrative; always refresh both
+    await loadSession()
+    await loadHistory()
+  } catch (error) {
+    console.error('Error skipping turn:', error)
+    errorMessage.value = error.message || 'Error al saltar el turno'
+  } finally {
+    isSkipping.value = false
+  }
+}
+
 const loadSession = async () => {
   try {
     const response = await fetch(`/api/narrative/sessions/${props.sessionId}`)
     const result = await response.json()
-    
+
     if (result.success) {
       session.value = result.data
     } else {
@@ -436,7 +552,7 @@ const loadHistory = async () => {
   try {
     const response = await fetch(`/api/narrative/sessions/${props.sessionId}/history?limit=50`)
     const result = await response.json()
-    
+
     if (result.success) {
       storyHistory.value = result.data
     } else {
@@ -461,7 +577,7 @@ const saveSettings = async () => {
     })
 
     const result = await response.json()
-    
+
     if (result.success) {
       showSettings.value = false
     } else {
@@ -477,7 +593,7 @@ const exportStory = async () => {
   try {
     const response = await fetch(`/api/narrative/sessions/${props.sessionId}/export`)
     const result = await response.json()
-    
+
     if (result.success) {
       const dataStr = JSON.stringify(result.data, null, 2)
       const dataBlob = new Blob([dataStr], { type: 'application/json' })
@@ -497,16 +613,19 @@ const exportStory = async () => {
 }
 
 const endSession = async () => {
-  if (!confirm('¿Estás seguro de que quieres terminar esta sesión?')) return
-  
+  if (!confirm('¿Estás seguro de que quieres terminar esta sesión? Se generará un epílogo.')) return
+
   try {
     const response = await fetch(`/api/narrative/sessions/${props.sessionId}/end`, {
       method: 'POST'
     })
-    
+
     const result = await response.json()
-    
+
     if (result.success) {
+      // Refresh history so the ai_epilogue entry is visible
+      await loadSession()
+      await loadHistory()
       emit('session-ended', result.data)
     } else {
       throw new Error(result.message)
@@ -546,7 +665,7 @@ let pollInterval = null
 onMounted(async () => {
   await loadSession()
   await loadHistory()
-  
+
   // Set up polling for updates
   pollInterval = setInterval(async () => {
     if (session.value?.isActive) {
@@ -743,6 +862,14 @@ onUnmounted(() => {
   background: rgba(155, 89, 182, 0.1);
 }
 
+/* Epilogue entry — golden border */
+.story-entry.ai_epilogue {
+  border-left-color: #f1c40f;
+  background: rgba(241, 196, 15, 0.08);
+  border: 2px solid #f1c40f;
+  border-left-width: 4px;
+}
+
 .entry-header {
   display: flex;
   align-items: center;
@@ -814,6 +941,30 @@ onUnmounted(() => {
 
 .narrative-text :deep(em) {
   color: #f39c12;
+}
+
+/* Epilogue styles */
+.ai-epilogue .epilogue-label {
+  font-size: 1em;
+  font-weight: bold;
+  color: #f1c40f;
+  margin-bottom: 10px;
+  letter-spacing: 0.05em;
+}
+
+.epilogue-text {
+  line-height: 1.7;
+  color: #F5DEB3;
+  font-style: italic;
+  font-size: 1.05em;
+}
+
+.epilogue-text :deep(strong) {
+  color: #f1c40f;
+}
+
+.epilogue-text :deep(em) {
+  color: #e67e22;
 }
 
 .typing-indicator {
@@ -927,6 +1078,99 @@ onUnmounted(() => {
 .current-indicator {
   font-size: 1.2em;
   animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* Host action buttons */
+.host-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.skip-btn {
+  flex: 1;
+  padding: 10px 16px;
+  background: rgba(52, 152, 219, 0.2);
+  border: 1px solid rgba(52, 152, 219, 0.4);
+  border-radius: 6px;
+  color: #3498db;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.skip-btn:hover:not(:disabled) {
+  background: rgba(52, 152, 219, 0.35);
+  border-color: rgba(52, 152, 219, 0.6);
+}
+
+.skip-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Retry alert */
+.retry-alert {
+  background: rgba(231, 76, 60, 0.12);
+  border: 1px solid rgba(231, 76, 60, 0.4);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.retry-alert-text {
+  color: #e74c3c;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.retry-btn {
+  padding: 9px 16px;
+  background: rgba(231, 76, 60, 0.2);
+  border: 1px solid rgba(231, 76, 60, 0.5);
+  border-radius: 6px;
+  color: #e74c3c;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.retry-btn:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.35);
+}
+
+.retry-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Ended session notice */
+.session-ended-notice {
+  text-align: center;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  color: #bdc3c7;
+}
+
+.ended-icon {
+  font-size: 2em;
+  margin-bottom: 10px;
+}
+
+.session-ended-notice p {
+  margin: 0;
+  font-size: 0.9em;
+  line-height: 1.5;
 }
 
 .session-info-panel {
@@ -1165,27 +1409,27 @@ onUnmounted(() => {
   .session-content {
     flex-direction: column;
   }
-  
+
   .story-panel {
     flex: 1;
     border-right: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
-  
+
   .player-panel {
     flex: none;
     max-height: 40vh;
   }
-  
+
   .session-header {
     flex-direction: column;
     gap: 15px;
     text-align: center;
   }
-  
+
   .modal-content {
     width: 95%;
     margin: 20px;
   }
 }
-</style> 
+</style>
