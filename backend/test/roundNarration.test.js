@@ -66,4 +66,14 @@ describe('narración por cierre de ronda', () => {
     await expect(svc.submitAction(session.id, beto.id, 'a2'))
       .rejects.toMatchObject({ code: 'AI_NARRATION_FAILED' });
   });
+
+  it('el prompt de ronda incluye el inicio de la historia y las narraciones recientes', async () => {
+    session.addAINarrative('Apertura: érase una vez en Eldoria');
+    session.addAINarrative('Narración intermedia 1');
+    await svc.submitAction(session.id, ana.id, 'a1');
+    await svc.submitAction(session.id, beto.id, 'a2');
+    const prompt = svc.aiService.generateStoryNarrative.mock.calls[0][0];
+    expect(prompt).toContain('érase una vez en Eldoria');
+    expect(prompt).toContain('Narración intermedia 1');
+  });
 });
