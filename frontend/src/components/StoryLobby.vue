@@ -475,6 +475,8 @@ const createSession = async () => {
 const fetchSession = async (sessionId) => {
   try {
     const response = await fetch(`/api/narrative/sessions/${sessionId}`)
+    // 429 in the waiting room: don't count as a failure, just skip this tick
+    if (response.status === 429) return 'rate-limited'
     const result = await response.json()
     return result.success ? result.data : null
   } catch {
@@ -489,6 +491,7 @@ const startWaitingPoll = (role) => {
   waitingPollInterval = setInterval(async () => {
     if (role === 'host' && hostedSession.value) {
       const updated = await fetchSession(hostedSession.value.id)
+      if (updated === 'rate-limited') return  // skip tick, don't count as failure
       if (updated) {
         waitingPollFailures = 0
         hostedSession.value = updated
@@ -505,6 +508,7 @@ const startWaitingPoll = (role) => {
       }
     } else if (role === 'guest' && guestSession.value) {
       const updated = await fetchSession(guestSession.value.id)
+      if (updated === 'rate-limited') return  // skip tick, don't count as failure
       if (updated) {
         waitingPollFailures = 0
         guestSession.value = updated
@@ -593,9 +597,17 @@ const joinByCode = async () => {
       joinError.value = 'Sala no encontrada'
       return
     }
+    if (lookupResponse.status === 429) {
+      joinError.value = 'El servidor está ocupado — espera unos segundos y reintenta'
+      return
+    }
+    if (!lookupResponse.ok) {
+      joinError.value = 'No se pudo conectar — reintenta'
+      return
+    }
     const lookupResult = await lookupResponse.json()
     if (!lookupResult.success) {
-      joinError.value = lookupResult.message || 'Sala no encontrada'
+      joinError.value = lookupResult.message || 'No se pudo conectar — reintenta'
       return
     }
     const foundSession = lookupResult.data
