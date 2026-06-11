@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NarrativeService } from '../src/services/NarrativeService.js';
 import { StorySession } from '../src/models/StorySession.js';
 
@@ -23,6 +23,19 @@ describe('códigos de sala en sesiones', () => {
     const a = await svc.createSession({ title: 'A' });
     const b = await svc.createSession({ title: 'B' });
     expect(a.code).not.toBe(b.code);
+  });
+});
+
+describe('retry de código en colisión única', () => {
+  it('regenera el código si el guardado falla por colisión única', async () => {
+    const svc2 = new NarrativeService({ skipDatabase: true });
+    const uniqueErr = new Error('UNIQUE constraint failed: story_sessions.code');
+    const save = vi.spyOn(svc2, 'saveSessionToDatabase')
+      .mockRejectedValueOnce(uniqueErr)
+      .mockResolvedValueOnce(undefined);
+    const s = await svc2.createSession({ title: 'X' });
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(s.code).toMatch(/^[A-Z]{5}$/);
   });
 });
 
