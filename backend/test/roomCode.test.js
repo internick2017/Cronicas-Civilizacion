@@ -21,4 +21,12 @@ describe('generateRoomCode', () => {
     const second = generateRoomCode(c => existing.has(c));
     expect(second).not.toBe(first);
   });
+
+  it('lanza si no puede generar código único en 50 intentos', () => {
+    expect(() => generateRoomCode(() => true)).toThrow('No se pudo generar');
+  });
+
+  it('el alfabeto tiene exactamente 23 caracteres', () => {
+    expect(ROOM_CODE_ALPHABET).toHaveLength(23);
+  });
 });
