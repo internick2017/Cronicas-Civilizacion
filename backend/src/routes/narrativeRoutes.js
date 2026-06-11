@@ -374,6 +374,56 @@ router.put('/sessions/:sessionId/context', async (req, res) => {
 });
 
 /**
+ * POST /api/narrative/sessions/:sessionId/retry-narrative
+ * Retry AI narration for the current round (use when the AI call failed previously)
+ */
+router.post('/sessions/:sessionId/retry-narrative', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const result = await NarrativeService.retryNarration(sessionId);
+    res.json({
+      success: true,
+      data: result,
+      message: 'Narración generada correctamente'
+    });
+  } catch (error) {
+    console.error('Error retrying narration:', error);
+    const status = error.message === 'Sesión no encontrada' ? 404
+      : error.message === 'No hay ronda pendiente de narrar' ? 400
+      : 500;
+    res.status(status).json({
+      success: false,
+      error: 'Failed to retry narration',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/narrative/sessions/:sessionId/skip-turn
+ * Skip the current player's turn
+ */
+router.post('/sessions/:sessionId/skip-turn', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const result = await NarrativeService.skipTurn(sessionId);
+    res.json({
+      success: true,
+      data: result,
+      message: result.roundComplete ? 'Turno saltado — ronda completada' : 'Turno saltado'
+    });
+  } catch (error) {
+    console.error('Error skipping turn:', error);
+    const status = error.message === 'Sesión no activa' ? 400 : 500;
+    res.status(status).json({
+      success: false,
+      error: 'Failed to skip turn',
+      message: error.message
+    });
+  }
+});
+
+/**
  * POST /api/narrative/sessions/:sessionId/end
  * End a story session
  */

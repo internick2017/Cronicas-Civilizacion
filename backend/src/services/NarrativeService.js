@@ -344,12 +344,21 @@ export class NarrativeService {
       throw new Error('Session is not active');
     }
 
+    // Reconnect: if a player with the same name (case-insensitive) already exists, return them
+    const existing = session.players.find(
+      p => p.name.trim().toLowerCase() === String(playerData.name || '').trim().toLowerCase()
+    );
+    if (existing) {
+      existing.isActive = true;
+      return { session, player: existing, message: 'Reconectado a la sesión' };
+    }
+
     const player = session.addPlayer(playerData);
     console.log(`👤 ${player.name} joined session ${session.title}`);
-    
+
     // Save to database
     await this.saveSessionToDatabase(session);
-    
+
     return {
       session: session.toJSON(), // Return full session data for resuming
       player,
@@ -387,6 +396,31 @@ export class NarrativeService {
   }
 
   /**
+   * Close a round: call AI with all round actions, record narrative, advance turnNumber.
+   * Throws if AI throws (turnNumber is left unincremented so the round can be retried).
+   */
+  async closeRound(session) {
+    const roundActions = session.storyHistory.filter(
+      e => e.type === 'player_action' && e.turnNumber === session.turnNumber
+    );
+    const prompt = this.buildRoundPrompt(session, roundActions);
+    const language = (session.settings && session.settings.language) || 'es';
+    const genre = (session.settings && session.settings.genre) || 'fantasy';
+
+    // Throws → propagates; turnNumber is NOT incremented yet
+    const aiText = await this.aiService.generateStoryNarrative(prompt, { language, genre });
+
+    // null means unconfigured — use local fallback so the round always gets some narrative
+    const narrative = aiText ?? this.getFallbackNarrative({ characterName: 'los héroes' });
+
+    const aiEntry = session.addAINarrative(narrative);
+    if (!this.skipDatabase) await this.saveStoryEntryToDatabase(session.id, aiEntry);
+    session.turnNumber += 1;
+    if (!this.skipDatabase) await this.saveSessionToDatabase(session);
+    return narrative;
+  }
+
+  /**
    * Submit a player action.
    * Saves the action and advances turn order. Only when the LAST player of the round
    * submits does the service call the AI ONCE with ALL the round's actions.
@@ -420,22 +454,8 @@ export class NarrativeService {
       // Persist advanced index before the AI call so a crash re-hydrates consistent turn state
       if (!this.skipDatabase) await this.saveSessionToDatabase(session);
 
-      const roundActions = session.storyHistory.filter(
-        e => e.type === 'player_action' && e.turnNumber === session.turnNumber
-      );
-      const prompt = this.buildRoundPrompt(session, roundActions);
-      const language = (session.settings && session.settings.language) || 'es';
-      const genre = (session.settings && session.settings.genre) || 'fantasy';
-
-      // generateStoryNarrative throws → propagate (action+index already mutated; turnNumber not yet incremented)
-      const aiText = await this.aiService.generateStoryNarrative(prompt, { language, genre });
-
-      // null means unconfigured — use local fallback so the round always gets some narrative
-      narrative = aiText ?? this.getFallbackNarrative({ characterName: 'los héroes' });
-
-      const aiEntry = session.addAINarrative(narrative);
-      if (!this.skipDatabase) await this.saveStoryEntryToDatabase(sessionId, aiEntry);
-      session.turnNumber += 1;
+      // closeRound throws → propagate (action+index already mutated; turnNumber not yet incremented)
+      narrative = await this.closeRound(session);
     }
 
     if (!this.skipDatabase) await this.saveSessionToDatabase(session);
@@ -445,6 +465,65 @@ export class NarrativeService {
       nextPlayer: session.players[session.currentPlayerIndex],
       turnNumber: session.turnNumber,
       roundComplete,
+    };
+  }
+
+  /**
+   * Retry narration for the current round (when AI failed previously).
+   * Only valid if there are player_actions for the current turnNumber and no ai_narrative yet.
+   */
+  async retryNarration(sessionId) {
+    const session = await this.getSession(sessionId);
+    if (!session) throw new Error('Sesión no encontrada');
+
+    const roundActions = session.storyHistory.filter(
+      e => e.type === 'player_action' && e.turnNumber === session.turnNumber
+    );
+    if (roundActions.length === 0) throw new Error('No hay ronda pendiente de narrar');
+
+    // Guard against double-narration: if this turn already has an ai_narrative, nothing to retry
+    const alreadyNarrated = session.storyHistory.some(
+      e => e.type === 'ai_narrative' && e.turnNumber === session.turnNumber
+    );
+    if (alreadyNarrated) throw new Error('No hay ronda pendiente de narrar');
+
+    const narrative = await this.closeRound(session);
+    return { narrative, turnNumber: session.turnNumber };
+  }
+
+  /**
+   * Skip the current player's turn, advancing to the next player.
+   * If advancing wraps back to index 0 (round complete), close the round.
+   */
+  async skipTurn(sessionId) {
+    const session = await this.getSession(sessionId);
+    if (!session || !session.isActive) throw new Error('Sesión no activa');
+
+    session.currentPlayerIndex = (session.currentPlayerIndex + 1) % session.players.length;
+    const roundComplete = session.currentPlayerIndex === 0;
+
+    if (!this.skipDatabase) await this.saveSessionToDatabase(session);
+
+    let narrative = null;
+    if (roundComplete) {
+      const roundActions = session.storyHistory.filter(
+        e => e.type === 'player_action' && e.turnNumber === session.turnNumber
+      );
+      if (roundActions.length > 0) {
+        // There are actions this round — generate AI narrative
+        narrative = await this.closeRound(session);
+      } else {
+        // Nobody acted this round — just advance turnNumber without narrating
+        session.turnNumber += 1;
+        if (!this.skipDatabase) await this.saveSessionToDatabase(session);
+      }
+    }
+
+    return {
+      roundComplete,
+      narrative,
+      nextPlayer: session.players[session.currentPlayerIndex],
+      turnNumber: session.turnNumber,
     };
   }
 
