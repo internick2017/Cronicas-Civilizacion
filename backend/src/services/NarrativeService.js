@@ -35,19 +35,20 @@ export class NarrativeService {
       // Save main session
       await client.query(`
         INSERT INTO story_sessions (id, title, description, max_players, current_player_index,
-                                  turn_number, is_active, world_context, settings, code, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                                  turn_number, is_active, world_context, settings, code, summary, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT (id) DO UPDATE SET
           current_player_index = $5,
           turn_number = $6,
           is_active = $7,
           world_context = $8,
           code = $10,
-          updated_at = $12
+          summary = $11,
+          updated_at = $13
       `, [session.id, session.title, session.description, session.maxPlayers,
           session.currentPlayerIndex, session.turnNumber, session.isActive,
           JSON.stringify(session.worldContext), JSON.stringify(session.settings),
-          session.code || null, session.createdAt, session.updatedAt]);
+          session.code || null, session.summary ?? '', session.createdAt, session.updatedAt]);
       
       // Save players
       await client.query('DELETE FROM story_session_players WHERE session_id = $1', [session.id]);
@@ -84,6 +85,7 @@ export class NarrativeService {
       worldContext: JSON.parse(sessionData.world_context || '{}'),
       settings: JSON.parse(sessionData.settings || '{}'),
       code: sessionData.code || null,
+      summary: sessionData.summary ?? '',
       createdAt: sessionData.created_at,
       updatedAt: sessionData.updated_at,
       players: players.map(p => ({
@@ -180,6 +182,14 @@ export class NarrativeService {
     if (sessionData.settings) {
       sessionData.settings.language = normalizeLanguage(sessionData.settings.language);
     }
+
+    // Normalise mode and maxRounds
+    const VALID_MODES = ['narrador-activo', 'colaborativo'];
+    sessionData.settings = sessionData.settings || {};
+    sessionData.settings.mode = VALID_MODES.includes(sessionData.settings.mode)
+      ? sessionData.settings.mode : 'narrador-activo';
+    const mr = Number(sessionData.settings.maxRounds);
+    sessionData.settings.maxRounds = Number.isInteger(mr) && mr >= 3 && mr <= 50 ? mr : null;
 
     const session = new StorySession(sessionData);
     session.code = generateRoomCode(c =>
