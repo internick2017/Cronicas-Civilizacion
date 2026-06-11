@@ -1,6 +1,6 @@
 import { GeminiClient } from './GeminiClient.js';
 import config from '../config/index.js';
-import { getNarratorSystemPrompt, getOpeningPrompt, getEpiloguePrompt } from './narrativePrompts.js';
+import { getNarratorSystemPrompt, getOpeningPrompt, getEpiloguePrompt, getSummaryPrompt } from './narrativePrompts.js';
 
 export class AIService {
   constructor() {
@@ -53,17 +53,15 @@ export class AIService {
    * @returns {Promise<string|null>} Generated narrative text,
    *   or null cuando la IA no está configurada; el caller debe usar el fallback.
    */
-  async generateStoryNarrative(prompt, { language = 'es', genre = 'fantasy' } = {}) {
+  async generateStoryNarrative(prompt, { language = 'es', genre = 'fantasy', mode = 'colaborativo' } = {}) {
     if (!this.gemini.isConfigured()) {
       return null; // caller must handle fallback
     }
 
-    const systemPrompt = getNarratorSystemPrompt(language, genre);
-
     return await this.gemini.generate(prompt, {
-      systemPrompt,
+      systemPrompt: getNarratorSystemPrompt(language, genre, mode),
       temperature: 0.8,
-      maxOutputTokens: 500,
+      maxOutputTokens: 400,
     });
   }
 
@@ -74,12 +72,31 @@ export class AIService {
    * @param {string} [options.genre='fantasy']
    * @returns {Promise<string|null>} null cuando la IA no está configurada.
    */
-  async generateOpening({ language = 'es', genre = 'fantasy' } = {}) {
+  async generateOpening({ language = 'es', genre = 'fantasy', mode = 'colaborativo' } = {}) {
     if (!this.gemini.isConfigured()) return null;
-    return await this.gemini.generate(getOpeningPrompt(language, genre), {
-      systemPrompt: getNarratorSystemPrompt(language, genre),
+    return await this.gemini.generate(getOpeningPrompt(language, genre, mode), {
+      systemPrompt: getNarratorSystemPrompt(language, genre, mode),
       temperature: 0.9,
       maxOutputTokens: 300,
+    });
+  }
+
+  /**
+   * Generate or update the running story summary.
+   * @param {string} previousSummary - The existing synopsis (may be empty)
+   * @param {string} newNarrative - The latest AI narrative to incorporate
+   * @param {Object} [options]
+   * @param {string} [options.language='es']
+   * @returns {Promise<string|null>} Updated synopsis string, or null when the IA is not configured.
+   */
+  async generateSummary(previousSummary, newNarrative, { language = 'es' } = {}) {
+    if (!this.gemini.isConfigured()) return null;
+    const prompt = `SINOPSIS ACTUAL:\n${previousSummary || '(la historia recién comienza)'}\n\n` +
+      `HECHOS NUEVOS:\n${newNarrative}`;
+    return await this.gemini.generate(prompt, {
+      systemPrompt: getSummaryPrompt(language),
+      temperature: 0.4,
+      maxOutputTokens: 250,
     });
   }
 
