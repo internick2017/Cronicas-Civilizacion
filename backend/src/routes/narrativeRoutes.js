@@ -424,25 +424,52 @@ router.post('/sessions/:sessionId/skip-turn', async (req, res) => {
 });
 
 /**
+ * POST /api/narrative/sessions/:sessionId/start
+ * Start a story session (lobby → active), generating the AI opening narrative.
+ */
+router.post('/sessions/:sessionId/start', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const result = await NarrativeService.startSession(sessionId);
+    res.json({
+      success: true,
+      data: result,
+      message: 'Historia iniciada',
+    });
+  } catch (error) {
+    console.error('Error starting session:', error);
+    const status = error.message === 'Sesión no encontrada' ? 404
+      : (error.message.includes('ya está en curso') || error.message.includes('2 jugadores')) ? 400
+      : 500;
+    res.status(status).json({
+      success: false,
+      error: 'Failed to start session',
+      message: error.message,
+    });
+  }
+});
+
+/**
  * POST /api/narrative/sessions/:sessionId/end
- * End a story session
+ * End a story session, generating an AI epilogue.
  */
 router.post('/sessions/:sessionId/end', async (req, res) => {
   try {
     const { sessionId } = req.params;
     const result = await NarrativeService.endSession(sessionId);
-    
+
     res.json({
       success: true,
       data: result,
-      message: result.message
+      message: result.message,
     });
   } catch (error) {
     console.error('Error ending session:', error);
-    res.status(400).json({
+    const status = error.message === 'Sesión no encontrada' ? 404 : 400;
+    res.status(status).json({
       success: false,
       error: 'Failed to end session',
-      message: error.message
+      message: error.message,
     });
   }
 });

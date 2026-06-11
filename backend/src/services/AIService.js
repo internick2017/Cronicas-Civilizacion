@@ -1,6 +1,6 @@
 import { GeminiClient } from './GeminiClient.js';
 import config from '../config/index.js';
-import { getNarratorSystemPrompt } from './narrativePrompts.js';
+import { getNarratorSystemPrompt, getOpeningPrompt, getEpiloguePrompt } from './narrativePrompts.js';
 
 export class AIService {
   constructor() {
@@ -65,6 +65,38 @@ export class AIService {
       temperature: 0.8,
       maxOutputTokens: 500,
     });
+  }
+
+  /**
+   * Generate the opening narrative for a new story session.
+   * @param {Object} [options]
+   * @param {string} [options.language='es']
+   * @param {string} [options.genre='fantasy']
+   * @returns {Promise<string|null>} null cuando la IA no está configurada.
+   */
+  async generateOpening({ language = 'es', genre = 'fantasy' } = {}) {
+    if (!this.gemini.isConfigured()) return null;
+    return await this.gemini.generate(getOpeningPrompt(language, genre), {
+      systemPrompt: getNarratorSystemPrompt(language, genre),
+      temperature: 0.9,
+      maxOutputTokens: 300,
+    });
+  }
+
+  /**
+   * Generate the epilogue narrative for a completed story session.
+   * @param {string} storySummary - The story so far (AI narrative entries joined)
+   * @param {Object} [options]
+   * @param {string} [options.language='es']
+   * @param {string} [options.genre='fantasy']
+   * @returns {Promise<string|null>} null cuando la IA no está configurada.
+   */
+  async generateEpilogue(storySummary, { language = 'es', genre = 'fantasy' } = {}) {
+    if (!this.gemini.isConfigured()) return null;
+    return await this.gemini.generate(
+      `${getEpiloguePrompt(language)}\n\nHISTORIA:\n${storySummary}`,
+      { systemPrompt: getNarratorSystemPrompt(language, genre), temperature: 0.8, maxOutputTokens: 400 }
+    );
   }
 
   /**

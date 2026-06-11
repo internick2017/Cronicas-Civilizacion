@@ -7,7 +7,7 @@ export class StorySession {
     this.description = data.description || 'Una aventura épica colaborativa';
     this.createdAt = data.createdAt || new Date();
     this.updatedAt = data.updatedAt || new Date();
-    this.isActive = data.isActive !== false;
+    this.isActive = data.isActive === true;
     this.maxPlayers = data.maxPlayers || 6;
     this.currentPlayerIndex = data.currentPlayerIndex || 0;
     this.turnNumber = data.turnNumber || 1;
