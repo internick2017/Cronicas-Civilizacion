@@ -42,15 +42,11 @@ router.post('/sessions', async (req, res) => {
       });
     }
 
-    // Normalise settings.language: only 'es' and 'pt' are accepted; default 'es'
-    const rawSettings = settings || {};
-    const normalizedLanguage = rawSettings.language === 'pt' ? 'pt' : 'es';
-
     const sessionData = {
       title: title.trim(),
       description: description || 'Una aventura épica colaborativa',
       maxPlayers: maxPlayers || 6,
-      settings: { ...rawSettings, language: normalizedLanguage }
+      settings: settings || {}
     };
 
     const session = await NarrativeService.createSession(sessionData);

@@ -1,5 +1,6 @@
 import { StorySession } from '../models/StorySession.js';
 import AIService from './AIService.js';
+import { normalizeLanguage } from './narrativePrompts.js';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database.js';
 import logger from '../utils/logger.js';
@@ -164,8 +165,7 @@ export class NarrativeService {
   async createSession(sessionData = {}) {
     // Normalise language: only 'es' and 'pt' are supported
     if (sessionData.settings) {
-      const rawLang = sessionData.settings.language;
-      sessionData.settings.language = rawLang === 'pt' ? 'pt' : 'es';
+      sessionData.settings.language = normalizeLanguage(sessionData.settings.language);
     }
 
     const session = new StorySession(sessionData);

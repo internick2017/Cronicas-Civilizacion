@@ -50,7 +50,8 @@ export class AIService {
    * @param {Object} [options]
    * @param {string} [options.language='es'] - 'es' | 'pt'
    * @param {string} [options.genre='fantasy']
-   * @returns {Promise<string>} Generated narrative text
+   * @returns {Promise<string|null>} Generated narrative text,
+   *   or null cuando la IA no está configurada; el caller debe usar el fallback.
    */
   async generateStoryNarrative(prompt, { language = 'es', genre = 'fantasy' } = {}) {
     if (!this.gemini.isConfigured()) {

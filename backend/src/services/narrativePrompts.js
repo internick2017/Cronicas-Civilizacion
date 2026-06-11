@@ -54,11 +54,11 @@ const OPENING = {
 };
 
 /**
- * Normalise language code: only 'es' and 'pt' are supported; everything else → 'es'.
+ * Normalize language code: only 'es' and 'pt' are supported; everything else → 'es'.
  * @param {string} language
  * @returns {'es'|'pt'}
  */
-function normaliseLanguage(language) {
+export function normalizeLanguage(language) {
   return language === 'pt' ? 'pt' : 'es';
 }
 
@@ -69,7 +69,7 @@ function normaliseLanguage(language) {
  * @returns {string}
  */
 export function getNarratorSystemPrompt(language, genre = 'fantasy') {
-  const l = normaliseLanguage(language);
+  const l = normalizeLanguage(language);
   const translatedGenre = GENRES[l][genre] || genre;
   return NARRATOR[l](translatedGenre);
 }
@@ -80,7 +80,7 @@ export function getNarratorSystemPrompt(language, genre = 'fantasy') {
  * @returns {string}
  */
 export function getEpiloguePrompt(language) {
-  return EPILOGUE[normaliseLanguage(language)];
+  return EPILOGUE[normalizeLanguage(language)];
 }
 
 /**
@@ -90,7 +90,7 @@ export function getEpiloguePrompt(language) {
  * @returns {string}
  */
 export function getOpeningPrompt(language, genre = 'fantasy') {
-  const l = normaliseLanguage(language);
+  const l = normalizeLanguage(language);
   const translatedGenre = GENRES[l][genre] || genre;
   return OPENING[l](translatedGenre);
 }
