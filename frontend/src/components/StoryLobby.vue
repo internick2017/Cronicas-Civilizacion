@@ -23,13 +23,13 @@
           <h3>👥 Jugadores ({{ hostedSession?.players?.length || 0 }}/{{ hostedSession?.maxPlayers }})</h3>
           <div class="waiting-players-list">
             <div
-              v-for="player in hostedSession?.players"
+              v-for="(player, idx) in hostedSession?.players"
               :key="player.id"
               class="waiting-player-card"
-              :class="{ 'is-host': player.isHost }"
+              :class="{ 'is-host': idx === 0 }"
             >
               <span class="player-name-item">{{ player.name }}</span>
-              <span v-if="player.isHost" class="host-badge">Anfitrión</span>
+              <span v-if="idx === 0" class="host-badge">Anfitrión</span>
             </div>
             <!-- Empty slots -->
             <div
@@ -83,13 +83,13 @@
           <h3>👥 Jugadores ({{ guestSession?.players?.length || 0 }}/{{ guestSession?.maxPlayers }})</h3>
           <div class="waiting-players-list">
             <div
-              v-for="player in guestSession?.players"
+              v-for="(player, idx) in guestSession?.players"
               :key="player.id"
               class="waiting-player-card"
-              :class="{ 'is-host': player.isHost, 'is-me': player.id === guestPlayer?.id }"
+              :class="{ 'is-host': idx === 0, 'is-me': player.id === guestPlayer?.id }"
             >
               <span class="player-name-item">{{ player.name }}</span>
-              <span v-if="player.isHost" class="host-badge">Anfitrión</span>
+              <span v-if="idx === 0" class="host-badge">Anfitrión</span>
               <span v-if="player.id === guestPlayer?.id" class="you-badge">Tú</span>
             </div>
             <div
@@ -104,6 +104,9 @@
 
         <div class="waiting-actions">
           <p class="start-hint">El anfitrión iniciará la partida cuando todos estén listos.</p>
+          <button @click="cancelGuestWaiting" class="cancel-btn" style="margin-top: 10px;">
+            ← Volver al lobby
+          </button>
         </div>
       </div>
     </div>
@@ -334,6 +337,8 @@ const lanHint = window.location.hostname
 // ── polling ───────────────────────────────────────────────────────────────────
 let pollInterval = null
 let waitingPollInterval = null
+let waitingPollFailures = 0
+const WAITING_POLL_MAX_FAILURES = 5
 
 // ── computed ─────────────────────────────────────────────────────────────────
 const canCreateSession = computed(() =>
@@ -428,17 +433,21 @@ const createSession = async () => {
     })
     const joinResult = await joinResponse.json()
 
-    // Whether join succeeded or not, proceed to waiting room with session data
-    // Refresh session to get updated players list
+    // I5: if auto-join failed, surface a clear error and stay in lobby
+    if (!joinResult.success) {
+      errorMessage.value = `La sala se creó pero no pudiste entrar — intenta unirte con el código ${createdSession.code}`
+      emit('error', errorMessage.value)
+      return
+    }
+
+    // Auto-join succeeded — refresh session to get updated players list
     const refreshed = await fetchSession(createdSession.id)
     hostedSession.value = refreshed || createdSession
+    hostedPlayer.value = joinResult.data.player
 
-    if (joinResult.success) {
-      hostedPlayer.value = joinResult.data.player
-      // Save to localStorage
-      localStorage.setItem('cronicas-session', JSON.stringify(hostedSession.value))
-      localStorage.setItem('cronicas-player', JSON.stringify(hostedPlayer.value))
-    }
+    // Save to localStorage
+    localStorage.setItem('cronicas-session', JSON.stringify(hostedSession.value))
+    localStorage.setItem('cronicas-player', JSON.stringify(hostedPlayer.value))
 
     // Reset form
     hostName.value = ''
@@ -476,19 +485,43 @@ const fetchSession = async (sessionId) => {
 // ── poll waiting room ─────────────────────────────────────────────────────────
 const startWaitingPoll = (role) => {
   stopWaitingPoll()
+  waitingPollFailures = 0
   waitingPollInterval = setInterval(async () => {
     if (role === 'host' && hostedSession.value) {
       const updated = await fetchSession(hostedSession.value.id)
-      if (updated) hostedSession.value = updated
+      if (updated) {
+        waitingPollFailures = 0
+        hostedSession.value = updated
+      } else {
+        waitingPollFailures++
+        if (waitingPollFailures >= WAITING_POLL_MAX_FAILURES) {
+          stopWaitingPoll()
+          errorMessage.value = 'Se perdió la conexión con la sala'
+          hostedSession.value = null
+          hostedPlayer.value = null
+          startError.value = ''
+          lobbyView.value = 'lobby'
+        }
+      }
     } else if (role === 'guest' && guestSession.value) {
       const updated = await fetchSession(guestSession.value.id)
       if (updated) {
+        waitingPollFailures = 0
         guestSession.value = updated
         // Auto-navigate when host starts the session
         if (updated.isActive) {
           stopWaitingPoll()
           localStorage.setItem('cronicas-session', JSON.stringify(updated))
           emit('session-joined', { session: updated, player: guestPlayer.value })
+        }
+      } else {
+        waitingPollFailures++
+        if (waitingPollFailures >= WAITING_POLL_MAX_FAILURES) {
+          stopWaitingPoll()
+          errorMessage.value = 'Se perdió la conexión con la sala'
+          guestSession.value = null
+          guestPlayer.value = null
+          lobbyView.value = 'lobby'
         }
       }
     }
@@ -533,6 +566,16 @@ const cancelWaiting = () => {
   hostedSession.value = null
   hostedPlayer.value = null
   startError.value = ''
+  lobbyView.value = 'lobby'
+}
+
+// ── cancel guest waiting (go back to lobby) ───────────────────────────────────
+const cancelGuestWaiting = () => {
+  stopWaitingPoll()
+  guestSession.value = null
+  guestPlayer.value = null
+  localStorage.removeItem('cronicas-session')
+  localStorage.removeItem('cronicas-player')
   lobbyView.value = 'lobby'
 }
 
