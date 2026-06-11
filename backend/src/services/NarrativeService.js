@@ -435,8 +435,14 @@ export class NarrativeService {
     const language = (session.settings && session.settings.language) || 'es';
     const genre = (session.settings && session.settings.genre) || 'fantasy';
 
-    // Throws → propagates; turnNumber is NOT incremented yet
-    const aiText = await this.aiService.generateStoryNarrative(prompt, { language, genre });
+    // Throws → propagates with AI_NARRATION_FAILED marker; turnNumber is NOT incremented yet
+    let aiText;
+    try {
+      aiText = await this.aiService.generateStoryNarrative(prompt, { language, genre });
+    } catch (err) {
+      err.code = 'AI_NARRATION_FAILED';
+      throw err;
+    }
 
     // null means unconfigured — use local fallback so the round always gets some narrative
     const narrative = aiText ?? this.getFallbackNarrative({ characterName: 'los héroes' });
