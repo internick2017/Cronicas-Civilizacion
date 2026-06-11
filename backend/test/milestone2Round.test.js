@@ -51,7 +51,7 @@ describe('M2 — closeRound con resumen, arcos y epílogo automático', () => {
     await playRound(svc, session, ana, beto);
     const prompt = svc.aiService.generateStoryNarrative.mock.calls[0][0];
     expect(prompt).toContain('LA SINOPSIS');
-    expect(prompt).not.toContain('apertura vieja'); // queda cubierta por las últimas 3 solo si es reciente
+    expect(prompt).not.toContain('apertura vieja');
   });
 
   it('agrega la instrucción de cierre de arcos cuando quedan <= 2 rondas', async () => {
@@ -93,5 +93,27 @@ describe('M2 — closeRound con resumen, arcos y epílogo automático', () => {
     await playRound(svc, session, ana, beto);
     const opts = svc.aiService.generateStoryNarrative.mock.calls[0][1];
     expect(opts.mode).toBe('narrador-activo');
+  });
+
+  it('una ronda completa de skips en la última ronda también dispara el epílogo', async () => {
+    const { session } = await makeSession(svc, { maxRounds: 3 });
+    session.turnNumber = 3;
+    await svc.skipTurn(session.id); // salta a beto
+    const r = await svc.skipTurn(session.id); // cierra ronda sin acciones
+    expect(r.sessionEnded).toBe(true);
+    expect(session.isActive).toBe(false);
+  });
+
+  it('retryNarration en la última ronda dispara el epílogo automático', async () => {
+    const { session, ana, beto } = await makeSession(svc, { maxRounds: 3 });
+    session.turnNumber = 3;
+    svc.aiService.generateStoryNarrative.mockRejectedValueOnce(new Error('boom'));
+    await svc.submitAction(session.id, ana.id, 'a');
+    await expect(svc.submitAction(session.id, beto.id, 'b')).rejects.toThrow();
+    svc.aiService.generateStoryNarrative.mockResolvedValueOnce('final');
+    const r = await svc.retryNarration(session.id);
+    expect(r.sessionEnded).toBe(true);
+    expect(session.isActive).toBe(false);
+    expect(svc.aiService.generateEpilogue).toHaveBeenCalled();
   });
 });
