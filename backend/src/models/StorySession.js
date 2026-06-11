@@ -73,6 +73,7 @@ export class StorySession {
 
   /**
    * Add a story action and generate narrative
+   * @deprecated Use addPlayerAction (does NOT advance index/turn — caller controls those)
    */
   addStoryAction(playerId, actionText) {
     const player = this.players.find(p => p.id === playerId);
@@ -93,16 +94,66 @@ export class StorySession {
 
     this.storyHistory.push(storyEntry);
     this.updatedAt = new Date();
-    
+
     // Move to next player
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
-    
+
     // Increment turn if we've gone through all players
     if (this.currentPlayerIndex === 0) {
       this.turnNumber++;
     }
 
     return storyEntry;
+  }
+
+  /**
+   * Record a player action entry at the current turnNumber.
+   * Does NOT advance currentPlayerIndex or turnNumber — the service controls those.
+   */
+  addPlayerAction(playerId, actionText) {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) {
+      throw new Error('Player not found');
+    }
+
+    const entry = {
+      id: uuidv4(),
+      playerId,
+      playerName: player.name,
+      characterName: player.characterName,
+      action: actionText,
+      narrative: null,
+      timestamp: new Date(),
+      turnNumber: this.turnNumber,
+      type: 'player_action',
+      context: {}
+    };
+
+    this.storyHistory.push(entry);
+    this.updatedAt = new Date();
+    return entry;
+  }
+
+  /**
+   * Record an AI narrative entry at the current turnNumber.
+   */
+  addAINarrative(narrativeText) {
+    const entry = {
+      id: uuidv4(),
+      playerId: null,
+      playerName: null,
+      characterName: null,
+      action: null,
+      narrative: narrativeText,
+      timestamp: new Date(),
+      turnNumber: this.turnNumber,
+      type: 'ai_narrative',
+      context: {}
+    };
+
+    this.storyHistory.push(entry);
+    this.updatedAt = new Date();
+    return entry;
   }
 
   /**
