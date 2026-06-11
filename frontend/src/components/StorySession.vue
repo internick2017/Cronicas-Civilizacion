@@ -284,6 +284,7 @@ const localSettings = ref({
 // Poll resilience state
 const pollConsecutiveFailures = ref(0)
 const showReconnectBanner = ref(false)
+const pollDetectedStuck = ref(false)      // true when last poll saw session.roundPending===true
 const POLL_FAILURE_BANNER_THRESHOLD = 3  // show banner after this many consecutive failures
 let currentPollIntervalMs = 3000         // starts at 3s, backs off to 15s on 429
 
@@ -704,6 +705,15 @@ const schedulePoll = () => {
         pollConsecutiveFailures.value = 0
         showReconnectBanner.value = false
         currentPollIntervalMs = 3000  // restore normal cadence on success
+        // Sync stuck-round detection from poll: if server says round is pending, show alert
+        pollDetectedStuck.value = session.value?.roundPending === true
+        if (pollDetectedStuck.value && !showRetryAlert.value) {
+          showRetryAlert.value = true
+          retryAlertMessage.value = 'La ronda quedó sin narrar — reintenta la narración'
+        } else if (!pollDetectedStuck.value && showRetryAlert.value) {
+          // Only clear if it was poll-sourced (not a direct 500 still in flight)
+          showRetryAlert.value = false
+        }
       } else {
         pollConsecutiveFailures.value++
         if (pollConsecutiveFailures.value >= POLL_FAILURE_BANNER_THRESHOLD) {

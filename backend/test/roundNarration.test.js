@@ -77,3 +77,41 @@ describe('narración por cierre de ronda', () => {
     expect(prompt).toContain('Narración intermedia 1');
   });
 });
+
+describe('roundPending — detección de rondas atascadas', () => {
+  let svc, session, ana, beto;
+
+  beforeEach(async () => {
+    svc = new NarrativeService({ skipDatabase: true });
+    svc.aiService = { generateStoryNarrative: vi.fn().mockResolvedValue('La ronda épica...') };
+    session = await svc.createSession({ title: 'Test', settings: { language: 'es', genre: 'fantasy' } });
+    ({ player: ana } = await svc.joinSession(session.id, { name: 'Ana' }));
+    ({ player: beto } = await svc.joinSession(session.id, { name: 'Beto' }));
+    session.isActive = true;
+  });
+
+  it('roundPending es true cuando todos actuaron y la IA no narró', async () => {
+    svc.aiService.generateStoryNarrative.mockRejectedValueOnce(new Error('boom'));
+    await svc.submitAction(session.id, ana.id, 'a1');
+    await expect(svc.submitAction(session.id, beto.id, 'a2')).rejects.toThrow();
+    expect(session.toJSON().roundPending).toBe(true);
+  });
+
+  it('roundPending es false en una ronda normal a medias y tras narrar', async () => {
+    expect(session.toJSON().roundPending).toBe(false);
+    await svc.submitAction(session.id, ana.id, 'a1');
+    expect(session.toJSON().roundPending).toBe(false); // falta beto
+    svc.aiService.generateStoryNarrative.mockResolvedValueOnce('narrado');
+    await svc.submitAction(session.id, beto.id, 'a2');
+    expect(session.toJSON().roundPending).toBe(false); // ya narrada
+  });
+
+  it('roundPending es true aun con apertura en el mismo turnNumber', async () => {
+    // Opening narrative added at turnNumber 1 (before any actions, same turn)
+    session.addAINarrative('apertura');
+    svc.aiService.generateStoryNarrative.mockRejectedValueOnce(new Error('boom'));
+    await svc.submitAction(session.id, ana.id, 'a1');
+    await expect(svc.submitAction(session.id, beto.id, 'a2')).rejects.toThrow();
+    expect(session.toJSON().roundPending).toBe(true);
+  });
+});
