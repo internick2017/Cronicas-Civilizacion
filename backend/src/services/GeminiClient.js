@@ -20,7 +20,8 @@ export class GeminiClient {
     const url = `${BASE_URL}/models/${this.model}:generateContent?key=${this.apiKey}`;
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature, maxOutputTokens },
+      // thinkingBudget 0: thinking consume maxOutputTokens en gemini-2.5 → narraciones truncadas sin esto
+      generationConfig: { temperature, maxOutputTokens, thinkingConfig: { thinkingBudget: 0 } },
     };
     if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
 

@@ -40,4 +40,12 @@ describe('GeminiClient', () => {
     expect(new GeminiClient({ apiKey: '' }).isConfigured()).toBe(false);
     expect(new GeminiClient({ apiKey: 'k' }).isConfigured()).toBe(true);
   });
+
+  it('desactiva el thinking para que el texto no se trunque', async () => {
+    fetch.mockResolvedValueOnce(okResponse('texto completo'));
+    const client = new GeminiClient({ apiKey: 'k' });
+    await client.generate('hola');
+    const body = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+  });
 });
