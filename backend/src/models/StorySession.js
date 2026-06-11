@@ -122,24 +122,6 @@ export class StorySession {
   }
 
   /**
-   * Add AI-generated narrative response
-   */
-  addNarrativeResponse(narrativeText, context = {}) {
-    const narrativeEntry = {
-      id: uuidv4(),
-      narrative: narrativeText,
-      timestamp: new Date(),
-      turnNumber: this.turnNumber,
-      type: 'ai_narrative',
-      context
-    };
-
-    this.storyHistory.push(narrativeEntry);
-    this.updatedAt = new Date();
-    return narrativeEntry;
-  }
-
-  /**
    * Get current player
    */
   getCurrentPlayer() {
