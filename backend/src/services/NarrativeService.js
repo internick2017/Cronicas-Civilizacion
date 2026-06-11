@@ -57,84 +57,81 @@ export class NarrativeService {
   }
 
   /**
+   * Shared hydration: build a StorySession from raw DB rows.
+   */
+  hydrateSessionFromRows(sessionData, players, history) {
+    return new StorySession({
+      id: sessionData.id,
+      title: sessionData.title,
+      description: sessionData.description,
+      maxPlayers: sessionData.max_players,
+      currentPlayerIndex: sessionData.current_player_index,
+      turnNumber: sessionData.turn_number,
+      isActive: sessionData.is_active,
+      worldContext: JSON.parse(sessionData.world_context || '{}'),
+      settings: JSON.parse(sessionData.settings || '{}'),
+      code: sessionData.code || null,
+      createdAt: sessionData.created_at,
+      updatedAt: sessionData.updated_at,
+      players: players.map(p => ({
+        id: p.id,
+        playerId: p.player_id,
+        name: p.name,
+        characterName: p.character_name,
+        characterClass: p.character_class,
+        countryName: p.country_name,
+        countryType: p.country_type,
+        worldRole: p.world_role,
+        turnOrder: p.turn_order,
+        isActive: p.is_active,
+        joinedAt: p.joined_at
+      })),
+      storyHistory: history.map(h => ({
+        id: h.id,
+        playerId: h.player_id,
+        playerName: h.player_name,
+        characterName: h.character_name,
+        action: h.action,
+        narrative: h.narrative,
+        turnNumber: h.turn_number,
+        type: h.entry_type,
+        context: h.context ? JSON.parse(h.context) : {},
+        timestamp: h.timestamp
+      }))
+    });
+  }
+
+  /**
    * Load session from database
    */
   async loadSessionFromDatabase(sessionId) {
     if (this.skipDatabase) return null;
+    const client = await pool.connect();
     try {
-      const client = await pool.connect();
-      
-      // Load main session
       const sessionResult = await client.query(
         'SELECT * FROM story_sessions WHERE id = $1', [sessionId]
       );
-      
-      if (sessionResult.rows.length === 0) {
-        client.release();
-        return null;
-      }
-      
+
+      if (sessionResult.rows.length === 0) return null;
+
       const sessionData = sessionResult.rows[0];
-      
-      // Load players
+
       const playersResult = await client.query(
         'SELECT * FROM story_session_players WHERE session_id = $1 ORDER BY turn_order',
         [sessionId]
       );
-      
-      // Load story history
+
       const historyResult = await client.query(
         'SELECT * FROM story_history WHERE session_id = $1 ORDER BY timestamp',
         [sessionId]
       );
-      
-      client.release();
-      
-      // Create session object
-      const session = new StorySession({
-        id: sessionData.id,
-        title: sessionData.title,
-        description: sessionData.description,
-        maxPlayers: sessionData.max_players,
-        currentPlayerIndex: sessionData.current_player_index,
-        turnNumber: sessionData.turn_number,
-        isActive: sessionData.is_active,
-        worldContext: JSON.parse(sessionData.world_context || '{}'),
-        settings: JSON.parse(sessionData.settings || '{}'),
-        createdAt: sessionData.created_at,
-        updatedAt: sessionData.updated_at,
-        players: playersResult.rows.map(p => ({
-          id: p.id,
-          playerId: p.player_id,
-          name: p.name,
-          characterName: p.character_name,
-          characterClass: p.character_class,
-          countryName: p.country_name,
-          countryType: p.country_type,
-          worldRole: p.world_role,
-          turnOrder: p.turn_order,
-          isActive: p.is_active,
-          joinedAt: p.joined_at
-        })),
-        storyHistory: historyResult.rows.map(h => ({
-          id: h.id,
-          playerId: h.player_id,
-          playerName: h.player_name,
-          characterName: h.character_name,
-          action: h.action,
-          narrative: h.narrative,
-          turnNumber: h.turn_number,
-          type: h.entry_type,
-          context: h.context ? JSON.parse(h.context) : {},
-          timestamp: h.timestamp
-        }))
-      });
-      session.code = sessionData.code || null;
 
-      return session;
+      return this.hydrateSessionFromRows(sessionData, playersResult.rows, historyResult.rows);
     } catch (error) {
       logger.error('Error loading session from database:', error);
       return null;
+    } finally {
+      client.release();
     }
   }
 
@@ -170,8 +167,25 @@ export class NarrativeService {
     );
     this.sessions.set(session.id, session);
 
-    // Save to database
-    await this.saveSessionToDatabase(session);
+    // Save to database with retry on unique-code collision (DB state after restart)
+    const MAX_CODE_RETRIES = 3;
+    for (let attempt = 0; attempt < MAX_CODE_RETRIES; attempt++) {
+      try {
+        await this.saveSessionToDatabase(session);
+        break;
+      } catch (error) {
+        const isCodeCollision =
+          /UNIQUE constraint failed[\s\S]*code/i.test(error.message) ||
+          error.code === '23505';
+        if (isCodeCollision && attempt < MAX_CODE_RETRIES - 1) {
+          session.code = generateRoomCode(c =>
+            [...this.sessions.values()].some(s => s !== session && s.code === c)
+          );
+        } else {
+          throw error;
+        }
+      }
+    }
 
     logger.info(`Created new story session: ${session.title} (${session.id})`);
     return session;
@@ -195,17 +209,13 @@ export class NarrativeService {
    */
   async loadSessionByCodeFromDatabase(code) {
     if (this.skipDatabase) return null;
+    const client = await pool.connect();
     try {
-      const client = await pool.connect();
-
       const sessionResult = await client.query(
         'SELECT * FROM story_sessions WHERE code = $1', [code]
       );
 
-      if (sessionResult.rows.length === 0) {
-        client.release();
-        return null;
-      }
+      if (sessionResult.rows.length === 0) return null;
 
       const sessionData = sessionResult.rows[0];
 
@@ -219,53 +229,14 @@ export class NarrativeService {
         [sessionData.id]
       );
 
-      client.release();
-
-      const session = new StorySession({
-        id: sessionData.id,
-        title: sessionData.title,
-        description: sessionData.description,
-        maxPlayers: sessionData.max_players,
-        currentPlayerIndex: sessionData.current_player_index,
-        turnNumber: sessionData.turn_number,
-        isActive: sessionData.is_active,
-        worldContext: JSON.parse(sessionData.world_context || '{}'),
-        settings: JSON.parse(sessionData.settings || '{}'),
-        createdAt: sessionData.created_at,
-        updatedAt: sessionData.updated_at,
-        players: playersResult.rows.map(p => ({
-          id: p.id,
-          playerId: p.player_id,
-          name: p.name,
-          characterName: p.character_name,
-          characterClass: p.character_class,
-          countryName: p.country_name,
-          countryType: p.country_type,
-          worldRole: p.world_role,
-          turnOrder: p.turn_order,
-          isActive: p.is_active,
-          joinedAt: p.joined_at
-        })),
-        storyHistory: historyResult.rows.map(h => ({
-          id: h.id,
-          playerId: h.player_id,
-          playerName: h.player_name,
-          characterName: h.character_name,
-          action: h.action,
-          narrative: h.narrative,
-          turnNumber: h.turn_number,
-          type: h.entry_type,
-          context: h.context ? JSON.parse(h.context) : {},
-          timestamp: h.timestamp
-        }))
-      });
-      session.code = sessionData.code;
-
+      const session = this.hydrateSessionFromRows(sessionData, playersResult.rows, historyResult.rows);
       this.sessions.set(session.id, session);
       return session;
     } catch (error) {
       logger.error('Error loading session by code from database:', error);
       return null;
+    } finally {
+      client.release();
     }
   }
 

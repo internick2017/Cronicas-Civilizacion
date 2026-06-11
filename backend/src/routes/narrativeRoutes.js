@@ -74,11 +74,20 @@ router.get('/sessions/code/:code', async (req, res) => {
   try {
     const session = await NarrativeService.getSessionByCode(req.params.code);
     if (!session) {
-      return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found',
+        message: 'Sala no encontrada'
+      });
     }
     res.json({ success: true, data: session.toJSON(), message: 'OK' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Error getting session by code:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve session',
+      message: error.message
+    });
   }
 });
 

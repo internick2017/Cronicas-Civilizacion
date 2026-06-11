@@ -27,6 +27,7 @@ export class StorySession {
       gameType: 'character', // character, country, world
       language: 'es'
     };
+    this.code = data.code !== undefined ? data.code : null;
   }
 
   /**
