@@ -76,6 +76,14 @@ describe('narración por cierre de ronda', () => {
     expect(prompt).toContain('érase una vez en Eldoria');
     expect(prompt).toContain('Narración intermedia 1');
   });
+
+  it('el prompt de ronda etiqueta el contexto como ya narrado y ordena continuar solo la ronda nueva', async () => {
+    session.addAINarrative('Apertura: érase una vez en Eldoria');
+    await svc.submitAction(session.id, ana.id, 'a1');
+    await svc.submitAction(session.id, beto.id, 'a2');
+    const prompt = svc.aiService.generateStoryNarrative.mock.calls[0][0];
+    expect(prompt).toContain('NO lo repitas');
+  });
 });
 
 describe('roundPending — detección de rondas atascadas', () => {

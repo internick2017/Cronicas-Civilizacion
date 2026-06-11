@@ -27,4 +27,9 @@ describe('prompts por idioma', () => {
     expect(getNarratorSystemPrompt('es', 'fantasy')).toContain('coherencia');
     expect(getNarratorSystemPrompt('pt', 'fantasy')).toContain('coerência');
   });
+
+  it('el narrador tiene prohibido repetir lo ya narrado (es y pt)', () => {
+    expect(getNarratorSystemPrompt('es', 'fantasy')).toMatch(/NUNCA repitas/);
+    expect(getNarratorSystemPrompt('pt', 'fantasy')).toMatch(/NUNCA repita/);
+  });
 });
