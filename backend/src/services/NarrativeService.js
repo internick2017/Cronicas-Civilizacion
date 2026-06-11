@@ -585,18 +585,18 @@ export class NarrativeService {
 
     if (!opening) {
       // No narratives yet — story is just beginning
-      return `HISTORIA RECIENTE:\n(la historia recién comienza)\n\nACCIONES DE ESTA RONDA:\n${actions}\n\nNarra el resultado de la ronda.`;
+      return `ACCIONES DE ESTA RONDA:\n${actions}\n\nTu tarea: continúa la historia narrando SOLO el resultado de las acciones de esta ronda (100-180 palabras), como si fuera el siguiente párrafo del libro.`;
     }
 
     // Deduplicate: if the opening is already within the recent slice, avoid repeating it
     const recentWithoutOpening = recent.filter(e => e !== opening);
     const recentText = recentWithoutOpening.map(e => e.narrative).join('\n');
 
-    let prompt = `INICIO DE LA HISTORIA:\n${opening.narrative}`;
+    let prompt = `CONTEXTO — YA NARRADO ANTES (solo para tu memoria, NO lo repitas):\n[INICIO DE LA HISTORIA]\n${opening.narrative}`;
     if (recentText) {
-      prompt += `\n\nHISTORIA RECIENTE:\n${recentText}`;
+      prompt += `\n[ÚLTIMAS RONDAS]\n${recentText}`;
     }
-    prompt += `\n\nACCIONES DE ESTA RONDA:\n${actions}\n\nNarra el resultado de la ronda.`;
+    prompt += `\n\nACCIONES DE ESTA RONDA:\n${actions}\n\nTu tarea: continúa la historia narrando SOLO el resultado de las acciones de esta ronda (100-180 palabras), como si fuera el siguiente párrafo del libro.`;
     return prompt;
   }
 
