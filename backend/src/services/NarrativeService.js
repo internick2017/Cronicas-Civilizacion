@@ -571,15 +571,33 @@ export class NarrativeService {
 
   /**
    * Build a prompt summarising all actions of a round for the AI narrator.
+   * Includes the opening narrative (world anchor) + the last 4 ai_narrative entries
+   * for coherence, deduplicating overlap between them.
    */
   buildRoundPrompt(session, roundActions) {
-    const lastNarratives = session.storyHistory
-      .filter(e => e.type === 'ai_narrative').slice(-2)
-      .map(e => e.narrative).join('\n');
+    const allNarratives = session.storyHistory.filter(e => e.type === 'ai_narrative');
+    const opening = allNarratives[0] ?? null;
+    const recent = allNarratives.slice(-4);
+
     const actions = roundActions
       .map(e => `${e.playerName ?? '?'}: ${e.action}`)
       .join('\n');
-    return `HISTORIA RECIENTE:\n${lastNarratives || '(la historia recién comienza)'}\n\nACCIONES DE ESTA RONDA:\n${actions}\n\nNarra el resultado de la ronda.`;
+
+    if (!opening) {
+      // No narratives yet — story is just beginning
+      return `HISTORIA RECIENTE:\n(la historia recién comienza)\n\nACCIONES DE ESTA RONDA:\n${actions}\n\nNarra el resultado de la ronda.`;
+    }
+
+    // Deduplicate: if the opening is already within the recent slice, avoid repeating it
+    const recentWithoutOpening = recent.filter(e => e !== opening);
+    const recentText = recentWithoutOpening.map(e => e.narrative).join('\n');
+
+    let prompt = `INICIO DE LA HISTORIA:\n${opening.narrative}`;
+    if (recentText) {
+      prompt += `\n\nHISTORIA RECIENTE:\n${recentText}`;
+    }
+    prompt += `\n\nACCIONES DE ESTA RONDA:\n${actions}\n\nNarra el resultado de la ronda.`;
+    return prompt;
   }
 
   /**

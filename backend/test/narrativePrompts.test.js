@@ -22,4 +22,9 @@ describe('prompts por idioma', () => {
     expect(getEpiloguePrompt('pt')).toContain('epílogo');
     expect(getEpiloguePrompt('pt')).toContain('português');
   });
+
+  it('el narrador tiene instrucciones de coherencia en ambos idiomas', () => {
+    expect(getNarratorSystemPrompt('es', 'fantasy')).toContain('coherencia');
+    expect(getNarratorSystemPrompt('pt', 'fantasy')).toContain('coerência');
+  });
 });
