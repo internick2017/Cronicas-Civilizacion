@@ -1,14 +1,16 @@
 // Environment configuration for frontend
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 export const config = {
-  // API Configuration
+  // API Configuration — empty string means same-origin; Vite proxies /api → backend
   api: {
-    baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
+    baseUrl: API_BASE_URL,
     timeout: import.meta.env.VITE_API_TIMEOUT || 10000
   },
-  
-  // Socket.io Configuration
+
+  // Socket.io Configuration — connect to same origin so Vite proxy handles /socket.io
   socket: {
-    url: import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000',
+    url: typeof window !== 'undefined' ? window.location.origin : '',
     options: {
       transports: ['websocket'],
       autoConnect: false,
