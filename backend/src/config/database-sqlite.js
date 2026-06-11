@@ -167,6 +167,7 @@ const initializeTables = () => {
         world_context TEXT, -- JSON string
         settings TEXT, -- JSON string
         code TEXT UNIQUE,
+        summary TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
@@ -179,6 +180,13 @@ const initializeTables = () => {
       if (!/duplicate column name/i.test(e.message)) throw e;
     }
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_sessions_code ON story_sessions(code) WHERE code IS NOT NULL`);
+
+    // Migración: agregar columna summary (idempotente)
+    try {
+      db.exec(`ALTER TABLE story_sessions ADD COLUMN summary TEXT`);
+    } catch (e) {
+      if (!/duplicate column name/i.test(e.message)) throw e;
+    }
 
     // Story Session Players table
     db.exec(`

@@ -20,14 +20,18 @@ export class StorySession {
       weather: 'Despejado',
       mood: 'Pacífico'
     };
-    this.settings = data.settings || {
+    this.settings = {
       aiCreativity: 0.8,
       storyLength: 'medium', // short, medium, long
       genre: 'fantasy', // fantasy, historical, sci-fi, mystery
       gameType: 'character', // character, country, world
-      language: 'es'
+      language: 'es',
+      ...(data.settings || {}),
+      mode: data.settings?.mode ?? 'narrador-activo',
+      maxRounds: data.settings?.maxRounds ?? null,
     };
     this.code = data.code !== undefined ? data.code : null;
+    this.summary = data.summary ?? '';
   }
 
   /**
@@ -215,6 +219,10 @@ export class StorySession {
       storyHistory: this.storyHistory,
       worldContext: this.worldContext,
       settings: this.settings,
+      summary: this.summary,
+      roundsRemaining: this.settings.maxRounds
+        ? Math.max(0, this.settings.maxRounds - this.turnNumber + 1)
+        : null,
       roundPending: this.isRoundPending()
     };
   }
