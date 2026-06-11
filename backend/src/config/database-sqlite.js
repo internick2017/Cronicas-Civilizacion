@@ -239,17 +239,53 @@ const initializeTables = () => {
 // Initialize tables on startup
 initializeTables();
 
+/**
+ * Translate PostgreSQL $1,$2,... placeholders to SQLite positional ? placeholders.
+ * Because a single query can reference the same $N multiple times (e.g. ON CONFLICT DO UPDATE),
+ * we walk through every $N occurrence in order and build an expanded params array so each ?
+ * maps to the correct original value.
+ *
+ * Example: "VALUES ($1, $2) ON CONFLICT DO UPDATE SET a=$2"
+ *   occurrences in order: [1, 2, 2]
+ *   expandedParams: [params[0], params[1], params[1]]
+ *   translated SQL: "VALUES (?, ?) ON CONFLICT DO UPDATE SET a=?"
+ */
+function translatePlaceholders(text, params = []) {
+  const expandedParams = [];
+  const translated = text.replace(/\$(\d+)/g, (_, n) => {
+    expandedParams.push(params[parseInt(n, 10) - 1]);
+    return '?';
+  });
+  return { sql: translated, values: expandedParams };
+}
+
+/**
+ * Coerce parameter values to types SQLite3 can bind.
+ * Date objects → ISO string. boolean → 0/1. undefined → null.
+ */
+function coerceSQLiteParams(values) {
+  return values.map(v => {
+    if (v instanceof Date) return v.toISOString();
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    if (v === undefined) return null;
+    return v;
+  });
+}
+
 // Create a PostgreSQL-like query interface for compatibility
 const pool = {
   query: (text, params = []) => {
     try {
-      if (text.includes('RETURNING') || text.startsWith('INSERT') || text.startsWith('UPDATE') || text.startsWith('DELETE')) {
-        const stmt = db.prepare(text);
-        const result = stmt.run(...params);
+      const { sql, values: rawValues } = translatePlaceholders(text, params);
+      const values = coerceSQLiteParams(rawValues);
+      const trimmed = sql.trimStart().toUpperCase();
+      if (trimmed.includes('RETURNING') || trimmed.startsWith('INSERT') || trimmed.startsWith('UPDATE') || trimmed.startsWith('DELETE')) {
+        const stmt = db.prepare(sql);
+        const result = stmt.run(...values);
         return { rows: [{ id: result.lastInsertRowid }], rowCount: result.changes };
       } else {
-        const stmt = db.prepare(text);
-        const rows = stmt.all(...params);
+        const stmt = db.prepare(sql);
+        const rows = stmt.all(...values);
         return { rows, rowCount: rows.length };
       }
     } catch (error) {
@@ -257,12 +293,12 @@ const pool = {
       throw error;
     }
   },
-  
+
   connect: () => ({
     query: pool.query,
     release: () => {}
   }),
-  
+
   end: () => db.close()
 };
 

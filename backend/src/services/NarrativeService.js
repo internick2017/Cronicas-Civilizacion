@@ -2,7 +2,7 @@ import { StorySession } from '../models/StorySession.js';
 import AIService from './AIService.js';
 import { normalizeLanguage } from './narrativePrompts.js';
 import { v4 as uuidv4 } from 'uuid';
-import pool from '../config/database.js';
+import { getDatabaseConnection } from '../config/index.js';
 import logger from '../utils/logger.js';
 import { generateRoomCode } from '../utils/roomCode.js';
 
@@ -11,6 +11,16 @@ export class NarrativeService {
     this.sessions = new Map(); // Keep memory cache for performance - cleared for fresh start
     this.aiService = AIService;
     this.skipDatabase = options.skipDatabase === true;
+    this._pool = null;
+  }
+
+  /**
+   * Lazily resolve the database pool using the dynamic config selector.
+   * Respects DATABASE_TYPE at startup; result is cached for the lifetime of the service.
+   */
+  async getPool() {
+    if (!this._pool) this._pool = await getDatabaseConnection();
+    return this._pool;
   }
 
   /**
@@ -19,6 +29,7 @@ export class NarrativeService {
   async saveSessionToDatabase(session) {
     if (this.skipDatabase) return;
     try {
+      const pool = await this.getPool();
       const client = await pool.connect();
       
       // Save main session
@@ -69,7 +80,7 @@ export class NarrativeService {
       maxPlayers: sessionData.max_players,
       currentPlayerIndex: sessionData.current_player_index,
       turnNumber: sessionData.turn_number,
-      isActive: sessionData.is_active,
+      isActive: Boolean(sessionData.is_active),
       worldContext: JSON.parse(sessionData.world_context || '{}'),
       settings: JSON.parse(sessionData.settings || '{}'),
       code: sessionData.code || null,
@@ -85,7 +96,7 @@ export class NarrativeService {
         countryType: p.country_type,
         worldRole: p.world_role,
         turnOrder: p.turn_order,
-        isActive: p.is_active,
+        isActive: Boolean(p.is_active),
         joinedAt: p.joined_at
       })),
       storyHistory: history.map(h => ({
@@ -108,6 +119,7 @@ export class NarrativeService {
    */
   async loadSessionFromDatabase(sessionId) {
     if (this.skipDatabase) return null;
+    const pool = await this.getPool();
     const client = await pool.connect();
     try {
       const sessionResult = await client.query(
@@ -143,6 +155,7 @@ export class NarrativeService {
   async saveStoryEntryToDatabase(sessionId, entry) {
     if (this.skipDatabase) return;
     try {
+      const pool = await this.getPool();
       const client = await pool.connect();
       
       await client.query(`
@@ -216,6 +229,7 @@ export class NarrativeService {
    */
   async loadSessionByCodeFromDatabase(code) {
     if (this.skipDatabase) return null;
+    const pool = await this.getPool();
     const client = await pool.connect();
     try {
       const sessionResult = await client.query(
@@ -270,37 +284,35 @@ export class NarrativeService {
    * Get all active sessions
    */
   async getAllSessions() {
+    if (this.skipDatabase) {
+      return Array.from(this.sessions.values())
+        .filter(session => session.isActive)
+        .map(session => session.getSummary());
+    }
     try {
+      const pool = await this.getPool();
       const client = await pool.connect();
       
-      // Get sessions with player counts, story lengths, and current player info
+      // Get active sessions with player counts and story lengths.
+      // Uses only narrative tables (story_sessions / story_session_players / story_history)
+      // so the query works on both PostgreSQL and SQLite (is_active stored as 1 on SQLite).
       const result = await client.query(`
-        SELECT 
+        SELECT
           ss.*,
           COALESCE(player_counts.player_count, 0) as player_count,
-          COALESCE(story_counts.story_length, 0) as story_length,
-          current_players.player_name as current_player_name,
-          current_players.player_id as current_player_id
+          COALESCE(story_counts.story_length, 0) as story_length
         FROM story_sessions ss
         LEFT JOIN (
-          SELECT session_id, COUNT(*) as player_count 
-          FROM story_session_players 
+          SELECT session_id, COUNT(*) as player_count
+          FROM story_session_players
           GROUP BY session_id
         ) player_counts ON ss.id = player_counts.session_id
         LEFT JOIN (
-          SELECT session_id, COUNT(*) as story_length 
-          FROM story_history 
+          SELECT session_id, COUNT(*) as story_length
+          FROM story_history
           GROUP BY session_id
         ) story_counts ON ss.id = story_counts.session_id
-        LEFT JOIN (
-          SELECT ssp.session_id, p.name as player_name, p.id as player_id
-          FROM story_session_players ssp
-          JOIN players p ON ssp.player_id = p.id
-          WHERE ssp.session_id IN (
-            SELECT id FROM story_sessions WHERE current_turn_player_id = ssp.player_id
-          )
-        ) current_players ON ss.id = current_players.session_id
-        WHERE ss.is_active = true 
+        WHERE ss.is_active = 1
         ORDER BY ss.created_at DESC
       `);
       
@@ -314,11 +326,7 @@ export class NarrativeService {
         playerCount: parseInt(row.player_count) || 0,
         turnNumber: row.turn_number,
         storyLength: parseInt(row.story_length) || 0,
-        currentPlayer: row.current_player_name ? {
-          id: row.current_player_id,
-          name: row.current_player_name
-        } : null,
-        isActive: row.is_active,
+        isActive: Boolean(row.is_active),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }));
