@@ -522,10 +522,7 @@ export class NarrativeService {
       narrative = await this.closeRound(session);
 
       // Auto-epilogue when last round completed (turnNumber was already incremented by closeRound)
-      if (session.settings.maxRounds && session.turnNumber > session.settings.maxRounds) {
-        await this.endSession(session.id);
-        sessionEnded = true;
-      }
+      sessionEnded = (await this.maybeAutoEpilogue(session)) || undefined;
     }
 
     if (!this.skipDatabase) await this.saveSessionToDatabase(session);
@@ -537,6 +534,18 @@ export class NarrativeService {
       roundComplete,
       ...(sessionEnded && { sessionEnded }),
     };
+  }
+
+  /**
+   * Termina la sesión con epílogo si turnNumber ya superó maxRounds.
+   * @returns {Promise<boolean>} true si la historia terminó.
+   */
+  async maybeAutoEpilogue(session) {
+    if (session.settings.maxRounds && session.turnNumber > session.settings.maxRounds) {
+      await this.endSession(session.id);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -559,7 +568,8 @@ export class NarrativeService {
     if (alreadyNarrated) throw new Error('No hay ronda pendiente de narrar');
 
     const narrative = await this.closeRound(session);
-    return { narrative, turnNumber: session.turnNumber };
+    const sessionEnded = (await this.maybeAutoEpilogue(session)) || undefined;
+    return { narrative, turnNumber: session.turnNumber, ...(sessionEnded && { sessionEnded }) };
   }
 
   /**
@@ -586,14 +596,12 @@ export class NarrativeService {
         narrative = await this.closeRound(session);
 
         // Auto-epilogue when last round completed (turnNumber was already incremented by closeRound)
-        if (session.settings.maxRounds && session.turnNumber > session.settings.maxRounds) {
-          await this.endSession(session.id);
-          sessionEnded = true;
-        }
+        sessionEnded = (await this.maybeAutoEpilogue(session)) || undefined;
       } else {
         // Nobody acted this round — just advance turnNumber without narrating
         session.turnNumber += 1;
         if (!this.skipDatabase) await this.saveSessionToDatabase(session);
+        sessionEnded = (await this.maybeAutoEpilogue(session)) || undefined;
       }
     }
 
