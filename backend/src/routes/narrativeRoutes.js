@@ -240,10 +240,7 @@ router.post('/sessions/:sessionId/action', async (req, res) => {
 
     res.json({
       success: true,
-      data: {
-        ...result,
-        roundComplete: result.roundComplete,
-      },
+      data: result,
       message: result.roundComplete
         ? 'Round complete — narrative generated'
         : 'Action submitted successfully',

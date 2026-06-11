@@ -404,6 +404,11 @@ export class NarrativeService {
       throw new Error(`No es tu turno — le toca a ${current?.name ?? 'otro jugador'}`);
     }
 
+    const alreadyActed = session.storyHistory.some(
+      e => e.type === 'player_action' && e.turnNumber === session.turnNumber && e.playerId === playerId
+    );
+    if (alreadyActed) throw new Error('Ya enviaste tu acción en esta ronda');
+
     const entry = session.addPlayerAction(playerId, text);
     if (!this.skipDatabase) await this.saveStoryEntryToDatabase(sessionId, entry);
 
@@ -412,6 +417,9 @@ export class NarrativeService {
 
     let narrative = null;
     if (roundComplete) {
+      // Persist advanced index before the AI call so a crash re-hydrates consistent turn state
+      if (!this.skipDatabase) await this.saveSessionToDatabase(session);
+
       const roundActions = session.storyHistory.filter(
         e => e.type === 'player_action' && e.turnNumber === session.turnNumber
       );
@@ -448,7 +456,7 @@ export class NarrativeService {
       .filter(e => e.type === 'ai_narrative').slice(-2)
       .map(e => e.narrative).join('\n');
     const actions = roundActions
-      .map(e => `${session.players.find(p => p.id === e.playerId)?.name}: ${e.action}`)
+      .map(e => `${e.playerName ?? '?'}: ${e.action}`)
       .join('\n');
     return `HISTORIA RECIENTE:\n${lastNarratives || '(la historia recién comienza)'}\n\nACCIONES DE ESTA RONDA:\n${actions}\n\nNarra el resultado de la ronda.`;
   }
