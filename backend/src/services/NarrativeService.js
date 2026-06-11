@@ -53,6 +53,7 @@ export class NarrativeService {
       client.release();
     } catch (error) {
       logger.error('Error saving session to database:', error);
+      throw error;
     }
   }
 
