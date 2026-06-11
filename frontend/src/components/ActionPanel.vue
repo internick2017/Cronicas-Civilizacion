@@ -9,12 +9,12 @@
 
     <div class="actions-grid" v-if="isCurrentTurn">
       <button 
-        v-for="action in availableActions" 
-        :key="action.id"
+        v-for="action in actualAvailableActions" 
+        :key="action.type || action.id"
         @click="selectAction(action)"
-        :disabled="!action.enabled"
-        :class="['action-btn', action.category]"
-        :title="action.description"
+        :disabled="action.enabled === false"
+        :class="['action-btn', action.category || 'default']"
+        :title="action.description || action.name"
       >
         <div class="action-icon">{{ action.icon }}</div>
         <div class="action-name">{{ action.name }}</div>
@@ -35,7 +35,7 @@
     <div v-if="selectedAction" class="action-modal-overlay" @click="cancelAction">
       <div class="action-modal" @click.stop>
         <h4>{{ selectedAction.name }}</h4>
-        <p>{{ selectedAction.description }}</p>
+        <p>{{ selectedAction.description || 'Realizar esta acción en tu turno.' }}</p>
         
         <div class="action-details" v-if="selectedAction.cost">
           <h5>Costo:</h5>
@@ -78,13 +78,15 @@ const emit = defineEmits(['action-selected'])
 const selectedAction = ref(null)
 
 const selectAction = (action) => {
-  if (!action.enabled) return
+  if (action.enabled === false) return
   selectedAction.value = action
 }
 
 const confirmAction = () => {
   if (selectedAction.value) {
-    emit('action-selected', selectedAction.value)
+    // App.vue expects performAction(actionType, actionData)
+    const actionType = selectedAction.value.type || selectedAction.value.id
+    emit('action-selected', actionType, selectedAction.value)
     selectedAction.value = null
   }
 }
@@ -170,7 +172,10 @@ const defaultActions = computed(() => {
   ]
 })
 
-const availableActions = computed(() => defaultActions.value)
+// Use the actual actions passed as props, with fallback to defaults
+const actualAvailableActions = computed(() => {
+  return props.availableActions.length > 0 ? props.availableActions : defaultActions.value
+})
 </script>
 
 <style scoped>
@@ -274,6 +279,10 @@ const availableActions = computed(() => defaultActions.value)
 
 .action-btn.special {
   border-color: rgba(230, 126, 34, 0.5);
+}
+
+.action-btn.default {
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .action-icon {

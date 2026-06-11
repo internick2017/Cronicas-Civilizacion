@@ -3,13 +3,43 @@ import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import pool from '../config/database.js';
 import redisClient from '../config/redis.js';
+import { AuthenticationError, ValidationError, ConflictError, NotFoundError } from '../utils/errors.js';
+import logger from '../utils/logger.js';
 
 export class AuthService {
   constructor() {
-    this.jwtSecret = process.env.JWT_SECRET || 'cronicas-civilizacion-secret';
     this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
     this.dbAvailable = false;
     this.initializeDatabase();
+  }
+
+  /**
+   * Get JWT secret with validation
+   * @private
+   * @returns {string} JWT secret
+   * @throws {Error} When JWT_SECRET is not configured
+   */
+  getJwtSecret() {
+    if (!process.env.JWT_SECRET) {
+      logger.error('JWT_SECRET environment variable is required for authentication');
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+    
+    // Additional validation for production
+    if (process.env.NODE_ENV === 'production') {
+      if (process.env.JWT_SECRET.length < 32) {
+        logger.error('JWT_SECRET must be at least 32 characters in production');
+        throw new Error('JWT_SECRET must be at least 32 characters in production');
+      }
+      
+      if (process.env.JWT_SECRET === 'your-secret-key' || 
+          process.env.JWT_SECRET === 'development-secret') {
+        logger.error('JWT_SECRET cannot use default development values in production');
+        throw new Error('JWT_SECRET cannot use default development values in production');
+      }
+    }
+    
+    return process.env.JWT_SECRET;
   }
 
   async initializeDatabase() {
@@ -17,7 +47,7 @@ export class AuthService {
       await pool.query('SELECT 1');
       this.dbAvailable = true;
     } catch (error) {
-      console.warn('⚠️ AuthService: Database not available, using in-memory fallback');
+      logger.warn('⚠️ AuthService: Database not available, using in-memory fallback');
       this.dbAvailable = false;
     }
   }
@@ -43,7 +73,7 @@ export class AuthService {
       // Check if user already exists
       const existingUser = await this.getUserByEmail(email);
       if (existingUser) {
-        throw new Error('User with this email already exists');
+        throw new ConflictError('User with this email already exists', 'user');
       }
 
       // Hash password
@@ -87,8 +117,9 @@ export class AuthService {
         token
       };
     } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
+      if (error.isOperational) throw error;
+      logger.error('Registration error:', error);
+      throw new Error('Failed to register user');
     }
   }
 
@@ -109,18 +140,18 @@ export class AuthService {
       // Get user by email
       const user = await this.getUserByEmail(email);
       if (!user) {
-        throw new Error('Invalid email or password');
+        throw new AuthenticationError('Invalid email or password');
       }
 
       // Check if user is active
       if (!user.isActive) {
-        throw new Error('Account is deactivated');
+        throw new AuthenticationError('Account is deactivated');
       }
 
       // Verify password
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (!isPasswordValid) {
-        throw new Error('Invalid email or password');
+        throw new AuthenticationError('Invalid email or password');
       }
 
       // Update last login
@@ -142,8 +173,9 @@ export class AuthService {
         token
       };
     } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+      if (error.isOperational) throw error;
+      logger.error('Login error:', error);
+      throw new AuthenticationError('Login failed');
     }
   }
 
@@ -169,7 +201,7 @@ export class AuthService {
         message: 'Logged out successfully'
       };
     } catch (error) {
-      console.error('Logout error:', error);
+      logger.error('Logout error:', error);
       throw error;
     }
   }
@@ -190,7 +222,7 @@ export class AuthService {
       }
 
       // Verify JWT
-      const decoded = jwt.verify(token, this.jwtSecret);
+      const decoded = jwt.verify(token, this.getJwtSecret());
       
       // Get user from database
       const user = await this.getUserById(decoded.userId);
@@ -213,7 +245,7 @@ export class AuthService {
         }
       };
     } catch (error) {
-      console.error('Token verification error:', error);
+      logger.error('Token verification error:', error);
       throw error;
     }
   }
@@ -231,7 +263,7 @@ export class AuthService {
       civilizationName: user.civilizationName
     };
 
-    return jwt.sign(payload, this.jwtSecret, { expiresIn: this.jwtExpiresIn });
+    return jwt.sign(payload, this.getJwtSecret(), { expiresIn: this.jwtExpiresIn });
   }
 
   /**
@@ -268,7 +300,7 @@ export class AuthService {
         updatedAt: user.updated_at
       };
     } catch (error) {
-      console.error('Error getting user by email:', error);
+      logger.error('Error getting user by email:', error);
       return null;
     }
   }
@@ -306,7 +338,7 @@ export class AuthService {
         updatedAt: user.updated_at
       };
     } catch (error) {
-      console.error('Error getting user by ID:', error);
+      logger.error('Error getting user by ID:', error);
       return null;
     }
   }
@@ -327,7 +359,7 @@ export class AuthService {
         WHERE id = $1
       `, [userId]);
     } catch (error) {
-      console.error('Error updating last login:', error);
+      logger.error('Error updating last login:', error);
     }
   }
 
@@ -355,7 +387,7 @@ export class AuthService {
 
       return await this.getUserById(userId);
     } catch (error) {
-      console.error('Error updating profile:', error);
+      logger.error('Error updating profile:', error);
       throw error;
     }
   }
@@ -411,7 +443,7 @@ export class AuthService {
         message: 'Password changed successfully'
       };
     } catch (error) {
-      console.error('Error changing password:', error);
+      logger.error('Error changing password:', error);
       throw error;
     }
   }
@@ -423,7 +455,7 @@ export class AuthService {
   getStatus() {
     return {
       dbAvailable: this.dbAvailable,
-      jwtConfigured: !!this.jwtSecret,
+      jwtConfigured: !!process.env.JWT_SECRET,
       redisAvailable: redisClient.isOpen
     };
   }

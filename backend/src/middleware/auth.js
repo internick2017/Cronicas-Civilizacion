@@ -1,4 +1,5 @@
 import authService from '../services/AuthService.js';
+import logger from '../utils/logger.js';
 
 /**
  * Middleware to authenticate JWT tokens
@@ -34,7 +35,7 @@ export async function authenticateToken(req, res, next) {
     
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
+    logger.error('Authentication error:', error);
     return res.status(401).json({
       success: false,
       error: 'Invalid or expired token'
@@ -62,19 +63,19 @@ export async function optionalAuth(req, res, next) {
         }
       } catch (error) {
         // Token invalid but we don't fail the request
-        console.warn('Invalid token in optional auth:', error.message);
+        logger.warn('Invalid token in optional auth:', error.message);
       }
     }
 
     next();
   } catch (error) {
-    console.error('Optional auth error:', error);
+    logger.error('Optional auth error:', error);
     next();
   }
 }
 
 /**
- * Middleware to check if user is admin (placeholder for future use)
+ * Middleware to check if user is admin
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
@@ -88,11 +89,17 @@ export async function requireAdmin(req, res, next) {
       });
     }
 
-    // For now, all authenticated users are considered "admin"
-    // In the future, you could check req.user.role === 'admin'
+    // Check if user has admin role
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Admin privileges required'
+      });
+    }
+
     next();
   } catch (error) {
-    console.error('Admin check error:', error);
+    logger.error('Admin check error:', error);
     return res.status(500).json({
       success: false,
       error: 'Server error'
@@ -125,7 +132,7 @@ export async function authenticateSocket(socket, next) {
     
     next();
   } catch (error) {
-    console.error('Socket authentication error:', error);
+    logger.error('Socket authentication error:', error);
     next(new Error('Authentication failed'));
   }
 }
@@ -147,13 +154,13 @@ export async function optionalSocketAuth(socket, next) {
           socket.token = token;
         }
       } catch (error) {
-        console.warn('Invalid token in optional socket auth:', error.message);
+        logger.warn('Invalid token in optional socket auth:', error.message);
       }
     }
 
     next();
   } catch (error) {
-    console.error('Optional socket auth error:', error);
+    logger.error('Optional socket auth error:', error);
     next();
   }
 } 

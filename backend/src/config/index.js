@@ -19,7 +19,7 @@ const config = {
   },
   
   cache: {
-    type: process.env.CACHE_TYPE || 'redis',
+    type: process.env.CACHE_TYPE || 'memory',
     redis: {
       host: process.env.REDIS_HOST || 'localhost',
       port: process.env.REDIS_PORT || 6379,
@@ -39,7 +39,7 @@ const config = {
   },
   
   jwt: {
-    secret: process.env.JWT_SECRET || 'cronicas_jwt_secret_2024',
+    secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
   },
   
@@ -68,7 +68,15 @@ export async function getCacheConnection() {
     return redisClient;
   } else {
     const { default: redisClient } = await import('./redis.js');
-    return redisClient;
+    try {
+      await redisClient.connect();
+      return redisClient;
+    } catch (error) {
+      console.log('⚠️ Redis connection failed, falling back to memory cache');
+      const { default: memoryClient } = await import('./redis-memory.js');
+      await memoryClient.connect();
+      return memoryClient;
+    }
   }
 }
 

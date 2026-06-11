@@ -1,9 +1,6 @@
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -153,6 +150,58 @@ const initializeTables = () => {
         message_type TEXT DEFAULT 'public',
         target_player_id TEXT REFERENCES players(id) ON DELETE CASCADE,
         message_text TEXT NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Story Sessions table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS story_sessions (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        max_players INTEGER DEFAULT 6,
+        current_player_index INTEGER DEFAULT 0,
+        turn_number INTEGER DEFAULT 1,
+        is_active INTEGER DEFAULT 1,
+        world_context TEXT, -- JSON string
+        settings TEXT, -- JSON string
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Story Session Players table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS story_session_players (
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        session_id TEXT NOT NULL REFERENCES story_sessions(id) ON DELETE CASCADE,
+        player_id TEXT, -- Can be null for guest players
+        name TEXT NOT NULL,
+        character_name TEXT,
+        character_class TEXT DEFAULT 'Aventurero',
+        country_name TEXT,
+        country_type TEXT,
+        world_role TEXT,
+        turn_order INTEGER,
+        is_active INTEGER DEFAULT 1,
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Story History table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS story_history (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES story_sessions(id) ON DELETE CASCADE,
+        player_id TEXT,
+        player_name TEXT,
+        character_name TEXT,
+        action TEXT,
+        narrative TEXT,
+        turn_number INTEGER,
+        entry_type TEXT DEFAULT 'player_action', -- 'player_action' or 'ai_narrative'
+        context TEXT, -- JSON string
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);

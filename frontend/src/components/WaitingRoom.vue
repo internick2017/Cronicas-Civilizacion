@@ -1,14 +1,22 @@
 <template>
-  <div class="waiting-room">
-    <div class="room-header">
-      <h2>🏛️ {{ game?.name }}</h2>
-      <p>Esperando a que se unan más jugadores...</p>
+  <div class="waiting-room bg-game-pattern">
+    <div class="header-game">
+      <h1 class="text-glow">
+        <span class="icon-game">🏛️</span>
+        {{ game?.name }}
+        <span class="icon-game">🏛️</span>
+      </h1>
+      <h2 class="text-shadow-game">Sala de Espera</h2>
+      <p class="text-shadow-game">Esperando a que se unan más jugadores...</p>
     </div>
 
-    <div class="room-content">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Game Info -->
-      <div class="game-info-panel">
-        <h3>Información del Juego</h3>
+      <div class="panel-game">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="icon-game">📊</span>
+          <h3 class="text-2xl font-bold text-white">Información del Juego</h3>
+        </div>
         <div class="info-grid">
           <div class="info-item">
             <span class="label">Modo de Juego:</span>
@@ -30,14 +38,17 @@
       </div>
 
       <!-- Players List -->
-      <div class="players-panel">
-        <h3>Jugadores ({{ game?.players?.length || 0 }}/{{ game?.maxPlayers }})</h3>
+      <div class="panel-game">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="icon-game">👥</span>
+          <h3 class="text-2xl font-bold text-white">Jugadores ({{ game?.players?.length || 0 }}/{{ game?.maxPlayers }})</h3>
+        </div>
         <div class="players-list">
           <div 
             v-for="player in game?.players" 
             :key="player.id"
-            class="player-card"
-            :class="{ 'current-player': player.id === playerId }"
+            class="card-game p-4"
+            :class="{ 'border-green-500': player.id === playerId }"
           >
             <div class="player-avatar">
               <img 
@@ -51,8 +62,8 @@
             </div>
             
             <div class="player-info">
-              <h4>{{ player.civilizationName }}</h4>
-              <p class="player-name">{{ player.name }}</p>
+              <h4>{{ player.civilizationName || 'Sin nombre' }}</h4>
+              <p class="player-name">{{ player.name || 'Sin nombre' }}</p>
               <div class="player-status">
                 <span class="status-indicator" :class="{ online: player.isOnline }"></span>
                 {{ player.isOnline ? 'En línea' : 'Desconectado' }}
@@ -68,7 +79,7 @@
           <div 
             v-for="n in emptySlots" 
             :key="`empty-${n}`"
-            class="player-card empty-slot"
+            class="card-game p-4 opacity-50"
           >
             <div class="player-avatar">
               <div class="default-avatar empty">?</div>
@@ -82,8 +93,11 @@
       </div>
 
       <!-- Game Rules -->
-      <div class="rules-panel">
-        <h3>Reglas del Juego</h3>
+      <div class="panel-game">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="icon-game">📜</span>
+          <h3 class="text-2xl font-bold text-white">Reglas del Juego</h3>
+        </div>
         <div class="rules-content">
           <div class="rule-section">
             <h4>🎯 Objetivo</h4>
@@ -112,20 +126,41 @@
     </div>
 
     <!-- Action Buttons -->
-    <div class="room-actions">
+    <div class="flex gap-4 mt-8">
       <button 
         @click="leaveGame"
-        class="btn btn-secondary"
+        class="btn-game btn-game-outline"
       >
-        Salir del Juego
+        <span class="flex items-center gap-2">
+          <span class="icon-game">🚪</span>
+          Salir del Juego
+        </span>
+      </button>
+      
+      <button 
+        v-if="game?.status === 'playing'"
+        @click="resetGame"
+        class="btn-game btn-game-danger"
+      >
+        <span class="flex items-center gap-2">
+          <span class="icon-game">🔄</span>
+          Reiniciar Juego (Dev)
+        </span>
       </button>
       
       <button 
         @click="startGame"
-        class="btn btn-primary"
-        :disabled="!canStartGame"
+        class="btn-game btn-game-primary"
+        :disabled="!canStartGame || startingGame"
       >
-        {{ canStartGame ? 'Iniciar Juego' : `Esperando jugadores (${game?.players?.length || 0}/${game?.maxPlayers})` }}
+        <span v-if="startingGame" class="flex items-center gap-2">
+          <span class="loading-game">⏳</span>
+          Iniciando juego...
+        </span>
+        <span v-else class="flex items-center gap-2">
+          <span class="icon-game">🎮</span>
+          {{ canStartGame ? 'Iniciar Juego' : `Esperando jugadores (${game?.players?.length || 0}/${game?.maxPlayers})` }}
+        </span>
       </button>
     </div>
 
@@ -142,9 +177,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch, onMounted, ref } from 'vue'
+import { useGameSocket } from '../composables/useGameSocket'
 
-const emit = defineEmits(['start-game', 'leave-game'])
+const emit = defineEmits(['start-game', 'leave-game', 'reset-game'])
 const props = defineProps({
   game: {
     type: Object,
@@ -155,6 +191,38 @@ const props = defineProps({
     required: true
   }
 })
+
+const startingGame = ref(false)
+
+const { socket } = useGameSocket()
+
+// Update player online status when component mounts
+onMounted(() => {
+  if (socket.value && props.game?.id && props.playerId) {
+    console.log('🔄 WaitingRoom mounted - updating player online status')
+    socket.value.emit('get-game-state', { 
+      gameId: props.game.id,
+      playerId: props.playerId 
+    })
+  }
+  
+  // Listen for game start events to reset loading state
+  if (socket.value) {
+    socket.value.on('game-started', () => {
+      startingGame.value = false
+    })
+    
+    socket.value.on('start-game-response', (data) => {
+      if (!data.success) {
+        startingGame.value = false
+      } else {
+        // Keep loading state until game-started event
+      }
+    })
+  }
+})
+
+
 
 // Computed properties
 const canStartGame = computed(() => {
@@ -169,13 +237,23 @@ const emptySlots = computed(() => {
 
 // Methods
 const startGame = () => {
-  if (canStartGame.value) {
+  if (canStartGame.value && !startingGame.value) {
+    startingGame.value = true
     emit('start-game')
+    
+    // Reset loading state after a timeout as fallback
+    setTimeout(() => {
+      startingGame.value = false
+    }, 10000) // 10 seconds timeout
   }
 }
 
 const leaveGame = () => {
   emit('leave-game')
+}
+
+const resetGame = () => {
+  emit('reset-game')
 }
 
 const getInitials = (name) => {
@@ -198,6 +276,10 @@ const getGameModeText = (mode) => {
 }
 
 const getMapSizeText = (size) => {
+  if (!size || size === 'undefined' || size === undefined) {
+    return 'Mediano (20x20)'
+  }
+  
   const sizes = {
     15: 'Pequeño (15x15)',
     20: 'Mediano (20x20)', 
@@ -218,10 +300,9 @@ const getStatusText = (status) => {
 
 const getObjectiveText = (mode) => {
   const objectives = {
-    domination: 'Conquista el 60% del mapa o elimina a todos los oponentes',
-    science: 'Sé el primero en alcanzar 1000 puntos de Ciencia',
-    culture: 'Sé el primero en alcanzar 1000 puntos de Cultura',
-    economic: 'Sé el primero en alcanzar 2000 puntos de Oro'
+    classic: 'Conquista el 60% del mapa, alcanza 1000 puntos de Ciencia o elimina a todos los oponentes',
+    fast: 'Partida rápida: Alcanza 500 puntos de cualquier tipo o conquista el 40% del mapa',
+    custom: 'Reglas personalizadas definidas por el creador del juego'
   }
   return objectives[mode] || 'Objetivo no definido'
 }
