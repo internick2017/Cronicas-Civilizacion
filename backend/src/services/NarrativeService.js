@@ -3,35 +3,39 @@ import AIService from './AIService.js';
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database.js';
 import logger from '../utils/logger.js';
+import { generateRoomCode } from '../utils/roomCode.js';
 
 export class NarrativeService {
-  constructor() {
+  constructor(options = {}) {
     this.sessions = new Map(); // Keep memory cache for performance - cleared for fresh start
     this.aiService = AIService;
+    this.skipDatabase = options.skipDatabase === true;
   }
 
   /**
    * Save session to database
    */
   async saveSessionToDatabase(session) {
+    if (this.skipDatabase) return;
     try {
       const client = await pool.connect();
       
       // Save main session
       await client.query(`
-        INSERT INTO story_sessions (id, title, description, max_players, current_player_index, 
-                                  turn_number, is_active, world_context, settings, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        INSERT INTO story_sessions (id, title, description, max_players, current_player_index,
+                                  turn_number, is_active, world_context, settings, code, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ON CONFLICT (id) DO UPDATE SET
           current_player_index = $5,
           turn_number = $6,
           is_active = $7,
           world_context = $8,
-          updated_at = $11
-      `, [session.id, session.title, session.description, session.maxPlayers, 
+          code = $10,
+          updated_at = $12
+      `, [session.id, session.title, session.description, session.maxPlayers,
           session.currentPlayerIndex, session.turnNumber, session.isActive,
           JSON.stringify(session.worldContext), JSON.stringify(session.settings),
-          session.createdAt, session.updatedAt]);
+          session.code || null, session.createdAt, session.updatedAt]);
       
       // Save players
       await client.query('DELETE FROM story_session_players WHERE session_id = $1', [session.id]);
@@ -56,6 +60,7 @@ export class NarrativeService {
    * Load session from database
    */
   async loadSessionFromDatabase(sessionId) {
+    if (this.skipDatabase) return null;
     try {
       const client = await pool.connect();
       
@@ -124,7 +129,8 @@ export class NarrativeService {
           timestamp: h.timestamp
         }))
       });
-      
+      session.code = sessionData.code || null;
+
       return session;
     } catch (error) {
       logger.error('Error loading session from database:', error);
@@ -136,6 +142,7 @@ export class NarrativeService {
    * Save story entry to database
    */
   async saveStoryEntryToDatabase(sessionId, entry) {
+    if (this.skipDatabase) return;
     try {
       const client = await pool.connect();
       
@@ -158,13 +165,108 @@ export class NarrativeService {
    */
   async createSession(sessionData = {}) {
     const session = new StorySession(sessionData);
+    session.code = generateRoomCode(c =>
+      [...this.sessions.values()].some(s => s.code === c)
+    );
     this.sessions.set(session.id, session);
-    
+
     // Save to database
     await this.saveSessionToDatabase(session);
-    
+
     logger.info(`Created new story session: ${session.title} (${session.id})`);
     return session;
+  }
+
+  /**
+   * Get a session by room code (case-insensitive)
+   */
+  async getSessionByCode(code) {
+    const target = String(code || '').trim().toUpperCase();
+    for (const session of this.sessions.values()) {
+      if (session.code === target) return session;
+    }
+    // Fallback to DB for sessions not in cache (survives restart)
+    if (this.skipDatabase) return null;
+    return await this.loadSessionByCodeFromDatabase(target);
+  }
+
+  /**
+   * Load session from database by room code
+   */
+  async loadSessionByCodeFromDatabase(code) {
+    if (this.skipDatabase) return null;
+    try {
+      const client = await pool.connect();
+
+      const sessionResult = await client.query(
+        'SELECT * FROM story_sessions WHERE code = $1', [code]
+      );
+
+      if (sessionResult.rows.length === 0) {
+        client.release();
+        return null;
+      }
+
+      const sessionData = sessionResult.rows[0];
+
+      const playersResult = await client.query(
+        'SELECT * FROM story_session_players WHERE session_id = $1 ORDER BY turn_order',
+        [sessionData.id]
+      );
+
+      const historyResult = await client.query(
+        'SELECT * FROM story_history WHERE session_id = $1 ORDER BY timestamp',
+        [sessionData.id]
+      );
+
+      client.release();
+
+      const session = new StorySession({
+        id: sessionData.id,
+        title: sessionData.title,
+        description: sessionData.description,
+        maxPlayers: sessionData.max_players,
+        currentPlayerIndex: sessionData.current_player_index,
+        turnNumber: sessionData.turn_number,
+        isActive: sessionData.is_active,
+        worldContext: JSON.parse(sessionData.world_context || '{}'),
+        settings: JSON.parse(sessionData.settings || '{}'),
+        createdAt: sessionData.created_at,
+        updatedAt: sessionData.updated_at,
+        players: playersResult.rows.map(p => ({
+          id: p.id,
+          playerId: p.player_id,
+          name: p.name,
+          characterName: p.character_name,
+          characterClass: p.character_class,
+          countryName: p.country_name,
+          countryType: p.country_type,
+          worldRole: p.world_role,
+          turnOrder: p.turn_order,
+          isActive: p.is_active,
+          joinedAt: p.joined_at
+        })),
+        storyHistory: historyResult.rows.map(h => ({
+          id: h.id,
+          playerId: h.player_id,
+          playerName: h.player_name,
+          characterName: h.character_name,
+          action: h.action,
+          narrative: h.narrative,
+          turnNumber: h.turn_number,
+          type: h.entry_type,
+          context: h.context ? JSON.parse(h.context) : {},
+          timestamp: h.timestamp
+        }))
+      });
+      session.code = sessionData.code;
+
+      this.sessions.set(session.id, session);
+      return session;
+    } catch (error) {
+      logger.error('Error loading session by code from database:', error);
+      return null;
+    }
   }
 
   /**

@@ -166,10 +166,14 @@ const initializeTables = () => {
         is_active INTEGER DEFAULT 1,
         world_context TEXT, -- JSON string
         settings TEXT, -- JSON string
+        code TEXT UNIQUE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Idempotent migration: add code column to existing DBs
+    try { db.exec(`ALTER TABLE story_sessions ADD COLUMN code TEXT UNIQUE`); } catch (e) { /* already exists */ }
 
     // Story Session Players table
     db.exec(`
