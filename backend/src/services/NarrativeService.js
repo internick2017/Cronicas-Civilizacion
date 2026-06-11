@@ -162,6 +162,12 @@ export class NarrativeService {
    * Create a new story session
    */
   async createSession(sessionData = {}) {
+    // Normalise language: only 'es' and 'pt' are supported
+    if (sessionData.settings) {
+      const rawLang = sessionData.settings.language;
+      sessionData.settings.language = rawLang === 'pt' ? 'pt' : 'es';
+    }
+
     const session = new StorySession(sessionData);
     session.code = generateRoomCode(c =>
       [...this.sessions.values()].some(s => s.code === c)
@@ -419,8 +425,24 @@ export class NarrativeService {
    */
   async generateNarrativeResponse(session, storyEntry) {
     const prompt = this.buildNarrativePrompt(session, storyEntry);
-    
+    const language = (session.settings && session.settings.language) || 'es';
+    const genre = (session.settings && session.settings.genre) || 'fantasy';
+
     try {
+      // Use the language-aware narrative path
+      const narrativeText = await this.aiService.generateStoryNarrative(prompt, { language, genre });
+
+      if (narrativeText) {
+        return {
+          narrative: narrativeText,
+          context: {
+            worldContext: session.worldContext,
+            recentHistory: session.getRecentHistory(5)
+          }
+        };
+      }
+
+      // AI not configured — use legacy path which handles its own fallback
       const response = await this.aiService.generateActionNarrative(
         { action: { type: 'story_action', description: storyEntry.action }, player: { name: storyEntry.characterName } },
         { currentTurn: session.turnNumber, storyLength: session.storyHistory.length }
