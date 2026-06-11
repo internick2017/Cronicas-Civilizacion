@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
+import os from 'os';
 
 // Import routes
 import gameRoutes from './routes/gameRoutes.js';
@@ -26,11 +27,20 @@ import { generalLimiter, apiLimiter, narrativeLimiter } from './middleware/rateL
 import aiService from './services/AIService.js';
 import { GameService } from './services/GameService.js';
 
+function getLanIp() {
+  for (const ifaces of Object.values(os.networkInterfaces())) {
+    for (const iface of ifaces || []) {
+      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+    }
+  }
+  return 'localhost';
+}
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: config.server.frontendUrl,
+    origin: true,
     methods: ["GET", "POST"]
   }
 });
@@ -65,7 +75,7 @@ async function initializeConnections() {
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: true }));
 app.use(compression());
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
@@ -194,11 +204,13 @@ async function startServer() {
 
   const PORT = config.server.port;
 
-  server.listen(PORT, () => {
+  server.listen(PORT, '0.0.0.0', () => {
+    const ip = getLanIp();
     logger.info('\n==========================================');
     logger.info('🚀 Crónicas de Civilización Backend');
     logger.info('==========================================');
-    logger.info(`📡 Server: http://localhost:${PORT}`);
+    logger.info(`📡 Local:   http://localhost:${PORT}`);
+    logger.info(`📱 En tu WiFi: http://${ip}:${PORT}  ← para los celulares`);
     logger.info(`🏥 Health: http://localhost:${PORT}/health`);
     logger.info(`⚙️  Config: http://localhost:${PORT}/config`);
     logger.info(`🗃️  Database: ${config.database.type.toUpperCase()}`);
