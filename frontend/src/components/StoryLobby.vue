@@ -187,6 +187,22 @@
               </div>
             </div>
 
+            <div class="form-group">
+              <label for="mode">Estilo de narración</label>
+              <select id="mode" v-model="newSession.settings.mode">
+                <option value="narrador-activo">🎭 Narrador Activo — la IA propone, ustedes reaccionan</option>
+                <option value="colaborativo">✍️ Colaborativo — ustedes proponen, la IA integra</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="duration">Duración</label>
+              <select id="duration" v-model="newSession.settings.maxRounds">
+                <option :value="null">Libre — el anfitrión decide cuándo terminar</option>
+                <option :value="8">Corta — 8 rondas</option>
+                <option :value="15">Media — 15 rondas</option>
+              </select>
+            </div>
+
             <button @click="createSession" :disabled="!canCreateSession || isCreating" class="create-btn">
               <span v-if="!isCreating">🚀 Crear Historia</span>
               <span v-else class="loading-text">Creando...</span>
@@ -313,7 +329,9 @@ const newSession = ref({
   maxPlayers: 4,
   settings: {
     genre: 'fantasy',
-    language: 'es'
+    language: 'es',
+    mode: 'narrador-activo',
+    maxRounds: null
   }
 })
 
@@ -415,7 +433,9 @@ const createSession = async () => {
         maxPlayers: parseInt(newSession.value.maxPlayers),
         settings: {
           genre: newSession.value.settings.genre,
-          language: newSession.value.settings.language
+          language: newSession.value.settings.language,
+          mode: newSession.value.settings.mode,
+          maxRounds: newSession.value.settings.maxRounds
         }
       })
     })
@@ -455,7 +475,7 @@ const createSession = async () => {
       title: '',
       description: '',
       maxPlayers: 4,
-      settings: { genre: 'fantasy', language: 'es' }
+      settings: { genre: 'fantasy', language: 'es', mode: 'narrador-activo', maxRounds: null }
     }
 
     lobbyView.value = 'waiting'
