@@ -19,7 +19,8 @@
       <div class="turn-banner waiting-turn" v-else-if="props.currentPlayer">
         <div class="waiting-message">
           <div class="waiting-icon">⏳</div>
-          <span>Le toca a <strong>{{ props.nextPlayerName }}</strong></span>
+          <span v-if="props.turnMode === 'simultaneous'">✅ Enviado — esperando a los demás…</span>
+          <span v-else>Le toca a <strong>{{ props.nextPlayerName }}</strong></span>
         </div>
       </div>
     </div>
@@ -139,6 +140,10 @@ const props = defineProps({
   mode: {
     type: String,
     default: 'colaborativo'
+  },
+  turnMode: {
+    type: String,
+    default: 'sequential'
   }
 })
 
