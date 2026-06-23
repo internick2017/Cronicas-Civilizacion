@@ -38,3 +38,31 @@ describe('turnMode setting', () => {
     expect(s.settings.turnMode).toBe('sequential');
   });
 });
+
+describe('helpers de envíos del modelo', () => {
+  let svc;
+  beforeEach(() => { svc = new NarrativeService({ skipDatabase: true }); mockAi(svc); });
+
+  it('actedPlayerIds / hasActed / allActed reflejan los envíos de la ronda', async () => {
+    const { session, ana, beto, cris } = await makeSession(svc, { turnMode: 'simultaneous' });
+    expect(session.actedPlayerIds()).toEqual([]);
+    expect(session.allActed()).toBe(false);
+
+    session.addPlayerAction(ana.id, 'a');
+    expect(session.hasActed(ana.id)).toBe(true);
+    expect(session.hasActed(beto.id)).toBe(false);
+    expect(session.allActed()).toBe(false);
+
+    session.addPlayerAction(beto.id, 'b');
+    session.addPlayerAction(cris.id, 'c');
+    expect(session.allActed()).toBe(true);
+    expect(session.toJSON().actedPlayerIds.sort()).toEqual([ana.id, beto.id, cris.id].sort());
+  });
+
+  it('actedPlayerIds solo cuenta la ronda actual', async () => {
+    const { session, ana } = await makeSession(svc, { turnMode: 'simultaneous' });
+    session.addPlayerAction(ana.id, 'vieja');
+    session.turnNumber = 2;
+    expect(session.actedPlayerIds()).toEqual([]);
+  });
+});
