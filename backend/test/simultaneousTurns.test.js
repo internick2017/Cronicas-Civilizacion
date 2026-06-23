@@ -67,3 +67,44 @@ describe('helpers de envíos del modelo', () => {
     expect(session.actedPlayerIds()).toEqual([]);
   });
 });
+
+describe('submitAction simultáneo', () => {
+  let svc;
+  beforeEach(() => { svc = new NarrativeService({ skipDatabase: true }); mockAi(svc); });
+
+  it('cualquier jugador puede enviar sin esperar orden', async () => {
+    const { session, beto } = await makeSession(svc, { turnMode: 'simultaneous' });
+    // beto (índice 1) envía primero sin error
+    const r = await svc.submitAction(session.id, beto.id, 'acción de beto');
+    expect(r.roundComplete).toBe(false);
+  });
+
+  it('bloquea reenvío del mismo jugador en la ronda', async () => {
+    const { session, ana } = await makeSession(svc, { turnMode: 'simultaneous' });
+    await svc.submitAction(session.id, ana.id, 'una');
+    await expect(svc.submitAction(session.id, ana.id, 'otra')).rejects.toThrow(/Ya enviaste/);
+  });
+
+  it('NO cierra la ronda hasta que todos enviaron; cierra al último', async () => {
+    const { session, ana, beto, cris } = await makeSession(svc, { turnMode: 'simultaneous' });
+    expect((await svc.submitAction(session.id, ana.id, 'a')).roundComplete).toBe(false);
+    expect((await svc.submitAction(session.id, beto.id, 'b')).roundComplete).toBe(false);
+    expect(svc.aiService.generateStoryNarrative).not.toHaveBeenCalled();
+    const r = await svc.submitAction(session.id, cris.id, 'c');
+    expect(r.roundComplete).toBe(true);
+    expect(r.narrative).toBe('narración');
+    expect(svc.aiService.generateStoryNarrative).toHaveBeenCalledTimes(1);
+    expect(session.turnNumber).toBe(2);
+  });
+
+  it('el prompt de cierre incluye las acciones de todos', async () => {
+    const { session, ana, beto, cris } = await makeSession(svc, { turnMode: 'simultaneous' });
+    await svc.submitAction(session.id, ana.id, 'AAA');
+    await svc.submitAction(session.id, beto.id, 'BBB');
+    await svc.submitAction(session.id, cris.id, 'CCC');
+    const prompt = svc.aiService.generateStoryNarrative.mock.calls[0][0];
+    expect(prompt).toContain('AAA');
+    expect(prompt).toContain('BBB');
+    expect(prompt).toContain('CCC');
+  });
+});
