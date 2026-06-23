@@ -499,9 +499,16 @@ export class NarrativeService {
     if (!text) throw new Error('La acción no puede estar vacía');
     if (text.length > 280) throw new Error('La acción supera los 280 caracteres');
 
-    const current = session.players[session.currentPlayerIndex];
-    if (!current || current.id !== playerId) {
-      throw new Error(`No es tu turno — le toca a ${current?.name ?? 'otro jugador'}`);
+    const simultaneous = session.settings.turnMode === 'simultaneous';
+
+    if (simultaneous) {
+      const inSession = session.players.some(p => p.id === playerId);
+      if (!inSession) throw new Error('No perteneces a esta sesión');
+    } else {
+      const current = session.players[session.currentPlayerIndex];
+      if (!current || current.id !== playerId) {
+        throw new Error(`No es tu turno — le toca a ${current?.name ?? 'otro jugador'}`);
+      }
     }
 
     const alreadyActed = session.storyHistory.some(
@@ -512,8 +519,13 @@ export class NarrativeService {
     const entry = session.addPlayerAction(playerId, text);
     if (!this.skipDatabase) await this.saveStoryEntryToDatabase(sessionId, entry);
 
-    session.currentPlayerIndex = (session.currentPlayerIndex + 1) % session.players.length;
-    const roundComplete = session.currentPlayerIndex === 0;
+    let roundComplete;
+    if (simultaneous) {
+      roundComplete = session.allActed();
+    } else {
+      session.currentPlayerIndex = (session.currentPlayerIndex + 1) % session.players.length;
+      roundComplete = session.currentPlayerIndex === 0;
+    }
 
     let narrative = null;
     let sessionEnded;
