@@ -29,6 +29,7 @@ export class StorySession {
       ...(data.settings || {}),
       mode: data.settings?.mode ?? 'narrador-activo',
       maxRounds: data.settings?.maxRounds ?? null,
+      turnMode: data.settings?.turnMode ?? 'sequential',
     };
     this.code = data.code !== undefined ? data.code : null;
     this.summary = data.summary ?? '';
