@@ -162,8 +162,9 @@ export class StorySession {
     return [...ids];
   }
 
+  /** True si el jugador ya envió su acción en el turnNumber actual. */
   hasActed(playerId) {
-    return this.actedPlayerIds().includes(playerId);
+    return new Set(this.actedPlayerIds()).has(playerId);
   }
 
   /**

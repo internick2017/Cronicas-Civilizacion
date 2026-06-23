@@ -47,6 +47,7 @@ describe('helpers de envíos del modelo', () => {
     const { session, ana, beto, cris } = await makeSession(svc, { turnMode: 'simultaneous' });
     expect(session.actedPlayerIds()).toEqual([]);
     expect(session.allActed()).toBe(false);
+    expect(session.hasActed(ana.id)).toBe(false);
 
     session.addPlayerAction(ana.id, 'a');
     expect(session.hasActed(ana.id)).toBe(true);
