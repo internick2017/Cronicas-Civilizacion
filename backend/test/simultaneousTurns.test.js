@@ -151,3 +151,25 @@ describe('closeRoundNow (cierre forzado)', () => {
     expect(r.narrative).toBeNull();
   });
 });
+
+describe('salida de jugador en simultáneo', () => {
+  let svc;
+  beforeEach(() => { svc = new NarrativeService({ skipDatabase: true }); mockAi(svc); });
+
+  it('si los que quedan ya enviaron, la salida cierra la ronda', async () => {
+    const { session, ana, beto, cris } = await makeSession(svc, { turnMode: 'simultaneous' });
+    await svc.submitAction(session.id, ana.id, 'a');
+    await svc.submitAction(session.id, beto.id, 'b'); // falta cris
+    expect(svc.aiService.generateStoryNarrative).not.toHaveBeenCalled();
+    await svc.leaveSession(session.id, cris.id); // cris se va → ana y beto ya enviaron
+    expect(svc.aiService.generateStoryNarrative).toHaveBeenCalledTimes(1);
+    expect(session.turnNumber).toBe(2);
+  });
+
+  it('si aún faltan envíos, la salida NO cierra la ronda', async () => {
+    const { session, ana, cris } = await makeSession(svc, { turnMode: 'simultaneous' });
+    await svc.submitAction(session.id, ana.id, 'a'); // beto y cris no enviaron
+    await svc.leaveSession(session.id, cris.id); // queda beto sin enviar
+    expect(svc.aiService.generateStoryNarrative).not.toHaveBeenCalled();
+  });
+});
