@@ -108,3 +108,36 @@ describe('submitAction simultáneo', () => {
     expect(prompt).toContain('CCC');
   });
 });
+
+describe('closeRoundNow (cierre forzado)', () => {
+  let svc;
+  beforeEach(() => { svc = new NarrativeService({ skipDatabase: true }); mockAi(svc); });
+
+  it('con acciones parciales narra con lo que haya', async () => {
+    const { session, ana } = await makeSession(svc, { turnMode: 'simultaneous' });
+    await svc.submitAction(session.id, ana.id, 'solo ana'); // beto y cris no enviaron
+    const r = await svc.closeRoundNow(session.id);
+    expect(r.narrative).toBe('narración');
+    expect(svc.aiService.generateStoryNarrative).toHaveBeenCalledTimes(1);
+    expect(session.turnNumber).toBe(2);
+  });
+
+  it('sin acciones solo avanza el turnNumber sin narrar', async () => {
+    const { session } = await makeSession(svc, { turnMode: 'simultaneous' });
+    const r = await svc.closeRoundNow(session.id);
+    expect(r.narrative).toBeNull();
+    expect(svc.aiService.generateStoryNarrative).not.toHaveBeenCalled();
+    expect(session.turnNumber).toBe(2);
+  });
+
+  it('es idempotente: no narra dos veces el mismo turno', async () => {
+    const { session, ana, beto, cris } = await makeSession(svc, { turnMode: 'simultaneous' });
+    await svc.submitAction(session.id, ana.id, 'a');
+    await svc.submitAction(session.id, beto.id, 'b');
+    await svc.submitAction(session.id, cris.id, 'c'); // ya cerró → turnNumber 2
+    svc.aiService.generateStoryNarrative.mockClear();
+    const r = await svc.closeRoundNow(session.id); // turno 2 sin acciones
+    expect(r.narrative).toBeNull();
+    expect(svc.aiService.generateStoryNarrative).not.toHaveBeenCalled();
+  });
+});
