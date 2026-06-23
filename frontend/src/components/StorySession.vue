@@ -285,7 +285,7 @@ const emit = defineEmits(['session-ended', 'error'])
 
 // Refs
 const storyContent = ref(null)
-const autoScroll = ref(true)
+const autoScroll = ref(false)
 const showSettings = ref(false)
 const showSummary = ref(false)
 const isGenerating = ref(false)
