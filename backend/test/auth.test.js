@@ -8,7 +8,7 @@ describe('AuthService', () => {
   beforeEach(() => {
     // Set up test environment
     process.env.JWT_SECRET = 'test-secret-key-for-testing-purposes-only';
-    authService = new AuthService();
+    authService = new AuthService({ skipDatabase: true });
   });
 
   afterEach(() => {
@@ -66,7 +66,7 @@ describe('AuthService', () => {
       await authService.register(userData);
       
       // Then try to login
-      const result = await authService.login('test@example.com', 'password123');
+      const result = await authService.login({ email: 'test@example.com', password: 'password123' });
       
       expect(result.success).toBe(true);
       expect(result.user).toBeDefined();
@@ -74,7 +74,7 @@ describe('AuthService', () => {
     });
 
     it('should reject login with invalid credentials', async () => {
-      await expect(authService.login('nonexistent@example.com', 'wrongpassword'))
+      await expect(authService.login({ email: 'nonexistent@example.com', password: 'wrongpassword' }))
         .rejects.toThrow();
     });
   });
@@ -111,14 +111,14 @@ describe('AuthService', () => {
     it('should throw error when JWT_SECRET is not set', () => {
       delete process.env.JWT_SECRET;
       
-      expect(() => new AuthService().getJwtSecret()).toThrow('JWT_SECRET environment variable is required');
+      expect(() => new AuthService({ skipDatabase: true }).getJwtSecret()).toThrow('JWT_SECRET environment variable is required');
     });
 
     it('should validate JWT_SECRET length in production', () => {
       process.env.NODE_ENV = 'production';
       process.env.JWT_SECRET = 'short';
       
-      expect(() => new AuthService().getJwtSecret()).toThrow('JWT_SECRET must be at least 32 characters in production');
+      expect(() => new AuthService({ skipDatabase: true }).getJwtSecret()).toThrow('JWT_SECRET must be at least 32 characters in production');
       
       delete process.env.NODE_ENV;
     });
@@ -127,7 +127,7 @@ describe('AuthService', () => {
       process.env.NODE_ENV = 'production';
       process.env.JWT_SECRET = 'your-secret-key';
       
-      expect(() => new AuthService().getJwtSecret()).toThrow('JWT_SECRET cannot use default development values in production');
+      expect(() => new AuthService({ skipDatabase: true }).getJwtSecret()).toThrow('JWT_SECRET cannot use default development values in production');
       
       delete process.env.NODE_ENV;
     });

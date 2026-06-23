@@ -7,9 +7,14 @@ import { AuthenticationError, ValidationError, ConflictError, NotFoundError } fr
 import logger from '../utils/logger.js';
 
 export class AuthService {
-  constructor() {
+  constructor(options = {}) {
     this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
     this.dbAvailable = false;
+    this.memoryUsers = new Map(); // in-memory fallback store (keyed by user id) when DB unavailable
+    // skipDatabase keeps the service in deterministic in-memory mode (used by tests):
+    // no async DB probe, so dbAvailable can never flip mid-operation and tests never
+    // touch a real database.
+    if (options.skipDatabase) return;
     this.initializeDatabase();
   }
 
@@ -27,15 +32,16 @@ export class AuthService {
     
     // Additional validation for production
     if (process.env.NODE_ENV === 'production') {
-      if (process.env.JWT_SECRET.length < 32) {
-        logger.error('JWT_SECRET must be at least 32 characters in production');
-        throw new Error('JWT_SECRET must be at least 32 characters in production');
-      }
-      
-      if (process.env.JWT_SECRET === 'your-secret-key' || 
+      // Reject known default values first (a short default would otherwise trip the length check)
+      if (process.env.JWT_SECRET === 'your-secret-key' ||
           process.env.JWT_SECRET === 'development-secret') {
         logger.error('JWT_SECRET cannot use default development values in production');
         throw new Error('JWT_SECRET cannot use default development values in production');
+      }
+
+      if (process.env.JWT_SECRET.length < 32) {
+        logger.error('JWT_SECRET must be at least 32 characters in production');
+        throw new Error('JWT_SECRET must be at least 32 characters in production');
       }
     }
     
@@ -63,11 +69,16 @@ export class AuthService {
     try {
       // Validate input
       if (!username || !email || !password) {
-        throw new Error('Username, email, and password are required');
+        throw new ValidationError('Username, email, and password are required');
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new ValidationError('Invalid email address');
       }
 
       if (password.length < 6) {
-        throw new Error('Password must be at least 6 characters long');
+        throw new ValidationError('Password must be at least 6 characters long');
       }
 
       // Check if user already exists
@@ -99,6 +110,9 @@ export class AuthService {
           INSERT INTO users (id, username, email, password, civilization_name, is_active)
           VALUES ($1, $2, $3, $4, $5, $6)
         `, [user.id, user.username, user.email, user.password, user.civilizationName, user.isActive]);
+      } else {
+        // In-memory fallback store (used when the database is unavailable)
+        this.memoryUsers.set(user.id, user);
       }
 
       // Generate JWT token
@@ -224,14 +238,14 @@ export class AuthService {
       // Verify JWT
       const decoded = jwt.verify(token, this.getJwtSecret());
       
-      // Get user from database
+      // Get user from storage
       const user = await this.getUserById(decoded.userId);
       if (!user) {
-        throw new Error('User not found');
+        return { success: false, error: 'User not found' };
       }
 
       if (!user.isActive) {
-        throw new Error('Account is deactivated');
+        return { success: false, error: 'Account is deactivated' };
       }
 
       return {
@@ -245,8 +259,10 @@ export class AuthService {
         }
       };
     } catch (error) {
+      // Invalid/expired/blacklisted tokens resolve to a failure result (the
+      // auth middleware checks result.success rather than catching a throw).
       logger.error('Token verification error:', error);
-      throw error;
+      return { success: false, error: error.message };
     }
   }
 
@@ -273,6 +289,9 @@ export class AuthService {
    */
   async getUserByEmail(email) {
     if (!this.dbAvailable) {
+      for (const user of this.memoryUsers.values()) {
+        if (user.email === email) return user;
+      }
       return null;
     }
 
@@ -312,7 +331,7 @@ export class AuthService {
    */
   async getUserById(userId) {
     if (!this.dbAvailable) {
-      return null;
+      return this.memoryUsers.get(userId) || null;
     }
 
     try {
