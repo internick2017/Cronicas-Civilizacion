@@ -131,7 +131,10 @@
                 <div class="player-name">{{ getPlayerDisplayName(player) }}</div>
                 <div class="player-class">{{ getPlayerDisplayClass(player) }}</div>
               </div>
-              <div v-if="isCurrentPlayer(player.id)" class="current-indicator">
+              <div v-if="turnMode === 'simultaneous'" class="current-indicator" :title="hasSubmitted(player.id) ? 'Ya envió' : 'Pendiente'">
+                {{ hasSubmitted(player.id) ? '✅' : '✍️' }}
+              </div>
+              <div v-else-if="isCurrentPlayer(player.id)" class="current-indicator">
                 🎯
               </div>
             </div>
@@ -140,7 +143,11 @@
 
         <!-- Host action buttons (host only, active session) -->
         <div v-if="isHost && session?.isActive" class="host-actions">
-          <button @click="skipTurn" class="skip-btn" :disabled="isSkipping" title="Saltar turno actual">
+          <button v-if="turnMode === 'simultaneous'" @click="closeRoundNow" class="skip-btn" :disabled="isSkipping" title="Cerrar la ronda con lo que haya">
+            <span v-if="!isSkipping">🔚 Cerrar ronda ahora</span>
+            <span v-else>Cerrando...</span>
+          </button>
+          <button v-else @click="skipTurn" class="skip-btn" :disabled="isSkipping" title="Saltar turno actual">
             <span v-if="!isSkipping">⏭️ Saltar turno</span>
             <span v-else>Saltando...</span>
           </button>
@@ -167,6 +174,7 @@
             :session-id="sessionId"
             :game-type="session?.settings?.gameType || 'character'"
             :mode="session?.settings?.mode || 'colaborativo'"
+            :turn-mode="turnMode"
             @submit-action="handleSubmitAction"
             @clear-error="clearError"
           />
@@ -315,11 +323,25 @@ const currentPlayer = computed(() => {
   return session.value.players.find(p => p.id === props.currentPlayerId)
 })
 
+const turnMode = computed(() => session.value?.settings?.turnMode || 'sequential')
+const actedIds = computed(() => session.value?.actedPlayerIds || [])
+
 const isMyTurn = computed(() => {
   if (!session.value || !currentPlayer.value || !Array.isArray(session.value.players)) return false
+  if (turnMode.value === 'simultaneous') {
+    // En simultáneo "mi turno" = aún no envié esta ronda
+    return !actedIds.value.includes(props.currentPlayerId)
+  }
   const currentPlayerIndex = session.value.currentPlayerIndex
   const playerIndex = session.value.players.findIndex(p => p.id === props.currentPlayerId)
   return currentPlayerIndex === playerIndex
+})
+
+const hasSubmitted = (playerId) => actedIds.value.includes(playerId)
+
+const pendingCount = computed(() => {
+  const total = session.value?.players?.length || 0
+  return Math.max(0, total - actedIds.value.length)
 })
 
 const currentActorName = computed(() => {
@@ -567,6 +589,30 @@ const skipTurn = async () => {
   } catch (error) {
     console.error('Error skipping turn:', error)
     errorMessage.value = error.message || 'Error al saltar el turno'
+  } finally {
+    isSkipping.value = false
+  }
+}
+
+const closeRoundNow = async () => {
+  try {
+    isSkipping.value = true
+    errorMessage.value = ''
+
+    const response = await fetch(`/api/narrative/sessions/${props.sessionId}/close-round`, {
+      method: 'POST'
+    })
+    const result = await response.json()
+
+    if (!result.success) {
+      throw new Error(result.message || 'Error al cerrar la ronda')
+    }
+
+    await loadSession()
+    await loadHistory()
+  } catch (error) {
+    console.error('Error closing round:', error)
+    errorMessage.value = error.message || 'Error al cerrar la ronda'
   } finally {
     isSkipping.value = false
   }
