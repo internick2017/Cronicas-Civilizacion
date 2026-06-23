@@ -339,11 +339,6 @@ const isMyTurn = computed(() => {
 
 const hasSubmitted = (playerId) => actedIds.value.includes(playerId)
 
-const pendingCount = computed(() => {
-  const total = session.value?.players?.length || 0
-  return Math.max(0, total - actedIds.value.length)
-})
-
 const currentActorName = computed(() => {
   if (!session.value || !Array.isArray(session.value.players) || session.value.players.length === 0) return ''
   const actorIndex = session.value.currentPlayerIndex % session.value.players.length
@@ -598,11 +593,21 @@ const closeRoundNow = async () => {
   try {
     isSkipping.value = true
     errorMessage.value = ''
+    showRetryAlert.value = false
 
     const response = await fetch(`/api/narrative/sessions/${props.sessionId}/close-round`, {
       method: 'POST'
     })
     const result = await response.json()
+
+    if (response.status === 500 || result.error === 'ai_narration_failed') {
+      // AI failed while closing the round — actions are saved, retry available
+      showRetryAlert.value = true
+      retryAlertMessage.value = result.message || 'La IA no pudo generar la narrativa al cerrar la ronda.'
+      await loadSession()
+      await loadHistory()
+      return
+    }
 
     if (!result.success) {
       throw new Error(result.message || 'Error al cerrar la ronda')

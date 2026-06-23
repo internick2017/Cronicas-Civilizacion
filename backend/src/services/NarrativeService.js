@@ -547,15 +547,24 @@ export class NarrativeService {
 
     let narrative = null;
     let sessionEnded;
-    if (roundComplete) {
-      // Persist advanced index before the AI call so a crash re-hydrates consistent turn state
-      if (!this.skipDatabase) await this.saveSessionToDatabase(session);
+    if (roundComplete && !session._roundClosing) {
+      // Claim sincrónico: solo un request concurrente cierra la ronda (sin await entre el chequeo y la marca)
+      session._roundClosing = true;
+      try {
+        // Persist advanced index before the AI call so a crash re-hydrates consistent turn state
+        if (!this.skipDatabase) await this.saveSessionToDatabase(session);
 
-      // closeRound throws → propagate (action+index already mutated; turnNumber not yet incremented)
-      narrative = await this.closeRound(session);
+        // closeRound throws → propagate (action+index already mutated; turnNumber not yet incremented)
+        narrative = await this.closeRound(session);
 
-      // Auto-epilogue when last round completed (turnNumber was already incremented by closeRound)
-      sessionEnded = (await this.maybeAutoEpilogue(session)) || undefined;
+        // Auto-epilogue when last round completed (turnNumber was already incremented by closeRound)
+        sessionEnded = (await this.maybeAutoEpilogue(session)) || undefined;
+      } finally {
+        session._roundClosing = false;
+      }
+    } else if (roundComplete) {
+      // Otro request concurrente ya está cerrando esta ronda
+      roundComplete = false;
     }
 
     if (!this.skipDatabase) await this.saveSessionToDatabase(session);
