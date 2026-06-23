@@ -107,6 +107,16 @@ describe('submitAction simultáneo', () => {
     expect(prompt).toContain('BBB');
     expect(prompt).toContain('CCC');
   });
+
+  it('no cierra la ronda si otro request ya la está cerrando (guard de concurrencia)', async () => {
+    const { session, ana, beto, cris } = await makeSession(svc, { turnMode: 'simultaneous' });
+    await svc.submitAction(session.id, ana.id, 'a');
+    await svc.submitAction(session.id, beto.id, 'b');
+    session._roundClosing = true; // simula un cierre en curso de otro request
+    const r = await svc.submitAction(session.id, cris.id, 'c');
+    expect(r.roundComplete).toBe(false);
+    expect(svc.aiService.generateStoryNarrative).not.toHaveBeenCalled();
+  });
 });
 
 describe('closeRoundNow (cierre forzado)', () => {
