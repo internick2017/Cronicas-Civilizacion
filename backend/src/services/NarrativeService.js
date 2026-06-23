@@ -190,6 +190,9 @@ export class NarrativeService {
       ? sessionData.settings.mode : 'narrador-activo';
     const mr = Number(sessionData.settings.maxRounds);
     sessionData.settings.maxRounds = Number.isInteger(mr) && mr >= 3 && mr <= 50 ? mr : null;
+    const VALID_TURN_MODES = ['sequential', 'simultaneous'];
+    sessionData.settings.turnMode = VALID_TURN_MODES.includes(sessionData.settings.turnMode)
+      ? sessionData.settings.turnMode : 'sequential';
 
     const session = new StorySession(sessionData);
     session.code = generateRoomCode(c =>
