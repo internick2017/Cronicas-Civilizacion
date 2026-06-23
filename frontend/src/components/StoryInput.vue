@@ -28,7 +28,8 @@
       <div class="input-wrapper">
         <textarea
           ref="actionInput"
-          v-model="actionText"
+          :value="displayValue"
+          @input="onTextInput"
           :placeholder="getPlaceholder()"
           :disabled="!props.isMyTurn || props.isSubmitting"
           @keydown.ctrl.enter="submitAction"
@@ -42,10 +43,23 @@
         ></textarea>
 
         <div class="input-controls">
-          <div class="char-counter" :class="{ warning: actionText.length > 250 }">
-            {{ actionText.length }}/280
+          <div class="counter-area">
+            <div class="char-counter" :class="{ warning: actionText.length > 250 }">
+              {{ actionText.length }}/280
+            </div>
+            <span v-if="isListening" class="listening-indicator">🎙️ Escuchando…</span>
           </div>
           <div class="input-buttons">
+            <button
+              v-if="voiceSupported"
+              @click="toggleVoice"
+              class="mic-btn"
+              :class="{ listening: isListening }"
+              :disabled="micDisabled"
+              :title="isListening ? 'Detener dictado' : 'Dictar por voz'"
+            >
+              {{ isListening ? '🔴' : '🎤' }}
+            </button>
             <button
               @click="clearInput"
               class="clear-btn"
@@ -84,11 +98,18 @@
       <div class="error-icon">⚠️</div>
       <span>{{ errorMessage }}</span>
     </div>
+
+    <!-- Voice hint -->
+    <div v-if="voiceHint" class="voice-hint">
+      <div class="error-icon">🎤</div>
+      <span>{{ voiceHint }}</span>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { useSpeechToText } from '../composables/useSpeechToText.js'
 
 const props = defineProps({
   currentPlayer: {
@@ -127,6 +148,56 @@ const emit = defineEmits(['submit-action', 'clear-error'])
 const actionInput = ref(null)
 const actionText = ref('')
 const errorMessage = ref('')
+
+const MAX_LEN = 280
+
+// Une dos fragmentos con un único espacio intermedio
+const joinWithSpace = (base, addition) => {
+  if (!base) return addition
+  if (!addition) return base
+  return base.endsWith(' ') ? base + addition : base + ' ' + addition
+}
+
+// Cada frase definitiva del dictado se agrega a la acción, respetando el tope
+const appendFinal = (text) => {
+  const next = joinWithSpace(actionText.value, text)
+  actionText.value = next.length > MAX_LEN ? next.slice(0, MAX_LEN) : next
+}
+
+const {
+  isSupported: voiceSupported,
+  isListening,
+  interimText,
+  error: voiceError,
+  toggle: toggleVoice,
+  stop: stopVoice,
+} = useSpeechToText({ lang: 'es-ES', onFinal: appendFinal })
+
+// El micrófono se rige por las mismas reglas que el textarea
+const micDisabled = computed(() => !props.isMyTurn || props.isSubmitting)
+
+// Valor mostrado en el textarea: incluye la transcripción provisional en vivo
+const displayValue = computed(() =>
+  isListening.value && interimText.value
+    ? joinWithSpace(actionText.value, interimText.value)
+    : actionText.value
+)
+
+const onTextInput = (event) => {
+  actionText.value = event.target.value
+}
+
+// Mensaje legible para los errores de voz relevantes
+const voiceHint = computed(() => {
+  if (!voiceError.value) return ''
+  if (voiceError.value === 'not-allowed' || voiceError.value === 'service-not-allowed') {
+    return 'Activa el permiso de micrófono para dictar'
+  }
+  if (voiceError.value === 'network') {
+    return 'Sin conexión para el reconocimiento de voz'
+  }
+  return 'No se pudo usar el micrófono'
+})
 
 // Computed
 const canSubmit = computed(() => {
@@ -282,10 +353,12 @@ watch(() => props.isMyTurn, (newValue) => {
   }
 })
 
-// Clear error when turn changes
-watch(() => props.isMyTurn, () => {
+// Clear error and stop dictation when turn changes
+watch(() => props.isMyTurn, (mine) => {
   errorMessage.value = ''
+  voiceError.value = null
   emit('clear-error')
+  if (!mine && isListening.value) stopVoice()
 })
 </script>
 
@@ -478,6 +551,60 @@ watch(() => props.isMyTurn, () => {
   border-color: rgba(231, 76, 60, 0.5);
 }
 
+.mic-btn {
+  background: rgba(155, 89, 182, 0.2);
+  color: #9b59b6;
+  border: 1px solid rgba(155, 89, 182, 0.3);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.3s ease;
+}
+
+.mic-btn:hover:not(:disabled) {
+  background: rgba(155, 89, 182, 0.3);
+  border-color: rgba(155, 89, 182, 0.5);
+}
+
+.mic-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mic-btn.listening {
+  background: rgba(231, 76, 60, 0.25);
+  color: #e74c3c;
+  border-color: rgba(231, 76, 60, 0.6);
+  animation: pulse 1.2s infinite;
+}
+
+.counter-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.listening-indicator {
+  font-size: 0.85em;
+  color: #e74c3c;
+  font-weight: bold;
+  animation: pulse 1.2s infinite;
+}
+
+.voice-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(155, 89, 182, 0.1);
+  border: 1px solid rgba(155, 89, 182, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 15px;
+  color: #c39bd3;
+  font-size: 0.9em;
+}
+
 .submit-btn {
   background: linear-gradient(45deg, #27ae60, #2ecc71);
   color: white;
@@ -606,6 +733,13 @@ watch(() => props.isMyTurn, () => {
   .submit-btn {
     min-height: 44px;
     padding: 10px 20px;
+    font-size: 1em;
+  }
+
+  .mic-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px 14px;
     font-size: 1em;
   }
 
