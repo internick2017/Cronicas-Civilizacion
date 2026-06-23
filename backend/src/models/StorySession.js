@@ -152,6 +152,30 @@ export class StorySession {
   }
 
   /**
+   * Ids de jugadores con una acción registrada en el turnNumber actual.
+   */
+  actedPlayerIds() {
+    const ids = new Set();
+    for (const e of this.storyHistory) {
+      if (e.type === 'player_action' && e.turnNumber === this.turnNumber) ids.add(e.playerId);
+    }
+    return [...ids];
+  }
+
+  hasActed(playerId) {
+    return this.actedPlayerIds().includes(playerId);
+  }
+
+  /**
+   * True cuando todos los jugadores de la sesión ya enviaron su acción esta ronda.
+   */
+  allActed() {
+    if (this.players.length === 0) return false;
+    const acted = new Set(this.actedPlayerIds());
+    return this.players.every(p => acted.has(p.id));
+  }
+
+  /**
    * Get recent story history
    */
   getRecentHistory(limit = 10) {
@@ -224,7 +248,8 @@ export class StorySession {
       roundsRemaining: this.settings.maxRounds
         ? Math.max(0, this.settings.maxRounds - this.turnNumber + 1)
         : null,
-      roundPending: this.isRoundPending()
+      roundPending: this.isRoundPending(),
+      actedPlayerIds: this.actedPlayerIds()
     };
   }
 
