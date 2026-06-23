@@ -140,4 +140,14 @@ describe('closeRoundNow (cierre forzado)', () => {
     expect(r.narrative).toBeNull();
     expect(svc.aiService.generateStoryNarrative).not.toHaveBeenCalled();
   });
+
+  it('no narra si el turno ya tiene narrativa (guard de idempotencia)', async () => {
+    const { session, ana } = await makeSession(svc, { turnMode: 'simultaneous' });
+    // Estado construido: hay acción Y ya hay narrativa en el MISMO turnNumber
+    session.addPlayerAction(ana.id, 'a');
+    session.addAINarrative('ya narrado');
+    const r = await svc.closeRoundNow(session.id);
+    expect(svc.aiService.generateStoryNarrative).not.toHaveBeenCalled();
+    expect(r.narrative).toBeNull();
+  });
 });
