@@ -432,6 +432,29 @@ router.post('/sessions/:sessionId/skip-turn', async (req, res) => {
 });
 
 /**
+ * POST /api/narrative/sessions/:sessionId/close-round
+ * Force-close the current round (host, simultaneous mode)
+ */
+router.post('/sessions/:sessionId/close-round', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const result = await NarrativeService.closeRoundNow(sessionId);
+    res.json({ success: true, data: result, message: 'Ronda cerrada' });
+  } catch (error) {
+    if (error.code === 'AI_NARRATION_FAILED') {
+      return res.status(500).json({
+        success: false,
+        error: 'ai_narration_failed',
+        message: 'La IA no pudo narrar la ronda. Las acciones quedaron guardadas — reintenta la narración.',
+      });
+    }
+    console.error('Error closing round:', error);
+    const status = error.message === 'Sesión no activa' ? 400 : 500;
+    res.status(status).json({ success: false, error: 'Failed to close round', message: error.message });
+  }
+});
+
+/**
  * POST /api/narrative/sessions/:sessionId/start
  * Start a story session (lobby → active), generating the AI opening narrative.
  */

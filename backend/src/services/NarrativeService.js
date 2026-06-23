@@ -630,6 +630,41 @@ export class NarrativeService {
   }
 
   /**
+   * Cierre forzado de la ronda (host, modo simultáneo).
+   * Con acciones pendientes → narra. Sin acciones → solo avanza el turno.
+   * Idempotente: si el turno ya tiene narrativa, no narra de nuevo.
+   */
+  async closeRoundNow(sessionId) {
+    const session = await this.getSession(sessionId);
+    if (!session || !session.isActive) throw new Error('Sesión no activa');
+
+    const roundActions = session.storyHistory.filter(
+      e => e.type === 'player_action' && e.turnNumber === session.turnNumber
+    );
+    const alreadyNarrated = session.storyHistory.some(
+      e => e.type === 'ai_narrative' && e.turnNumber === session.turnNumber
+    );
+
+    let narrative = null;
+    let sessionEnded;
+    if (roundActions.length > 0 && !alreadyNarrated) {
+      narrative = await this.closeRound(session);
+      sessionEnded = (await this.maybeAutoEpilogue(session)) || undefined;
+    } else if (roundActions.length === 0) {
+      session.turnNumber += 1;
+      if (!this.skipDatabase) await this.saveSessionToDatabase(session);
+      sessionEnded = (await this.maybeAutoEpilogue(session)) || undefined;
+    }
+
+    return {
+      roundComplete: true,
+      narrative,
+      turnNumber: session.turnNumber,
+      ...(sessionEnded && { sessionEnded }),
+    };
+  }
+
+  /**
    * Build a prompt summarising all actions of a round for the AI narrator.
    *
    * With summary: uses "[RESUMEN DE LA HISTORIA] + [ÚLTIMAS RONDAS] (last 3, excluding opening)".
