@@ -410,6 +410,24 @@ export class NarrativeService {
       console.log(`🔚 Session ${session.title} closed (no players)`);
     }
 
+    // Simultáneo: una salida puede completar la ronda con los que quedan
+    if (session.isActive && session.settings.turnMode === 'simultaneous' && session.players.length > 0) {
+      const roundActions = session.storyHistory.filter(
+        e => e.type === 'player_action' && e.turnNumber === session.turnNumber
+      );
+      const alreadyNarrated = session.storyHistory.some(
+        e => e.type === 'ai_narrative' && e.turnNumber === session.turnNumber
+      );
+      if (roundActions.length > 0 && !alreadyNarrated && session.allActed()) {
+        try {
+          await this.closeRound(session);
+          await this.maybeAutoEpilogue(session);
+        } catch (err) {
+          logger.warn('No se pudo cerrar la ronda tras una salida; se podrá reintentar:', err.message);
+        }
+      }
+    }
+
     return {
       session: session.getSummary(),
       message: `${player.characterName} ha abandonado la historia.`
