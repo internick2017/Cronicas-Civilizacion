@@ -202,6 +202,13 @@
                 <option :value="15">Media — 15 rondas</option>
               </select>
             </div>
+            <div class="form-group">
+              <label for="turnMode">Modo de escritura</label>
+              <select id="turnMode" v-model="newSession.settings.turnMode">
+                <option value="sequential">🔁 Por turnos — uno escribe a la vez</option>
+                <option value="simultaneous">⚡ Simultáneo — todos escriben a la vez</option>
+              </select>
+            </div>
 
             <button @click="createSession" :disabled="!canCreateSession || isCreating" class="create-btn">
               <span v-if="!isCreating">🚀 Crear Historia</span>
@@ -331,7 +338,8 @@ const newSession = ref({
     genre: 'fantasy',
     language: 'es',
     mode: 'narrador-activo',
-    maxRounds: null
+    maxRounds: null,
+    turnMode: 'sequential'
   }
 })
 
@@ -435,7 +443,8 @@ const createSession = async () => {
           genre: newSession.value.settings.genre,
           language: newSession.value.settings.language,
           mode: newSession.value.settings.mode,
-          maxRounds: newSession.value.settings.maxRounds
+          maxRounds: newSession.value.settings.maxRounds,
+          turnMode: newSession.value.settings.turnMode
         }
       })
     })
