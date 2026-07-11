@@ -23,7 +23,7 @@ export class StorySession {
     this.settings = {
       aiCreativity: 0.8,
       storyLength: 'medium', // short, medium, long
-      genre: 'fantasy', // fantasy, historical, sci-fi, mystery
+      genre: 'fantasy', // fantasy, historical, sci-fi, mystery, sports-sim
       gameType: 'character', // character, country, world
       language: 'es',
       ...(data.settings || {}),
