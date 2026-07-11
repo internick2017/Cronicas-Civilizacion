@@ -31,10 +31,6 @@ export default [
       // TODO: hay ~25 sitios que relanzan errores sin { cause }; bajado a warn
       // hasta que se aborde como tarea propia (no es parte del setup de lint).
       'preserve-caught-error': 'warn',
-      // TODO: Game.js tiene addPlayer/removePlayer/discoverSurroundingTiles duplicados
-      // con comportamiento distinto entre versiones — requiere decisión de producto,
-      // ver memoria del proyecto. Bajado a warn hasta resolverlo.
-      'no-dupe-class-members': 'warn',
     },
   },
   {
