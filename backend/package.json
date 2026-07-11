@@ -21,7 +21,8 @@
     "setup-local": "setup-local.bat",
     "setup-sqlite": "setup-sqlite.bat",
     "setup-neon": "setup-neon.bat",
-    "migrate-neon": "node migrate-neon.js"
+    "migrate-neon": "node migrate-neon.js",
+    "lint": "eslint ."
   },
   "keywords": [
     "game",
@@ -50,9 +51,11 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitest/coverage-v8": "^2.1.5",
     "@vitest/ui": "^2.1.5",
     "cross-env": "^7.0.3",
+    "eslint": "^10.7.0",
     "nodemon": "^3.1.9",
     "vitest": "^2.1.5"
   },

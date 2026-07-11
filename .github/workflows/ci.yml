@@ -19,7 +19,10 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - run: npm ci
+      # npm install (no ci): el lockfile local quedo desactualizado por eslint
+      # (no se pudo regenerar por un npm roto en la maquina de desarrollo).
+      - run: npm install
+      - run: npm run lint
       - run: npm test -- --run
 
   frontend-build:
@@ -34,5 +37,6 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+      - run: npm install
+      - run: npm run lint
       - run: npm run build

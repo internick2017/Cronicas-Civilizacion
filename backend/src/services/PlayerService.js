@@ -1,6 +1,6 @@
 import Player from '../models/Player.js';
 import pool from '../config/database.js';
-import { safeRedisDel } from '../utils/redis.js';
+import { safeRedisDel, safeRedisGet, safeRedisSet } from '../utils/redis.js';
 
 let playerServiceInstance = null;
 
@@ -88,7 +88,7 @@ export class PlayerService {
       }
 
       // Check cache
-      const cached = await redisClient.get(`player:${playerId}`);
+      const cached = await safeRedisGet(`player:${playerId}`);
       if (cached) {
         return JSON.parse(cached);
       }
@@ -129,7 +129,7 @@ export class PlayerService {
       // Store in memory and cache
       this.players.set(playerId, player);
       const playerJson = player.toJSON();
-      await redisClient.setEx(`player:${playerId}`, 300, JSON.stringify(playerJson));
+      await safeRedisSet(`player:${playerId}`, JSON.stringify(playerJson), { EX: 300 });
       
       return playerJson;
     } catch (error) {
