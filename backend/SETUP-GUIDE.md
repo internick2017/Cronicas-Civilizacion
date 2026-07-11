@@ -59,8 +59,8 @@ DB_PASSWORD=password
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
-# OpenAI (opcional)
-OPENAI_API_KEY=tu_clave_aqui
+# Gemini (opcional)
+GEMINI_API_KEY=tu_clave_aqui
 ```
 
 ### Paso 3: Iniciar servidor
@@ -201,9 +201,9 @@ PORT=3000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 
-# OpenAI (opcional para IA)
-OPENAI_API_KEY=tu_clave_aqui
-OPENAI_MODEL=gpt-4
+# Gemini (opcional para IA)
+GEMINI_API_KEY=tu_clave_aqui
+GEMINI_MODEL=gemini-2.5-flash
 
 # JWT
 JWT_SECRET=tu_secreto_seguro
@@ -221,7 +221,7 @@ Después de seguir cualquiera de las opciones:
 
 ### Próximos pasos:
 - Configurar frontend (Vue.js)
-- Agregar clave de OpenAI para funciones de IA
+- Agregar clave de Gemini para funciones de IA (gratis en https://aistudio.google.com/apikey)
 - Probar la funcionalidad del juego
 
 ---

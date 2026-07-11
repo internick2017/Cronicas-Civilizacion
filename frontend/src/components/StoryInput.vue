@@ -1,0 +1,756 @@
+<template>
+  <div class="story-input">
+    <div class="input-header">
+      <!-- Turn banner: my turn -->
+      <div class="turn-banner my-turn" v-if="props.isMyTurn && props.currentPlayer">
+        <div class="player-info">
+          <div class="player-avatar">{{ getPlayerAvatar(props.currentPlayer) }}</div>
+          <div class="player-details">
+            <div class="player-name">{{ getPlayerDisplayName(props.currentPlayer) }}</div>
+            <div class="player-class">{{ getPlayerDisplayClass(props.currentPlayer) }}</div>
+          </div>
+          <div class="turn-indicator">
+            <span class="turn-badge">✍️ Es tu turno</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Turn banner: waiting -->
+      <div class="turn-banner waiting-turn" v-else-if="props.currentPlayer">
+        <div class="waiting-message">
+          <div class="waiting-icon">⏳</div>
+          <span v-if="props.turnMode === 'simultaneous'">✅ Enviado — esperando a los demás…</span>
+          <span v-else>Le toca a <strong>{{ props.nextPlayerName }}</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area" :class="{ disabled: !props.isMyTurn }">
+      <div class="input-wrapper">
+        <textarea
+          ref="actionInput"
+          :value="displayValue"
+          @input="onTextInput"
+          :placeholder="getPlaceholder()"
+          :disabled="!props.isMyTurn || props.isSubmitting"
+          @keydown.ctrl.enter="submitAction"
+          @keydown.meta.enter="submitAction"
+          class="action-textarea"
+          maxlength="280"
+          rows="3"
+          autocapitalize="sentences"
+          autocomplete="off"
+          autocorrect="on"
+        ></textarea>
+
+        <div class="input-controls">
+          <div class="counter-area">
+            <div class="char-counter" :class="{ warning: actionText.length > 250 }">
+              {{ actionText.length }}/280
+            </div>
+            <span v-if="isListening" class="listening-indicator">🎙️ Escuchando…</span>
+          </div>
+          <div class="input-buttons">
+            <button
+              v-if="voiceSupported"
+              @click="toggleVoice"
+              class="mic-btn"
+              :class="{ listening: isListening }"
+              :disabled="micDisabled"
+              :title="isListening ? 'Detener dictado' : 'Dictar por voz'"
+            >
+              {{ isListening ? '🔴' : '🎤' }}
+            </button>
+            <button
+              @click="clearInput"
+              class="clear-btn"
+              :disabled="!actionText.trim() || props.isSubmitting"
+              title="Limpiar"
+            >
+              🗑️
+            </button>
+            <button
+              @click="submitAction"
+              class="submit-btn"
+              :disabled="!canSubmit"
+              :class="{ loading: props.isSubmitting }"
+              title="Enviar acción (Ctrl+Enter)"
+            >
+              <span v-if="!props.isSubmitting">📤 Enviar</span>
+              <span v-else class="loading-text">Generando...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-help">
+      <div class="help-title">💡 Consejos para escribir tu acción:</div>
+      <ul class="help-list">
+        <li>Describe qué hace tu personaje de manera clara y específica</li>
+        <li>Puedes incluir diálogo, pensamientos o descripciones</li>
+        <li>Mantén la continuidad con la historia anterior</li>
+        <li>Usa Ctrl+Enter para enviar rápidamente</li>
+      </ul>
+    </div>
+
+    <!-- Error message -->
+    <div v-if="errorMessage" class="error-message">
+      <div class="error-icon">⚠️</div>
+      <span>{{ errorMessage }}</span>
+    </div>
+
+    <!-- Voice hint -->
+    <div v-if="voiceHint" class="voice-hint">
+      <div class="error-icon">🎤</div>
+      <span>{{ voiceHint }}</span>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch, nextTick } from 'vue'
+import { useSpeechToText } from '../composables/useSpeechToText.js'
+
+const props = defineProps({
+  currentPlayer: {
+    type: Object,
+    default: null
+  },
+  isMyTurn: {
+    type: Boolean,
+    default: false
+  },
+  isSubmitting: {
+    type: Boolean,
+    default: false
+  },
+  nextPlayerName: {        // current acting player's display name (used in waiting banner)
+    type: String,
+    default: ''
+  },
+  sessionId: {
+    type: String,
+    required: true
+  },
+  gameType: {
+    type: String,
+    default: 'character'
+  },
+  mode: {
+    type: String,
+    default: 'colaborativo'
+  },
+  turnMode: {
+    type: String,
+    default: 'sequential'
+  }
+})
+
+const emit = defineEmits(['submit-action', 'clear-error'])
+
+// Refs
+const actionInput = ref(null)
+const actionText = ref('')
+const errorMessage = ref('')
+
+const MAX_LEN = 280
+
+// Une dos fragmentos con un único espacio intermedio
+const joinWithSpace = (base, addition) => {
+  if (!base) return addition
+  if (!addition) return base
+  return base.endsWith(' ') ? base + addition : base + ' ' + addition
+}
+
+// Cada frase definitiva del dictado se agrega a la acción, respetando el tope
+const appendFinal = (text) => {
+  const next = joinWithSpace(actionText.value, text)
+  actionText.value = next.length > MAX_LEN ? next.slice(0, MAX_LEN) : next
+}
+
+const {
+  isSupported: voiceSupported,
+  isListening,
+  interimText,
+  error: voiceError,
+  toggle: toggleVoice,
+  stop: stopVoice,
+} = useSpeechToText({ lang: 'es-ES', onFinal: appendFinal })
+
+// El micrófono se rige por las mismas reglas que el textarea
+const micDisabled = computed(() => !props.isMyTurn || props.isSubmitting)
+
+// Valor mostrado en el textarea: incluye la transcripción provisional en vivo
+const displayValue = computed(() =>
+  isListening.value && interimText.value
+    ? joinWithSpace(actionText.value, interimText.value)
+    : actionText.value
+)
+
+const onTextInput = (event) => {
+  actionText.value = event.target.value
+}
+
+// Mensaje legible para los errores de voz relevantes
+const voiceHint = computed(() => {
+  if (!voiceError.value) return ''
+  if (voiceError.value === 'not-allowed' || voiceError.value === 'service-not-allowed') {
+    return 'Activa el permiso de micrófono para dictar'
+  }
+  if (voiceError.value === 'network') {
+    return 'Sin conexión para el reconocimiento de voz'
+  }
+  return 'No se pudo usar el micrófono'
+})
+
+// Computed
+const canSubmit = computed(() => {
+  return props.isMyTurn &&
+         actionText.value.trim().length > 0 &&
+         !props.isSubmitting &&
+         actionText.value.length <= 280
+})
+
+// Computed placeholder reacts to mode and gameType changes
+const placeholder = computed(() => {
+  if (!props.isMyTurn) {
+    return `Esperando el turno de ${props.nextPlayerName}...`
+  }
+
+  if (props.mode === 'narrador-activo') {
+    return '¿Cómo reacciona tu personaje al evento? (ej: "Me escondo tras el árbol y observo...")'
+  }
+
+  const gameType = props.gameType
+
+  if (gameType === 'character') {
+    const placeholders = [
+      '¿Qué hace tu personaje? (ej: "Me acerco sigilosamente al castillo...")',
+      'Describe tu acción (ej: "Levanto mi espada y cargo contra el enemigo")',
+      '¿Qué dice tu personaje? (ej: "¡Por el honor de mi reino!")',
+      'Narra tu movimiento (ej: "Exploro las ruinas en busca de tesoros")',
+      '¿Cómo reaccionas? (ej: "Me escondo detrás de una roca y observo...")'
+    ]
+    return placeholders[Math.floor(Math.random() * placeholders.length)]
+  } else if (gameType === 'country') {
+    const placeholders = [
+      '¿Qué hace tu país? (ej: "Construyo una nueva ciudad fortificada...")',
+      'Describe tu acción (ej: "Declaro guerra al reino vecino")',
+      '¿Qué política implementas? (ej: "Establezco una alianza comercial")',
+      'Narra tu movimiento (ej: "Expando mis fronteras hacia el norte")',
+      '¿Cómo gobiernas? (ej: "Invierto en tecnología militar")'
+    ]
+    return placeholders[Math.floor(Math.random() * placeholders.length)]
+  } else if (gameType === 'world') {
+    const placeholders = [
+      '¿Qué cambia en el mundo? (ej: "Creo una nueva civilización...")',
+      'Describe tu acción (ej: "Cambio el clima de todo el continente")',
+      '¿Qué evento mundial ocurre? (ej: "Una gran guerra estalla entre naciones")',
+      'Narra tu movimiento (ej: "Formo una alianza mundial de paz")',
+      '¿Cómo evoluciona el mundo? (ej: "Una nueva era de prosperidad comienza")'
+    ]
+    return placeholders[Math.floor(Math.random() * placeholders.length)]
+  }
+
+  return 'Describe tu acción...'
+})
+
+// Keep getPlaceholder as a thin wrapper so the template binding stays simple
+const getPlaceholder = () => placeholder.value
+
+const getPlayerDisplayName = (player) => {
+  if (!player) return ''
+
+  if (player.countryName) return player.countryName
+  if (player.worldRole) return player.worldRole
+  return player.characterName || player.name
+}
+
+const getPlayerDisplayClass = (player) => {
+  if (!player) return ''
+
+  if (player.countryType) return player.countryType
+  if (player.worldType) return player.worldType
+  return player.characterClass || 'Aventurero'
+}
+
+const getPlayerAvatar = (player) => {
+  if (!player) return '👤'
+
+  const gameType = props.gameType
+
+  if (gameType === 'character') {
+    const avatars = {
+      'Aventurero': '🗡️',
+      'Mago': '🔮',
+      'Guerrero': '⚔️',
+      'Arquero': '🏹',
+      'Hechicero': '✨',
+      'Caballero': '🛡️',
+      'Mercader': '💰',
+      'Explorador': '🗺️'
+    }
+    return avatars[player.characterClass] || '👤'
+  } else if (gameType === 'country') {
+    const avatars = {
+      'Reino': '👑',
+      'Imperio': '🏛️',
+      'República': '⚖️',
+      'Principado': '👑',
+      'Confederación': '🤝',
+      'Ciudad-Estado': '🏙️',
+      'Tribu': '🏹',
+      'Orden': '⚔️'
+    }
+    return avatars[player.countryType] || '🏛️'
+  } else if (gameType === 'world') {
+    const avatars = {
+      'Continente': '🗺️',
+      'Civilización': '🏛️',
+      'Reino': '👑',
+      'Imperio': '🏛️',
+      'Federación': '🤝',
+      'Alianza': '⚔️',
+      'Gremio': '💰',
+      'Orden': '⚔️'
+    }
+    return avatars[player.worldType] || '🌍'
+  }
+
+  return '👤'
+}
+
+const submitAction = async () => {
+  if (!canSubmit.value) return
+
+  const action = actionText.value.trim()
+  if (action.length === 0) return
+
+  try {
+    errorMessage.value = ''
+    emit('submit-action', action)
+    actionText.value = ''
+  } catch (error) {
+    errorMessage.value = 'Error al enviar la acción. Inténtalo de nuevo.'
+  }
+}
+
+const clearInput = () => {
+  actionText.value = ''
+  errorMessage.value = ''
+  emit('clear-error')
+  nextTick(() => {
+    if (actionInput.value) {
+      actionInput.value.focus()
+    }
+  })
+}
+
+// Watch for turn changes to focus input
+watch(() => props.isMyTurn, (newValue) => {
+  if (newValue) {
+    nextTick(() => {
+      if (actionInput.value) {
+        actionInput.value.focus()
+      }
+    })
+  }
+})
+
+// Clear error and stop dictation when turn changes
+watch(() => props.isMyTurn, (mine) => {
+  errorMessage.value = ''
+  voiceError.value = null
+  emit('clear-error')
+  if (!mine && isListening.value) stopVoice()
+})
+</script>
+
+<style scoped>
+.story-input {
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  color: white;
+}
+
+.input-header {
+  margin-bottom: 20px;
+}
+
+/* Turn banners */
+.turn-banner {
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.turn-banner.my-turn {
+  background: rgba(46, 204, 113, 0.15);
+  border-left: 4px solid #2ecc71;
+}
+
+.turn-banner.waiting-turn {
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 4px solid #f39c12;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.player-avatar {
+  font-size: 2em;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(52, 152, 219, 0.2);
+  border-radius: 50%;
+}
+
+.player-details {
+  flex: 1;
+}
+
+.player-name {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #ecf0f1;
+  margin-bottom: 4px;
+}
+
+.player-class {
+  font-size: 0.9em;
+  color: #bdc3c7;
+  font-style: italic;
+}
+
+.turn-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.turn-badge {
+  background: linear-gradient(45deg, #27ae60, #2ecc71);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9em;
+  font-weight: bold;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+.waiting-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #bdc3c7;
+}
+
+.waiting-icon {
+  font-size: 1.5em;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.input-area {
+  margin-bottom: 20px;
+}
+
+.input-area.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.input-wrapper {
+  position: relative;
+}
+
+.action-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: white;
+  font-size: 16px; /* prevents iOS/Android zoom-on-focus */
+  line-height: 1.5;
+  resize: vertical;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.action-textarea:focus {
+  outline: none;
+  border-color: #3498db;
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 20px rgba(52, 152, 219, 0.3);
+}
+
+.action-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+.action-textarea:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: not-allowed;
+}
+
+.input-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.char-counter {
+  font-size: 0.9em;
+  color: #bdc3c7;
+}
+
+.char-counter.warning {
+  color: #f39c12;
+  font-weight: bold;
+}
+
+.input-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.clear-btn, .submit-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.3s ease;
+}
+
+.clear-btn {
+  background: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.clear-btn:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.3);
+  border-color: rgba(231, 76, 60, 0.5);
+}
+
+.mic-btn {
+  background: rgba(155, 89, 182, 0.2);
+  color: #9b59b6;
+  border: 1px solid rgba(155, 89, 182, 0.3);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.3s ease;
+}
+
+.mic-btn:hover:not(:disabled) {
+  background: rgba(155, 89, 182, 0.3);
+  border-color: rgba(155, 89, 182, 0.5);
+}
+
+.mic-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mic-btn.listening {
+  background: rgba(231, 76, 60, 0.25);
+  color: #e74c3c;
+  border-color: rgba(231, 76, 60, 0.6);
+  animation: pulse 1.2s infinite;
+}
+
+.counter-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.listening-indicator {
+  font-size: 0.85em;
+  color: #e74c3c;
+  font-weight: bold;
+  animation: pulse 1.2s infinite;
+}
+
+.voice-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(155, 89, 182, 0.1);
+  border: 1px solid rgba(155, 89, 182, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 15px;
+  color: #c39bd3;
+  font-size: 0.9em;
+}
+
+.submit-btn {
+  background: linear-gradient(45deg, #27ae60, #2ecc71);
+  color: white;
+  border: 1px solid rgba(39, 174, 96, 0.3);
+  font-weight: bold;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: linear-gradient(45deg, #2ecc71, #27ae60);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.submit-btn.loading {
+  background: linear-gradient(45deg, #95a5a6, #7f8c8d);
+  cursor: not-allowed;
+}
+
+.loading-text {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.loading-text::after {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border: 2px solid transparent;
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.input-help {
+  background: rgba(52, 152, 219, 0.1);
+  border-radius: 8px;
+  padding: 15px;
+  border-left: 4px solid #3498db;
+}
+
+.help-title {
+  font-weight: bold;
+  color: #3498db;
+  margin-bottom: 10px;
+  font-size: 0.95em;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #bdc3c7;
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.help-list li {
+  margin-bottom: 5px;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 15px;
+  color: #e74c3c;
+  font-size: 0.9em;
+}
+
+.error-icon {
+  font-size: 1.2em;
+}
+
+@media (max-width: 768px) {
+  .story-input {
+    padding: 12px;
+    border-radius: 0; /* edge-to-edge when docked at bottom */
+  }
+
+  .input-header {
+    margin-bottom: 12px;
+  }
+
+  .player-info {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+
+  .action-textarea {
+    min-height: 80px;
+    padding: 12px;
+  }
+
+  .input-controls {
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .input-buttons {
+    flex: 1;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* Touch targets ≥44px */
+  .clear-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px 14px;
+    font-size: 1em;
+  }
+
+  .submit-btn {
+    min-height: 44px;
+    padding: 10px 20px;
+    font-size: 1em;
+  }
+
+  .mic-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px 14px;
+    font-size: 1em;
+  }
+
+  /* Hide tips on mobile to reduce dead space */
+  .input-help {
+    display: none;
+  }
+}
+</style>

@@ -1,25 +1,114 @@
 import { GameService } from '../services/GameService.js';
 import { PlayerService } from '../services/PlayerService.js';
+import logger from '../utils/logger.js';
 
-const gameService = new GameService();
-const playerService = new PlayerService();
+const gameService = GameService.getInstance();
+const playerService = PlayerService.getInstance();
+
+// Map to track socket.id -> playerId
+const socketPlayerMap = new Map();
 
 export function handleGameSocket(socket, io) {
-  console.log(`Game socket connected: ${socket.id}`);
+  logger.debug(`Game socket connected: ${socket.id}`);
+
+  // Create new game
+  socket.on('create-game', async (data) => {
+    try {
+      const { name, maxPlayers, mapSize, gameMode, civilizationName, playerId } = data;
+      logger.info(`Create game request: ${name}, maxPlayers: ${maxPlayers}, playerId: ${playerId}`);
+      
+      // Create the game
+      const game = await gameService.createGame({
+        name,
+        maxPlayers: parseInt(maxPlayers),
+        mapSize: parseInt(mapSize),
+        gameMode
+      });
+      
+      // If playerId is provided, automatically join the player to the game
+      if (playerId && civilizationName) {
+        try {
+          // Wait a moment to ensure the game is fully saved
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Join the player to the game
+          const joinResult = await gameService.joinGame(game.id, playerId, civilizationName);
+          
+          // Join socket room after successful game join
+          socket.join(game.id);
+          
+          // Update player online status
+          await playerService.setPlayerOnline(playerId, socket.id);
+          
+          // Store socket -> player mapping
+          socketPlayerMap.set(socket.id, playerId);
+          
+          // Send success response with join info
+          socket.emit('create-game-response', {
+            success: true,
+            game: joinResult.game,
+            playerJoined: true,
+            playerId: playerId
+          });
+          
+          // Notify all players in the game
+          io.to(game.id).emit('player-joined', {
+            playerId,
+            civilizationName,
+            game: joinResult.game
+          });
+          
+        } catch (joinError) {
+          logger.error(`Error auto-joining player to game:`, joinError);
+          // Still send success response for game creation, but without auto-join
+          socket.emit('create-game-response', {
+            success: true,
+            game: game,
+            playerJoined: false,
+            error: joinError.message
+          });
+        }
+      } else {
+        // Send success response without auto-join
+        socket.emit('create-game-response', {
+          success: true,
+          game: game,
+          playerJoined: false
+        });
+      }
+      
+      // Broadcast updated games list to all connected clients
+      const allGames = await gameService.getAllGames();
+      io.emit('games-list', { games: allGames });
+      
+    } catch (error) {
+      logger.error(`Error creating game:`, error);
+      socket.emit('create-game-response', {
+        success: false,
+        error: error.message
+      });
+    }
+  });
 
   // Join game room
   socket.on('join-game', async (data) => {
     try {
       const { gameId, playerId, civilizationName } = data;
+      logger.info(`Join game request: ${gameId}, player: ${playerId}, civ: ${civilizationName}`);
       
-      // Join socket room
-      socket.join(gameId);
-      
-      // Join game logic
+      // Join game logic first
+      console.log(`[SOCKET] Calling gameService.joinGame...`);
       const result = await gameService.joinGame(gameId, playerId, civilizationName);
+      console.log(`[SOCKET] joinGame result:`, result);
+      
+      // Join socket room after successful game join
+      socket.join(gameId);
       
       // Update player online status
       await playerService.setPlayerOnline(playerId, socket.id);
+      
+      // Store socket -> player mapping
+      socketPlayerMap.set(socket.id, playerId);
       
       // Notify all players in the game
       io.to(gameId).emit('player-joined', {
@@ -35,7 +124,12 @@ export function handleGameSocket(socket, io) {
         game: result.game
       });
       
+      // Broadcast updated games list to all connected clients
+      const allGames = await gameService.getAllGames();
+      io.emit('games-list', { games: allGames });
+      
     } catch (error) {
+      logger.error(`Error joining game:`, error);
       socket.emit('join-game-response', {
         success: false,
         error: error.message
@@ -79,12 +173,31 @@ export function handleGameSocket(socket, io) {
       
       const result = await gameService.startGame(gameId);
       
-      // Notify all players
+      // Send success response to the player who started the game
+      socket.emit('start-game-response', {
+        success: true,
+        game: result.game
+      });
+      
+      // Notify all players in the game room
+      console.log(`[SOCKET] Broadcasting game-started to room ${gameId}`);
+      console.log(`[SOCKET] Game state:`, {
+        currentTurn: result.game.currentTurn,
+        currentPlayerIndex: result.game.currentPlayerIndex,
+        currentPlayer: result.game.currentPlayer,
+        players: result.game.players.map(p => ({ id: p.id, name: p.civilizationName }))
+      });
+      
       io.to(gameId).emit('game-started', {
         game: result.game
       });
       
+      // Update games list for lobby
+      const allGames = await gameService.getAllGames();
+      io.emit('games-list', { games: allGames });
+      
     } catch (error) {
+      console.error(`[SOCKET] Error starting game:`, error);
       socket.emit('start-game-response', {
         success: false,
         error: error.message
@@ -92,8 +205,93 @@ export function handleGameSocket(socket, io) {
     }
   });
 
+  // Delete game
+  socket.on('delete-game', async (data) => {
+    try {
+      const { gameId } = data;
+      console.log(`[SOCKET] Delete game request: ${gameId}`);
+      
+      const result = await gameService.deleteGame(gameId);
+      
+      // Send success response
+      socket.emit('delete-game-response', {
+        success: true,
+        message: result.message
+      });
+      
+      // Broadcast updated games list to all connected clients
+      const allGames = await gameService.getAllGames();
+      io.emit('games-list', { games: allGames });
+      
+    } catch (error) {
+      console.error(`[SOCKET] Error deleting game:`, error);
+      socket.emit('delete-game-response', {
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Reset game to waiting state (for development)
+  socket.on('reset-game', async (data) => {
+    try {
+      const { gameId } = data;
+      console.log(`[SOCKET] Reset game request: ${gameId}`);
+      
+      const result = await gameService.resetGameToWaiting(gameId);
+      
+      // Send success response
+      socket.emit('reset-game-response', {
+        success: true,
+        game: result.game
+      });
+      
+      // Notify all players in the game
+      io.to(gameId).emit('game-reset', {
+        game: result.game
+      });
+      
+      // Broadcast updated games list to all connected clients
+      const allGames = await gameService.getAllGames();
+      io.emit('games-list', { games: allGames });
+      
+    } catch (error) {
+      console.error(`[SOCKET] Error resetting game:`, error);
+      socket.emit('reset-game-response', {
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Clear all games
+  socket.on('clear-all-games', async (data) => {
+    try {
+      console.log(`[SOCKET] Clear all games request`);
+      
+      const result = await gameService.clearAllGames();
+      
+      // Send success response
+      socket.emit('clear-all-games-response', {
+        success: true,
+        message: result.message,
+        results: result.results
+      });
+      
+      // Broadcast empty games list to all connected clients
+      io.emit('games-list', { games: [] });
+      
+    } catch (error) {
+      console.error(`[SOCKET] Error clearing all games:`, error);
+      socket.emit('clear-all-games-response', {
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // Process turn action
-  socket.on('player-action', async (data) => {
+  socket.on('perform-action', async (data) => {
     try {
       const { gameId, playerId, action } = data;
       
@@ -106,6 +304,15 @@ export function handleGameSocket(socket, io) {
         game: result.game,
         narrative: result.narrative
       });
+      
+      // Notify about turn change if applicable
+      const currentPlayer = result.game.currentPlayer;
+      if (currentPlayer) {
+        io.to(gameId).emit('turn-changed', {
+          game: result.game,
+          currentPlayer: currentPlayer
+        });
+      }
       
       // Send AI narrative to all players
       if (result.narrative) {
@@ -146,13 +353,50 @@ export function handleGameSocket(socket, io) {
   socket.on('get-game-state', async (data) => {
     try {
       const { gameId, playerId } = data;
+      console.log(`[SOCKET] Getting game state for: ${gameId}, player: ${playerId}`);
       
-      const gameState = await gameService.getPlayerView(gameId, playerId);
+      // If playerId is provided, set player as online
+      if (playerId) {
+        try {
+          // First try to update the provided playerId
+          await playerService.setPlayerOnline(playerId, socket.id);
+          socketPlayerMap.set(socket.id, playerId);
+          console.log(`[SOCKET] Set player ${playerId} online during game state request`);
+        } catch (error) {
+          console.error(`[SOCKET] Error setting player online:`, error);
+          // If player doesn't exist, try to find a player in this game that could be this socket
+          // This is a fallback for cases where frontend has wrong playerId
+          console.log(`[SOCKET] Attempting fallback - trying to match player by game membership`);
+        }
+      }
       
-      socket.emit('game-state', gameState);
+      const game = await gameService.getGameById(gameId);
+      console.log(`[SOCKET] Game state result:`, {
+        id: game?.id,
+        name: game?.name,
+        playersCount: game?.players?.length || 0,
+        players: game?.players?.map(p => ({ id: p.id, name: p.civilizationName, isOnline: p.isOnline }))
+      });
+      
+      if (game) {
+        // Join the game room if not already joined
+        socket.join(gameId);
+        
+        socket.emit('game-state-update', {
+          success: true,
+          game: game
+        });
+      } else {
+        socket.emit('game-state-update', {
+          success: false,
+          error: 'Game not found'
+        });
+      }
       
     } catch (error) {
-      socket.emit('game-state-error', {
+      console.error(`[SOCKET] Error getting game state:`, error);
+      socket.emit('game-state-update', {
+        success: false,
         error: error.message
       });
     }
@@ -171,12 +415,26 @@ export function handleGameSocket(socket, io) {
   });
 
   // Handle disconnect
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     console.log(`Game socket disconnected: ${socket.id}`);
     
-    // Set player offline (would need to track socket -> player mapping)
-    // This is a simplified version
-    // In a real app, you'd maintain a mapping of socket.id -> playerId
+    // Get playerId from socket mapping
+    const playerId = socketPlayerMap.get(socket.id);
+    if (playerId) {
+      try {
+        // Set player offline
+        await playerService.setPlayerOffline(playerId);
+        console.log(`[SOCKET] Set player ${playerId} offline`);
+        
+        // Remove from mapping
+        socketPlayerMap.delete(socket.id);
+        
+        // Notify all connected clients about the player status change
+        // This will be handled when they request game state updates
+      } catch (error) {
+        console.error(`[SOCKET] Error setting player ${playerId} offline:`, error);
+      }
+    }
   });
 
   // Ping/pong for connection health

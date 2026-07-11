@@ -1,6 +1,8 @@
-import pkg from 'pg';
 import dotenv from 'dotenv';
+import pkg from 'pg';
+import logger from '../utils/logger.js';
 
+// Load environment variables first
 dotenv.config();
 
 const { Pool } = pkg;
@@ -23,7 +25,7 @@ const parseConnectionString = (connectionString) => {
       }
     };
   } catch (error) {
-    console.error('Error parsing connection string:', error);
+    logger.error('Error parsing connection string:', error);
     return null;
   }
 };
@@ -57,18 +59,60 @@ const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  // Add connection retry logic
+  allowExitOnIdle: false,
+  // Keep connections alive longer
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000
 });
 
 // Test database connection
 pool.on('connect', () => {
-  console.log('✅ Connected to PostgreSQL database');
+  logger.info('✅ Connected to PostgreSQL database');
   if (config.ssl) {
-    console.log('🔒 SSL connection enabled');
+    logger.info('🔒 SSL connection enabled');
   }
 });
 
 pool.on('error', (err) => {
-  console.error('❌ PostgreSQL connection error:', err);
+  logger.error('❌ PostgreSQL connection error:', err);
+  // Don't exit on error, let the pool handle reconnection
 });
+
+// Handle pool errors gracefully
+pool.on('acquire', (client) => {
+  logger.debug('Client acquired from pool');
+});
+
+pool.on('release', (client) => {
+  logger.debug('Client released to pool');
+});
+
+// Function to test connection and reconnect if needed
+export const testConnection = async () => {
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
+    return true;
+  } catch (error) {
+    logger.error('Database connection test failed:', error.message);
+    return false;
+  }
+};
+
+// Function to get a client with retry logic
+export const getClient = async (retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const client = await pool.connect();
+      return client;
+    } catch (error) {
+      logger.warn(`Failed to get client (attempt ${i + 1}/${retries}):`, error.message);
+      if (i === retries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+};
 
 export default pool; 

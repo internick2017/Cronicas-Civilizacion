@@ -1,146 +1,267 @@
-# Crónicas de Civilización
+# 📚 Crónicas de Civilización - Modo Narrativo
 
-**Juego de estrategia por turnos con narrativa generada por IA**
+Una experiencia de narración colaborativa donde tú y tu familia crean historias épicas juntos, con la IA como narrador maestro.
 
-## 🚀 Stack Tecnológico
+## 🎯 ¿Qué es?
 
-### Frontend
-- **Vue.js 3** - Framework reactivo para la interfaz
-- **Vite** - Build tool y dev server
-- **Socket.io Client** - Comunicación en tiempo real
-- **Canvas API** - Renderizado del mapa
+**Crónicas de Civilización** es ahora una plataforma de narración colaborativa que permite a familias crear historias épicas juntas. Cada miembro de la familia escribe una acción, y la IA genera una narrativa continua que mantiene la historia fluyendo.
 
-### Backend
-- **Node.js** - Runtime de JavaScript
-- **Express** - Framework web
-- **Socket.io** - WebSocket para multijugador
-- **PostgreSQL** - Base de datos principal
-- **Redis** - Caché y sesiones
-- **OpenAI API** - Generación de narrativa
+### ✨ Características Principales
 
-## 📁 Estructura del Proyecto
+- **Narración Colaborativa**: Cada jugador contribuye a la historia por turnos
+- **IA Narrativa**: La inteligencia artificial genera respuestas épicas y continuas
+- **Múltiples Géneros**: Fantasía, histórico, ciencia ficción, misterio
+- **Interfaz Simple**: Enfocada en la escritura y la narrativa
+- **Tiempo Real**: Actualizaciones en vivo de la historia
+- **Exportación**: Guarda tus historias para leerlas después
 
-```
-cronicas-civilizacion/
-├── frontend/          # Vue.js application
-├── backend/           # Node.js/Express API
-├── database/          # SQL schemas y migrations
-├── docker-compose.yml # Servicios de desarrollo
-└── README.md
-```
+## 🚀 Cómo Funciona
 
-## 🎯 Características Principales
+1. **Crear una Historia**: Define el título, descripción y género
+2. **Unirse**: Los miembros de la familia se unen con sus personajes
+3. **Escribir**: Cada uno describe qué hace su personaje
+4. **Narrar**: La IA continúa la historia con detalles épicos
+5. **Continuar**: La historia evoluciona turno tras turno
 
-- Mapa de mundo con territorios en cuadrícula
-- Sistema de turnos para 1-N jugadores
-- 7 tipos de recursos (Comida, Oro, Madera, Piedra, Ciencia, Cultura, Ejército)
-- Narrativa dinámica generada por IA
-- Multijugador en tiempo real
-- Diferentes modos de victoria
-
-## 🚧 Estado del Desarrollo
-
-### ✅ Completado
-- **Frontend**: Componentes principales (GameLobby, WaitingRoom, PlayerInfo, ResourcePanel, ActionPanel, GameMap, NarrativePanel, ChatPanel)
-- **Backend**: Estructura completa con Express, Socket.io, modelos de juego
-- **Base de datos**: Schema PostgreSQL completo con tablas para jugadores, partidas, mapa, ciudades, ejércitos, historial
-- **Infraestructura**: Docker Compose para desarrollo, Redis para caché
-- **Configuración**: Scripts de setup automático para Windows y Linux/macOS
-- **Lógica de juego**: Sistema completo de acciones (fundar ciudad, recolectar recursos, mover ejército, construir infraestructura, diplomacia, acción libre)
-- **Sistema de turnos**: Implementación completa con rotación de jugadores y efectos de fin de ronda
-- **Condiciones de victoria**: Sistema de verificación para dominio, ciencia, cultura y economía
-- **WebSocket**: Manejo completo de eventos en tiempo real con manejo de errores
-- **Composables Vue**: useGameSocket y useGameApi completamente implementados
-- **Fallback sin BD**: Sistema funciona sin base de datos para desarrollo
-
-### ✅ Completado
-- **Frontend**: Componentes principales (GameLobby, WaitingRoom, PlayerInfo, ResourcePanel, ActionPanel, GameMap, NarrativePanel, ChatPanel)
-- **Backend**: Estructura completa con Express, Socket.io, modelos de juego
-- **Base de datos**: Schema PostgreSQL completo con tablas para jugadores, partidas, mapa, ciudades, ejércitos, historial
-- **Infraestructura**: Docker Compose para desarrollo, Redis para caché
-- **Configuración**: Scripts de setup automático para Windows y Linux/macOS
-- **Lógica de juego**: Sistema completo de acciones (fundar ciudad, recolectar recursos, mover ejército, construir infraestructura, diplomacia, acción libre)
-- **Sistema de turnos**: Implementación completa con rotación de jugadores y efectos de fin de ronda
-- **Condiciones de victoria**: Sistema de verificación para dominio, ciencia, cultura y economía
-- **WebSocket**: Manejo completo de eventos en tiempo real con manejo de errores
-- **Composables Vue**: useGameSocket y useGameApi completamente implementados
-- **Fallback sin BD**: Sistema funciona sin base de datos para desarrollo
-- **Integración OpenAI**: Generación de narrativa con IA completamente implementada con fallback
-- **Integración de base de datos**: Migración completa de almacenamiento en memoria a PostgreSQL (funciona con fallback)
-- **Autenticación**: Sistema completo de usuarios y sesiones con JWT
-
-### 📋 Pendiente
-- **Mejoras UI**: Interfaz más pulida y responsive
-- **Pruebas**: Sistema de testing automatizado
-
-## 🎯 Estado Actual
-
-El juego está **funcionalmente completo** para desarrollo y pruebas:
-
-✅ **Backend funcionando**: API REST + WebSocket en puerto 3000  
-✅ **Frontend funcionando**: Interfaz Vue.js en puerto 5173  
-✅ **Juego jugable**: Crear partidas, unirse, jugar turnos, condiciones de victoria  
-✅ **Multijugador**: Hasta 8 jugadores simultáneos  
-✅ **Mapa generado**: Mundo de 20x20 con recursos y terrenos  
-✅ **7 tipos de recursos**: Comida, Oro, Madera, Piedra, Ciencia, Cultura, Ejército  
-✅ **6 acciones disponibles**: Fundar ciudad, recolectar recursos, mover ejército, construir, diplomacia, acción libre  
-✅ **4 modos de victoria**: Dominio (60% territorio), Ciencia (1000 pts), Cultura (800 pts), Economía (1500 oro)  
-
-## 🛠️ Instalación y Desarrollo
+## 🛠️ Instalación
 
 ### Prerrequisitos
-- Node.js 18+
-- Docker y Docker Compose
-- Cuenta OpenAI API (opcional para narrativa IA)
 
-### 📦 Configuración de Base de Datos
-- [📘 Guía Completa de Configuración de Bases de Datos](docs/DATABASE_SETUP.md)
-  - [🐘 PostgreSQL (Recomendado)](docs/DATABASE_SETUP.md#-configuración-de-postgresql-recomendado)
-  - [🔴 Redis](docs/DATABASE_SETUP.md#-configuración-de-redis)
-  - [🐳 MySQL (Alternativa)](docs/DATABASE_SETUP.md#-mysql-como-alternativa)
+- Node.js 18+ 
+- npm o yarn
+- OpenAI API Key (opcional, para narrativa mejorada)
 
-### Configuración rápida
+### Configuración Rápida
 
-#### Windows
-```batch
-# Ejecutar script de configuración
-setup-dev.bat
-
-# O manualmente:
-docker-compose up -d postgres redis
-cd backend && npm install && npm run dev
-cd frontend && npm install && npm run dev
-```
-
-#### Linux/macOS
+1. **Clonar el repositorio**
 ```bash
-# Ejecutar script de configuración
-./setup-dev.sh
-
-# O manualmente:
-docker-compose up -d postgres redis
-cd backend && npm install && npm run dev
-cd frontend && npm install && npm run dev
+git clone <repository-url>
+cd cronicas-civilizacion
 ```
 
-### URLs de desarrollo
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3000
-- **pgAdmin**: http://localhost:5050 (admin@cronicas.com / admin)
+2. **Configurar variables de entorno**
+```bash
+# Backend
+cd backend
+cp env.example .env
+```
+
+Editar `.env`:
+```env
+# OpenAI (opcional)
+OPENAI_API_KEY=tu_api_key_aqui
+
+# Base de datos (SQLite por defecto)
+DATABASE_TYPE=sqlite
+DATABASE_URL=./data/story_sessions.db
+
+# Servidor
+PORT=3000
+NODE_ENV=development
+```
+
+3. **Instalar dependencias**
+```bash
+# Backend
+cd backend
+npm install
+
+# Frontend
+cd ../frontend
+npm install
+```
+
+4. **Ejecutar en desarrollo**
+```bash
+# Terminal 1 - Backend
+cd backend
+npm run dev
+
+# Terminal 2 - Frontend
+cd frontend
+npm run dev
+```
+
+5. **Abrir en el navegador**
+```
+http://localhost:5173
+```
 
 ## 🎮 Cómo Jugar
 
-1. Cada jugador controla una civilización
-2. En su turno puede realizar una acción:
-   - Fundar/conquistar ciudad
-   - Recolectar recursos
-   - Crear/mover ejército
-   - Mejorar infraestructura
-   - Diplomacia
-   - Acción libre
-3. La IA narra las consecuencias y modifica el mundo
-4. Gana quien cumpla las condiciones de victoria
+### Crear una Nueva Historia
+
+1. En el lobby, completa el formulario de "Crear Nueva Historia"
+2. Define:
+   - **Título**: El nombre de tu aventura
+   - **Descripción**: El contexto o ambientación
+   - **Jugadores**: Cuántos participarán (2-6)
+   - **Género**: Fantasía, histórico, etc.
+
+### Unirse a una Historia
+
+1. Ve a la sección "Unirse a una Historia"
+2. Selecciona una sesión activa
+3. Completa tu información:
+   - **Tu nombre**: Tu nombre real
+   - **Personaje**: Nombre de tu personaje
+   - **Clase**: Tipo de personaje (Aventurero, Mago, etc.)
+
+### Jugar por Turnos
+
+1. **Espera tu turno**: El sistema indica quién debe escribir
+2. **Escribe tu acción**: Describe qué hace tu personaje
+3. **Envía**: La IA genera la narrativa
+4. **Continúa**: El turno pasa al siguiente jugador
+
+### Consejos para Escribir
+
+- **Sé específico**: "Levanto mi espada y cargo contra el dragón"
+- **Incluye diálogo**: "¡Por el honor de mi reino!"
+- **Mantén continuidad**: Lee las acciones anteriores
+- **Sé creativo**: La IA se alimenta de tu imaginación
+
+## 🏗️ Arquitectura
+
+### Backend (Node.js + Express)
+
+```
+backend/
+├── src/
+│   ├── models/
+│   │   └── StorySession.js      # Modelo de sesiones narrativas
+│   ├── services/
+│   │   ├── NarrativeService.js  # Lógica de narración
+│   │   └── AIService.js         # Integración con OpenAI
+│   ├── routes/
+│   │   └── narrativeRoutes.js   # API para sesiones
+│   └── config/
+│       └── index.js             # Configuración
+```
+
+### Frontend (Vue.js 3)
+
+```
+frontend/
+├── src/
+│   ├── components/
+│   │   ├── StoryLobby.vue       # Lobby para crear/unirse
+│   │   ├── StorySession.vue     # Interfaz de juego
+│   │   └── StoryInput.vue       # Entrada de texto
+│   └── App.vue                  # Componente principal
+```
+
+## 🔧 API Endpoints
+
+### Sesiones Narrativas
+
+- `GET /api/narrative/sessions` - Listar sesiones activas
+- `POST /api/narrative/sessions` - Crear nueva sesión
+- `POST /api/narrative/sessions/:id/join` - Unirse a sesión
+- `POST /api/narrative/sessions/:id/action` - Enviar acción
+- `GET /api/narrative/sessions/:id/history` - Obtener historial
+
+### Ejemplo de Uso
+
+```javascript
+// Crear sesión
+const response = await fetch('/api/narrative/sessions', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    title: 'La Búsqueda del Tesoro',
+    description: 'Una aventura épica',
+    maxPlayers: 4,
+    settings: { genre: 'fantasy' }
+  })
+})
+
+// Enviar acción
+const actionResponse = await fetch('/api/narrative/sessions/session-id/action', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    playerId: 'player-id',
+    action: 'Levanto mi espada y cargo contra el enemigo'
+  })
+})
+```
+
+## 🎨 Personalización
+
+### Configurar IA
+
+En `backend/src/services/AIService.js`:
+
+```javascript
+// Personalizar prompts
+getSystemPrompt() {
+  return `Eres el narrador de una historia colaborativa...
+  // Personaliza aquí el estilo narrativo
+`
+}
+```
+
+### Añadir Géneros
+
+En `frontend/src/components/StoryLobby.vue`:
+
+```javascript
+const genres = [
+  { value: 'fantasy', label: 'Fantasía' },
+  { value: 'historical', label: 'Histórico' },
+  { value: 'sci-fi', label: 'Ciencia Ficción' },
+  { value: 'mystery', label: 'Misterio' },
+  // Añade nuevos géneros aquí
+]
+```
+
+## 🚀 Despliegue
+
+### Docker
+
+```bash
+# Construir imágenes
+docker-compose build
+
+# Ejecutar
+docker-compose up -d
+```
+
+### Producción
+
+1. **Configurar variables de producción**
+2. **Usar base de datos PostgreSQL**
+3. **Configurar Redis para caché**
+4. **Configurar proxy reverso (nginx)**
+
+## 🤝 Contribuir
+
+1. Fork el proyecto
+2. Crea una rama para tu feature
+3. Commit tus cambios
+4. Push a la rama
+5. Abre un Pull Request
 
 ## 📝 Licencia
 
-MIT License 
+Este proyecto está bajo la Licencia MIT.
+
+## 🆘 Soporte
+
+- **Issues**: Reporta bugs en GitHub Issues
+- **Discusiones**: Únete a las discusiones para ideas
+- **Documentación**: Revisa la carpeta `docs/`
+
+## 🎯 Roadmap
+
+- [ ] **Múltiples idiomas**: Soporte para inglés y otros idiomas
+- [ ] **Imágenes generadas**: IA para ilustrar escenas
+- [ ] **Música de fondo**: Ambientación sonora
+- [ ] **Modo offline**: Jugar sin conexión
+- [ ] **Historias guardadas**: Biblioteca de historias
+- [ ] **Colaboración en tiempo real**: Múltiples dispositivos
+
+---
+
+**¡Que comience la aventura! 🗡️✨** 

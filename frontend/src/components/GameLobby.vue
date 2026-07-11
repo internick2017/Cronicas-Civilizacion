@@ -1,161 +1,264 @@
 <template>
-  <div class="game-lobby">
-    <div class="lobby-header">
-      <h2>🏛️ Lobby de Juegos</h2>
-      <p>Crea una nueva partida o únete a una existente</p>
+  <div class="game-lobby scrollbar-game bg-game-pattern">
+    <!-- Gaming Header -->
+    <div class="header-game">
+      <h1 class="flex items-center justify-center gap-4 text-glow">
+        <span class="icon-game">🏛️</span>
+        Crónicas de Civilización
+        <span class="icon-game">🏛️</span>
+      </h1>
+      <h2 class="text-shadow-game">Lobby de Juegos</h2>
+      <p class="text-shadow-game">Crea una nueva partida o únete a una existente</p>
     </div>
 
-    <div class="lobby-content">
-      <!-- Create Game Section -->
-      <div class="create-game-section">
-        <h3>Crear Nueva Partida</h3>
-        <form @submit.prevent="createNewGame" class="create-game-form">
-          <div class="form-group">
-            <label for="gameName">Nombre del Juego:</label>
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      
+      <!-- Create Game Panel -->
+      <div class="panel-game">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="icon-game">⚔️</span>
+          <h3 class="text-2xl font-game font-bold text-game-light">Crear Nueva Partida</h3>
+        </div>
+        
+        <form @submit.prevent="createNewGame" class="space-y-6">
+          <div class="space-y-2">
+            <label class="block text-game-light font-semibold">Nombre del Juego</label>
             <input 
-              id="gameName"
               v-model="newGame.name" 
               type="text" 
               required 
               placeholder="Mi Civilización Épica"
+              class="input-game w-full"
             >
           </div>
           
-          <div class="form-group">
-            <label for="maxPlayers">Máximo Jugadores:</label>
-            <select id="maxPlayers" v-model="newGame.maxPlayers">
-              <option value="2">2 Jugadores</option>
-              <option value="3">3 Jugadores</option>
-              <option value="4">4 Jugadores</option>
-              <option value="6">6 Jugadores</option>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <label class="block text-game-light font-semibold">Máximo Jugadores</label>
+              <select v-model="newGame.maxPlayers" class="input-game w-full">
+                <option value="2">2 Jugadores</option>
+                <option value="3">3 Jugadores</option>
+                <option value="4">4 Jugadores</option>
+                <option value="6">6 Jugadores</option>
+              </select>
+            </div>
+            
+            <div class="space-y-2">
+              <label class="block text-game-light font-semibold">Tamaño del Mapa</label>
+              <select v-model="newGame.mapSize" class="input-game w-full">
+                <option value="15">Pequeño (15x15)</option>
+                <option value="20">Mediano (20x20)</option>
+                <option value="25">Grande (25x25)</option>
+                <option value="30">Épico (30x30)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="space-y-2">
+            <label class="block text-game-light font-semibold">Modo de Juego</label>
+            <select v-model="newGame.gameMode" class="input-game w-full">
+              <option value="classic">Clásico</option>
+              <option value="fast">Rápido</option>
+              <option value="custom">Personalizado</option>
             </select>
           </div>
           
-          <div class="form-group">
-            <label for="mapSize">Tamaño del Mapa:</label>
-            <select id="mapSize" v-model="newGame.mapSize">
-              <option value="15">Pequeño (15x15)</option>
-              <option value="20">Mediano (20x20)</option>
-              <option value="25">Grande (25x25)</option>
-              <option value="30">Épico (30x30)</option>
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label for="gameMode">Modo de Juego:</label>
-            <select id="gameMode" v-model="newGame.gameMode">
-              <option value="domination">Dominación</option>
-              <option value="science">Victoria Científica</option>
-              <option value="culture">Victoria Cultural</option>
-              <option value="economic">Victoria Económica</option>
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label for="civilizationName">Nombre de tu Civilización:</label>
+          <div class="space-y-2">
+            <label class="block text-game-light font-semibold">Nombre de tu Civilización</label>
             <input 
-              id="civilizationName"
               v-model="newGame.civilizationName" 
               type="text" 
               required 
               placeholder="Imperio Romano"
+              class="input-game w-full"
             >
           </div>
           
-          <button type="submit" class="btn btn-primary" :disabled="creating">
-            {{ creating ? 'Creando...' : 'Crear Partida' }}
+          <button type="submit" class="btn-game-primary w-full" :disabled="creating">
+            <span v-if="creating" class="loading-game">Creando...</span>
+            <span v-else class="flex items-center justify-center gap-2">
+              <span class="icon-game">⚔️</span>
+              Crear Partida
+            </span>
           </button>
         </form>
       </div>
 
-      <!-- Available Games Section -->
-      <div class="available-games-section">
-        <h3>Partidas Disponibles</h3>
-        <div class="games-list">
-          <div v-if="games.length === 0" class="no-games">
-            <p>No hay partidas disponibles</p>
-            <p class="hint">¡Crea la primera partida!</p>
+      <!-- Available Games Panel -->
+      <div class="panel-game">
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center gap-3">
+            <span class="icon-game">🎮</span>
+            <h3 class="text-2xl font-game font-bold text-game-light text-shadow-game">Partidas Disponibles</h3>
+          </div>
+          <button @click="refreshGames" class="btn-game-outline" title="Actualizar lista de partidas">
+            <span class="icon-game">🔄</span>
+          </button>
+        </div>
+        
+        <div class="space-y-4 max-h-96 overflow-y-auto scrollbar-game">
+          <div v-if="games.length === 0" class="text-center py-12">
+            <span class="icon-game text-6xl mb-4 block">🏰</span>
+            <p class="text-game-light/60 text-lg">No hay partidas disponibles</p>
+            <p class="text-game-light/40 text-sm mt-2">¡Crea la primera partida!</p>
           </div>
           
-          <div v-else>
+          <div v-else class="space-y-4">
             <div 
               v-for="game in availableGames" 
               :key="game.id" 
-              class="game-card"
+              class="card-game p-4 hover:scale-105 transition-all duration-300 group"
             >
-              <div class="game-info">
-                <h4>{{ game.name }}</h4>
-                <div class="game-details">
-                  <span class="detail">
-                    <i class="icon">👥</i>
-                    {{ game.players }}/{{ game.maxPlayers }}
+              <!-- Game Header -->
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-xl font-game font-bold text-game-light">{{ game.name }}</h4>
+                <div class="badge-game">
+                  <span class="icon-game">👥</span>
+                  {{ game.players }}/{{ game.maxPlayers }}
+                </div>
+              </div>
+              
+              <!-- Game Details -->
+              <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="flex items-center gap-2 text-sm text-game-light/80">
+                  <span class="icon-game">🗺️</span>
+                  {{ getMapSizeText(game.mapSize) }}
+                </div>
+                <div class="flex items-center gap-2 text-sm text-game-light/80">
+                  <span class="icon-game">🎯</span>
+                  {{ getGameModeText(game.gameMode) }}
+                </div>
+                <div class="flex items-center gap-2 text-sm text-game-light/80">
+                  <span class="icon-game">⏰</span>
+                  {{ formatDate(game.createdAt) }}
+                </div>
+                <div class="flex items-center gap-2 text-sm">
+                  <span class="icon-game">🏆</span>
+                  <span :class="game.status === 'waiting' ? 'text-game-warning' : 'text-game-success'">
+                    {{ game.status === 'waiting' ? 'Esperando' : 'En Juego' }}
                   </span>
-                  <span class="detail">
-                    <i class="icon">🗺️</i>
-                    {{ getMapSizeText(game.mapSize) }}
-                  </span>
-                  <span class="detail">
-                    <i class="icon">🎯</i>
-                    {{ getGameModeText(game.gameMode) }}
-                  </span>
-                  <span class="detail">
-                    <i class="icon">⏰</i>
-                    {{ formatDate(game.createdAt) }}
+                  <div :class="game.status === 'waiting' ? 'status-waiting' : 'status-online'" class="w-2 h-2 rounded-full"></div>
+                </div>
+              </div>
+              
+              <!-- Player List -->
+              <div v-if="game.playerList && game.playerList.length > 0" class="mb-4 p-3 bg-game-primary/10 rounded-lg border border-game-primary/20">
+                <div class="flex items-center gap-2 text-sm text-game-success font-semibold mb-2">
+                  <span class="icon-game">👤</span>
+                  Jugadores:
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <span 
+                    v-for="player in game.playerList" 
+                    :key="player.id"
+                    class="badge-game text-xs"
+                  >
+                    {{ player.civilization_name || player.name }}
                   </span>
                 </div>
               </div>
               
-              <div class="game-actions">
-                <div class="join-form">
+              <!-- Game Actions -->
+              <div class="flex gap-3">
+                <!-- Enter Game Button -->
+                <button 
+                  v-if="isPlayerInGame(game)"
+                  @click="enterGame(game.id)"
+                  class="btn-game-primary flex-1"
+                >
+                  <span class="flex items-center justify-center gap-2">
+                    <span class="icon-game">🎮</span>
+                    Entrar al Juego
+                  </span>
+                </button>
+                
+                <!-- Join Game Form -->
+                <div v-else class="flex gap-3 flex-1">
                   <input 
                     v-model="joinForms[game.id]" 
                     type="text" 
                     placeholder="Nombre de civilización"
-                    class="civilization-input"
+                    class="input-game flex-1"
                   >
                   <button 
                     @click="joinGame(game.id)"
-                    class="btn btn-secondary"
+                    class="btn-game-secondary"
                     :disabled="!joinForms[game.id] || joining === game.id"
                   >
-                    {{ joining === game.id ? 'Uniéndose...' : 'Unirse' }}
+                    <span v-if="joining === game.id" class="loading-game">...</span>
+                    <span v-else class="flex items-center gap-1">
+                      <span class="icon-game">➕</span>
+                      Unirse
+                    </span>
                   </button>
                 </div>
+                
+                <!-- Delete Game Button -->
+                <button 
+                  v-if="canDeleteGame(game)"
+                  @click="deleteGame(game.id)"
+                  class="btn-game-danger"
+                  :disabled="deleting === game.id"
+                >
+                  <span v-if="deleting === game.id" class="loading-game">...</span>
+                  <span v-else class="flex items-center gap-1">
+                    <span class="icon-game">🗑️</span>
+                    Eliminar
+                  </span>
+                </button>
               </div>
             </div>
           </div>
         </div>
         
-        <button @click="refreshGames" class="btn btn-outline refresh-btn">
-          <i class="icon">🔄</i>
-          Actualizar Lista
-        </button>
+        <!-- Session Actions -->
+        <div class="mt-6 flex justify-center gap-4">
+          <button @click="clearSession" class="btn-game-outline">
+            <span class="flex items-center gap-2">
+              <span class="icon-game">🚪</span>
+              Limpiar Sesión
+            </span>
+          </button>
+          <button @click="clearAllGames" class="btn-game-danger text-sm">
+            <span class="flex items-center gap-2">
+              <span class="icon-game">🗑️</span>
+              Limpiar Todo (Dev)
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 
-const emit = defineEmits(['create-game', 'join-game'])
+const emit = defineEmits(['create-game', 'join-game', 'enter-game', 'delete-game', 'clear-session', 'recover-identity'])
 const props = defineProps({
   games: {
     type: Array,
     default: () => []
+  },
+  playerId: {
+    type: String,
+    default: null
   }
 })
 
 // Reactive data
 const creating = ref(false)
 const joining = ref(null)
+const deleting = ref(null)
 const joinForms = ref({})
+
 
 const newGame = ref({
   name: '',
   maxPlayers: 4,
   mapSize: 20,
-  gameMode: 'domination',
+  gameMode: 'classic',
   civilizationName: ''
 })
 
@@ -179,7 +282,7 @@ const createNewGame = async () => {
       name: '',
       maxPlayers: 4,
       mapSize: 20,
-      gameMode: 'domination',
+      gameMode: 'classic',
       civilizationName: ''
     }
   } finally {
@@ -189,38 +292,111 @@ const createNewGame = async () => {
 
 const joinGame = async (gameId) => {
   const civilizationName = joinForms.value[gameId]
-  if (!civilizationName) return
+  if (!civilizationName) {
+    return
+  }
   
   joining.value = gameId
   try {
     emit('join-game', gameId, civilizationName)
     joinForms.value[gameId] = ''
+  } catch (error) {
+    console.error('Error in joinGame:', error)
   } finally {
     joining.value = null
   }
 }
 
 const refreshGames = () => {
-  // This would typically refresh the games list
-  console.log('Refreshing games...')
+  // Refresh games list
 }
 
+const isPlayerInGame = (game) => {
+  if (!props.playerId || !game.playerList) {
+    return false
+  }
+  
+  // Check by player ID
+  const isInGameById = game.playerList.some(player => player.id === props.playerId)
+  
+  // Also check by civilization name (fallback)
+  const storedCivilization = localStorage.getItem('civilizationName')
+  const isInGameByName = game.playerList.some(player => 
+    player.civilization_name === storedCivilization || 
+    player.name === storedCivilization
+  )
+  
+  return isInGameById || isInGameByName
+}
+
+const enterGame = (gameId) => {
+  emit('enter-game', gameId)
+}
+
+const deleteGame = async (gameId) => {
+  if (!confirm('¿Estás seguro de que quieres eliminar esta partida? Esta acción no se puede deshacer.')) {
+    return
+  }
+  
+  deleting.value = gameId
+  try {
+    emit('delete-game', gameId)
+  } catch (error) {
+    console.error('Error deleting game:', error)
+  } finally {
+    deleting.value = null
+  }
+}
+
+const canDeleteGame = (game) => {
+  // Can delete if:
+  // 1. Game is in waiting status
+  // 2. Game has no players OR current player is in the game
+  // 3. Allow deletion for empty games or if user created it
+  return game.status === 'waiting' && 
+         (game.playerList.length === 0 || 
+          isPlayerInGame(game) || 
+          localStorage.getItem('civilizationName') && 
+          game.playerList.some(p => p.civilization_name === localStorage.getItem('civilizationName')))
+}
+
+const clearSession = () => {
+  emit('clear-session')
+}
+
+const clearAllGames = async () => {
+  if (!confirm('¿Estás seguro de que quieres eliminar TODAS las partidas? Esta acción no se puede deshacer.')) {
+    return
+  }
+  
+  try {
+    // Use the new clear-all-games event
+    emit('clear-all-games')
+  } catch (error) {
+    console.error('Error clearing all games:', error)
+  }
+}
+
+
 const getMapSizeText = (size) => {
+  if (!size || size === 'undefined' || size === undefined) {
+    return 'Mediano (20x20)'
+  }
+  
   const sizes = {
-    15: 'Pequeño',
-    20: 'Mediano', 
-    25: 'Grande',
-    30: 'Épico'
+    15: 'Pequeño (15x15)',
+    20: 'Mediano (20x20)', 
+    25: 'Grande (25x25)',
+    30: 'Épico (30x30)'
   }
   return sizes[size] || `${size}x${size}`
 }
 
 const getGameModeText = (mode) => {
   const modes = {
-    domination: 'Dominación',
-    science: 'Científica',
-    culture: 'Cultural',
-    economic: 'Económica'
+    classic: 'Clásico',
+    fast: 'Rápido',
+    custom: 'Personalizado'
   }
   return modes[mode] || mode
 }
@@ -238,230 +414,4 @@ onMounted(() => {
     joinForms.value[game.id] = ''
   })
 })
-</script>
-
-<style scoped>
-.game-lobby {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-.lobby-header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.lobby-header h2 {
-  color: #2c3e50;
-  margin-bottom: 10px;
-  font-size: 2.5rem;
-}
-
-.lobby-header p {
-  color: #7f8c8d;
-  font-size: 1.1rem;
-}
-
-.lobby-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
-  align-items: start;
-}
-
-.create-game-section,
-.available-games-section {
-  background: white;
-  border-radius: 12px;
-  padding: 30px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.create-game-section h3,
-.available-games-section h3 {
-  color: #2c3e50;
-  margin-bottom: 20px;
-  font-size: 1.5rem;
-  border-bottom: 2px solid #3498db;
-  padding-bottom: 10px;
-}
-
-.create-game-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-}
-
-.form-group label {
-  margin-bottom: 5px;
-  color: #34495e;
-  font-weight: 600;
-}
-
-.form-group input,
-.form-group select {
-  padding: 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 0.3s;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  outline: none;
-  border-color: #3498db;
-}
-
-.btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-primary {
-  background: #3498db;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #2980b9;
-  transform: translateY(-2px);
-}
-
-.btn-secondary {
-  background: #2ecc71;
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #27ae60;
-}
-
-.btn-outline {
-  background: transparent;
-  color: #3498db;
-  border: 2px solid #3498db;
-}
-
-.btn-outline:hover {
-  background: #3498db;
-  color: white;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.games-list {
-  margin-bottom: 20px;
-}
-
-.no-games {
-  text-align: center;
-  padding: 40px;
-  color: #7f8c8d;
-}
-
-.no-games .hint {
-  font-style: italic;
-  margin-top: 10px;
-}
-
-.game-card {
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 15px;
-  transition: all 0.3s;
-}
-
-.game-card:hover {
-  border-color: #3498db;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.game-info h4 {
-  color: #2c3e50;
-  margin-bottom: 10px;
-  font-size: 1.3rem;
-}
-
-.game-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  margin-bottom: 15px;
-}
-
-.detail {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: #7f8c8d;
-  font-size: 0.9rem;
-}
-
-.icon {
-  font-size: 1rem;
-}
-
-.join-form {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.civilization-input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.civilization-input:focus {
-  outline: none;
-  border-color: #3498db;
-}
-
-.refresh-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-@media (max-width: 768px) {
-  .lobby-content {
-    grid-template-columns: 1fr;
-  }
-  
-  .create-game-section,
-  .available-games-section {
-    padding: 20px;
-  }
-  
-  .game-details {
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .join-form {
-    flex-direction: column;
-  }
-}
-</style> 
+</script> 
