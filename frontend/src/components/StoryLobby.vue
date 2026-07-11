@@ -175,6 +175,7 @@
                   <option value="historical">Histórico</option>
                   <option value="sci-fi">Ciencia Ficción</option>
                   <option value="mystery">Misterio</option>
+                  <option value="sports-sim">Deportes (Simulación)</option>
                 </select>
               </div>
 

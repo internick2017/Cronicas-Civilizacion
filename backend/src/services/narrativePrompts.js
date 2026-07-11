@@ -11,12 +11,14 @@ const GENRES = {
     historical: 'histórico',
     'sci-fi': 'ciencia ficción',
     mystery: 'misterio',
+    'sports-sim': 'simulación deportiva',
   },
   pt: {
     fantasy: 'fantasia',
     historical: 'histórico',
     'sci-fi': 'ficção científica',
     mystery: 'mistério',
+    'sports-sim': 'simulação esportiva',
   },
 };
 
