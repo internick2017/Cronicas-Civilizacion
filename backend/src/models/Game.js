@@ -373,22 +373,25 @@ export class Game {
 
   executeAction(player, action) {
     switch (action.type) {
-      case 'found_city':
+      case 'found_city': {
         // Use provided position or find a suitable one
         const cityPosition = action.position || this.findSuitablePosition(player);
         const cityName = action.name || `${player.civilizationName} City ${this.getPlayerCityCount(player) + 1}`;
         return this.foundCity(player, cityPosition, cityName);
-      case 'collect_resource':
+      }
+      case 'collect_resource': {
         // Use provided position or find a resource tile owned by player
         const resourcePosition = action.position || this.findResourcePosition(player);
         return this.collectResource(player, resourcePosition);
+      }
       case 'move_army':
         return this.moveArmy(player, action.from, action.to);
-      case 'build_infrastructure':
+      case 'build_infrastructure': {
         // Use provided position or find a city owned by player
         const buildPosition = action.position || this.findPlayerCityPosition(player);
         const building = action.building || 'granary'; // Default building
         return this.buildInfrastructure(player, buildPosition, building);
+      }
       case 'diplomacy':
         return this.handleDiplomacy(player, action.targetPlayerId, action.diplomacyType || 'trade');
       case 'free_action':
