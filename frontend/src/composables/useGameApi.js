@@ -1,10 +1,9 @@
 import axios from 'axios'
-
-const API_BASE_URL = 'http://localhost:3000/api'
+import config from '../config/env.js'
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000,
+  baseURL: `${config.api.baseUrl}/api`,
+  timeout: config.api.timeout,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -13,7 +12,6 @@ const api = axios.create({
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`)
     return config
   },
   (error) => {
@@ -27,7 +25,6 @@ api.interceptors.response.use(
     return response.data
   },
   (error) => {
-    console.error('API Error:', error.response?.data || error.message)
     return Promise.reject(error.response?.data || error)
   }
 )
@@ -57,6 +54,10 @@ export function useGameApi() {
     return await api.post(`/games/${gameId}/leave`, {
       playerId
     })
+  }
+
+  const deleteGameApi = async (gameId) => {
+    return await api.delete(`/games/${gameId}`)
   }
 
   const startGameApi = async (gameId) => {
@@ -107,6 +108,7 @@ export function useGameApi() {
     createGameApi,
     joinGameApi,
     leaveGameApi,
+    deleteGameApi,
     startGameApi,
     performActionApi,
     getGameStateApi,

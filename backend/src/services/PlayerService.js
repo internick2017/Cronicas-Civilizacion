@@ -1,10 +1,42 @@
 import Player from '../models/Player.js';
 import pool from '../config/database.js';
-import redisClient from '../config/redis.js';
+import { safeRedisDel } from '../utils/redis.js';
+
+let playerServiceInstance = null;
 
 export class PlayerService {
   constructor() {
+    // Return existing instance if it exists
+    if (playerServiceInstance) {
+      return playerServiceInstance;
+    }
+    
     this.players = new Map(); // Keep some players in memory for performance
+    this.dbAvailable = false;
+    this.initializeDatabase();
+    
+    // Store instance for singleton pattern
+    playerServiceInstance = this;
+    return this;
+  }
+
+  static getInstance() {
+    if (!playerServiceInstance) {
+      new PlayerService();
+    }
+    return playerServiceInstance;
+  }
+
+  async initializeDatabase() {
+    try {
+      // Test database connection
+      await pool.query('SELECT 1');
+      this.dbAvailable = true;
+      console.log('✅ PlayerService: Database connection established');
+    } catch (error) {
+      console.warn('⚠️ PlayerService: Database not available, using in-memory storage:', error.message);
+      this.dbAvailable = false;
+    }
   }
 
   async createPlayer(playerData) {
@@ -126,7 +158,7 @@ export class PlayerService {
       `, [playerId, player.name, player.avatar, player.civilizationName]);
 
       // Clear cache
-      await redisClient.del(`player:${playerId}`);
+      await safeRedisDel(`player:${playerId}`);
 
       return player.toJSON();
     } catch (error) {
@@ -197,21 +229,32 @@ export class PlayerService {
 
   async setPlayerOnline(playerId, socketId) {
     try {
-      // Update database
-      await pool.query(`
-        UPDATE players 
-        SET is_online = true, socket_id = $2, last_seen = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-      `, [playerId, socketId]);
+      console.log(`[PLAYER SERVICE] Setting player ${playerId} online with socket ${socketId}`);
+      // Update database if available
+      if (this.dbAvailable) {
+        const result = await pool.query(`
+          UPDATE players 
+          SET is_online = true, socket_id = $2, last_seen = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1
+        `, [playerId, socketId]);
+        console.log(`[PLAYER SERVICE] Database update result: ${result.rowCount} rows affected`);
+      } else {
+        console.log(`[PLAYER SERVICE] Database not available, updating memory only`);
+      }
 
       // Update memory if player exists
       const player = this.players.get(playerId);
       if (player) {
         player.setOnline(socketId);
+      } else if (!this.dbAvailable) {
+        // If database not available, create player in memory
+        const memoryPlayer = new Player({ id: playerId, name: `Player ${playerId.slice(0, 8)}` });
+        memoryPlayer.setOnline(socketId);
+        this.players.set(playerId, memoryPlayer);
       }
 
       // Clear cache
-      await redisClient.del(`player:${playerId}`);
+      await safeRedisDel(`player:${playerId}`);
     } catch (error) {
       console.error('Error setting player online:', error);
       throw error;
@@ -234,7 +277,7 @@ export class PlayerService {
       }
 
       // Clear cache
-      await redisClient.del(`player:${playerId}`);
+      await safeRedisDel(`player:${playerId}`);
     } catch (error) {
       console.error('Error setting player offline:', error);
       throw error;
@@ -267,7 +310,7 @@ export class PlayerService {
       ]);
 
       // Clear cache
-      await redisClient.del(`player:${playerId}`);
+      await safeRedisDel(`player:${playerId}`);
 
       return player.stats;
     } catch (error) {

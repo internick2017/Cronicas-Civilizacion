@@ -1,9 +1,6 @@
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -157,6 +154,75 @@ const initializeTables = () => {
       )
     `);
 
+    // Story Sessions table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS story_sessions (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        max_players INTEGER DEFAULT 6,
+        current_player_index INTEGER DEFAULT 0,
+        turn_number INTEGER DEFAULT 1,
+        is_active INTEGER DEFAULT 1,
+        world_context TEXT, -- JSON string
+        settings TEXT, -- JSON string
+        code TEXT UNIQUE,
+        summary TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Migración: agregar columna sin constraint (SQLite no permite ADD COLUMN UNIQUE)
+    try {
+      db.exec(`ALTER TABLE story_sessions ADD COLUMN code TEXT`);
+    } catch (e) {
+      if (!/duplicate column name/i.test(e.message)) throw e;
+    }
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_sessions_code ON story_sessions(code) WHERE code IS NOT NULL`);
+
+    // Migración: agregar columna summary (idempotente)
+    try {
+      db.exec(`ALTER TABLE story_sessions ADD COLUMN summary TEXT`);
+    } catch (e) {
+      if (!/duplicate column name/i.test(e.message)) throw e;
+    }
+
+    // Story Session Players table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS story_session_players (
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        session_id TEXT NOT NULL REFERENCES story_sessions(id) ON DELETE CASCADE,
+        player_id TEXT, -- Can be null for guest players
+        name TEXT NOT NULL,
+        character_name TEXT,
+        character_class TEXT DEFAULT 'Aventurero',
+        country_name TEXT,
+        country_type TEXT,
+        world_role TEXT,
+        turn_order INTEGER,
+        is_active INTEGER DEFAULT 1,
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Story History table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS story_history (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL REFERENCES story_sessions(id) ON DELETE CASCADE,
+        player_id TEXT,
+        player_name TEXT,
+        character_name TEXT,
+        action TEXT,
+        narrative TEXT,
+        turn_number INTEGER,
+        entry_type TEXT DEFAULT 'player_action', -- 'player_action' or 'ai_narrative'
+        context TEXT, -- JSON string
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Insert sample data
     const checkPlayers = db.prepare('SELECT COUNT(*) as count FROM players').get();
     if (checkPlayers.count === 0) {
@@ -181,17 +247,53 @@ const initializeTables = () => {
 // Initialize tables on startup
 initializeTables();
 
+/**
+ * Translate PostgreSQL $1,$2,... placeholders to SQLite positional ? placeholders.
+ * Because a single query can reference the same $N multiple times (e.g. ON CONFLICT DO UPDATE),
+ * we walk through every $N occurrence in order and build an expanded params array so each ?
+ * maps to the correct original value.
+ *
+ * Example: "VALUES ($1, $2) ON CONFLICT DO UPDATE SET a=$2"
+ *   occurrences in order: [1, 2, 2]
+ *   expandedParams: [params[0], params[1], params[1]]
+ *   translated SQL: "VALUES (?, ?) ON CONFLICT DO UPDATE SET a=?"
+ */
+function translatePlaceholders(text, params = []) {
+  const expandedParams = [];
+  const translated = text.replace(/\$(\d+)/g, (_, n) => {
+    expandedParams.push(params[parseInt(n, 10) - 1]);
+    return '?';
+  });
+  return { sql: translated, values: expandedParams };
+}
+
+/**
+ * Coerce parameter values to types SQLite3 can bind.
+ * Date objects → ISO string. boolean → 0/1. undefined → null.
+ */
+function coerceSQLiteParams(values) {
+  return values.map(v => {
+    if (v instanceof Date) return v.toISOString();
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    if (v === undefined) return null;
+    return v;
+  });
+}
+
 // Create a PostgreSQL-like query interface for compatibility
 const pool = {
   query: (text, params = []) => {
     try {
-      if (text.includes('RETURNING') || text.startsWith('INSERT') || text.startsWith('UPDATE') || text.startsWith('DELETE')) {
-        const stmt = db.prepare(text);
-        const result = stmt.run(...params);
+      const { sql, values: rawValues } = translatePlaceholders(text, params);
+      const values = coerceSQLiteParams(rawValues);
+      const trimmed = sql.trimStart().toUpperCase();
+      if (trimmed.includes('RETURNING') || trimmed.startsWith('INSERT') || trimmed.startsWith('UPDATE') || trimmed.startsWith('DELETE')) {
+        const stmt = db.prepare(sql);
+        const result = stmt.run(...values);
         return { rows: [{ id: result.lastInsertRowid }], rowCount: result.changes };
       } else {
-        const stmt = db.prepare(text);
-        const rows = stmt.all(...params);
+        const stmt = db.prepare(sql);
+        const rows = stmt.all(...values);
         return { rows, rowCount: rows.length };
       }
     } catch (error) {
@@ -199,12 +301,12 @@ const pool = {
       throw error;
     }
   },
-  
+
   connect: () => ({
     query: pool.query,
     release: () => {}
   }),
-  
+
   end: () => db.close()
 };
 

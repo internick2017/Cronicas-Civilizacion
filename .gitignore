@@ -93,4 +93,8 @@ Thumbs.db
 
 # Build outputs
 dist/
-build/ 
+build/
+
+# Local TLS certificates (mkcert) — never commit the private key
+.certs/
+*.pem 

@@ -38,9 +38,9 @@ echo REDIS_HOST=localhost
 echo REDIS_PORT=6379
 echo REDIS_PASSWORD=
 echo.
-echo # OpenAI Configuration ^(Optional^)
-echo OPENAI_API_KEY=your_openai_api_key_here
-echo OPENAI_MODEL=gpt-4
+echo # Gemini Configuration ^(Optional - clave gratis en https://aistudio.google.com/apikey^)
+echo GEMINI_API_KEY=your_gemini_api_key_here
+echo GEMINI_MODEL=gemini-2.5-flash
 echo.
 echo # JWT Configuration
 echo JWT_SECRET=cronicas_jwt_secret_2024_neon

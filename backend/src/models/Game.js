@@ -2,24 +2,32 @@ import { v4 as uuidv4 } from 'uuid';
 
 export class Game {
   constructor({
+    id,
     name,
     maxPlayers = 4,
     mapSize = 20,
-    gameMode = 'domination'
+    gameMode = 'domination',
+    status = 'waiting',
+    currentTurn = 0,
+    currentPlayerIndex = 0,
+    players = [],
+    map = null,
+    createdAt,
+    updatedAt
   }) {
-    this.id = uuidv4();
+    this.id = id || uuidv4();
     this.name = name;
     this.maxPlayers = maxPlayers;
     this.mapSize = mapSize;
     this.gameMode = gameMode;
-    this.status = 'waiting'; // waiting, playing, finished
-    this.currentTurn = 0;
-    this.currentPlayerIndex = 0;
-    this.players = [];
-    this.map = this.generateMap();
+    this.status = status;
+    this.currentTurn = currentTurn;
+    this.currentPlayerIndex = currentPlayerIndex;
+    this.players = players;
+    this.map = map || this.generateMap();
     this.history = [];
-    this.createdAt = new Date();
-    this.updatedAt = new Date();
+    this.createdAt = createdAt || new Date();
+    this.updatedAt = updatedAt || new Date();
   }
 
   generateMap() {
@@ -155,13 +163,29 @@ export class Game {
   }
 
   getCurrentPlayer() {
-    return this.players[this.currentPlayerIndex];
+    if (this.players.length === 0) {
+      console.log(`[GAME] No players in game`);
+      return null;
+    }
+    
+    const player = this.players[this.currentPlayerIndex];
+    if (!player) {
+      console.log(`[GAME] No player at index ${this.currentPlayerIndex}, falling back to index 0`);
+      return this.players[0];
+    }
+    
+    console.log(`[GAME] Current player: ${player.id} (${player.civilizationName}) at index ${this.currentPlayerIndex}`);
+    return player;
   }
 
   nextTurn() {
+    if (this.players.length === 0) return;
+    
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
     if (this.currentPlayerIndex === 0) {
       this.currentTurn++;
+      // End of round - apply passive effects
+      this.applyEndOfRoundEffects();
     }
     this.updatedAt = new Date();
   }
@@ -202,15 +226,6 @@ export class Game {
     return result;
   }
 
-  nextTurn() {
-    this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
-    if (this.currentPlayerIndex === 0) {
-      this.currentTurn++;
-      
-      // End of round - apply passive effects
-      this.applyEndOfRoundEffects();
-    }
-  }
 
   applyEndOfRoundEffects() {
     // Apply resource generation from cities
@@ -359,23 +374,34 @@ export class Game {
   executeAction(player, action) {
     switch (action.type) {
       case 'found_city':
-        return this.foundCity(player, action.position, action.name);
+        // Use provided position or find a suitable one
+        const cityPosition = action.position || this.findSuitablePosition(player);
+        const cityName = action.name || `${player.civilizationName} City ${this.getPlayerCityCount(player) + 1}`;
+        return this.foundCity(player, cityPosition, cityName);
       case 'collect_resource':
-        return this.collectResource(player, action.position);
+        // Use provided position or find a resource tile owned by player
+        const resourcePosition = action.position || this.findResourcePosition(player);
+        return this.collectResource(player, resourcePosition);
       case 'move_army':
         return this.moveArmy(player, action.from, action.to);
       case 'build_infrastructure':
-        return this.buildInfrastructure(player, action.position, action.building);
+        // Use provided position or find a city owned by player
+        const buildPosition = action.position || this.findPlayerCityPosition(player);
+        const building = action.building || 'granary'; // Default building
+        return this.buildInfrastructure(player, buildPosition, building);
       case 'diplomacy':
-        return this.handleDiplomacy(player, action.targetPlayerId, action.type);
+        return this.handleDiplomacy(player, action.targetPlayerId, action.diplomacyType || 'trade');
       case 'free_action':
-        return this.handleFreeAction(player, action.description);
+        return this.handleFreeAction(player, action.description || 'Acción libre realizada');
       default:
         throw new Error('Unknown action type');
     }
   }
 
   foundCity(player, position, cityName) {
+    if (!position || typeof position.x === 'undefined' || typeof position.y === 'undefined') {
+      throw new Error('Invalid position for founding city');
+    }
     const { x, y } = position;
     const tile = this.map[x][y];
     
@@ -418,6 +444,9 @@ export class Game {
   }
 
   collectResource(player, position) {
+    if (!position || typeof position.x === 'undefined' || typeof position.y === 'undefined') {
+      throw new Error('Invalid position for collecting resources');
+    }
     const { x, y } = position;
     const tile = this.map[x][y];
     
@@ -477,6 +506,9 @@ export class Game {
   }
 
   buildInfrastructure(player, position, building) {
+    if (!position || typeof position.x === 'undefined' || typeof position.y === 'undefined') {
+      throw new Error('Invalid position for building infrastructure');
+    }
     const { x, y } = position;
     const tile = this.map[x][y];
     
@@ -620,13 +652,34 @@ export class Game {
   }
 
   getState() {
+    const currentPlayer = this.getCurrentPlayer();
+    console.log(`[GAME] getState() called - currentPlayer:`, currentPlayer ? { id: currentPlayer.id, name: currentPlayer.civilizationName } : null);
+    
     return {
       id: this.id,
       name: this.name,
       status: this.status,
       currentTurn: this.currentTurn,
-      currentPlayer: this.getCurrentPlayer(),
-      players: this.players,
+      currentPlayer: currentPlayer,
+      currentPlayerIndex: this.currentPlayerIndex,
+      players: this.players.map(player => {
+        // Handle both Player instances and plain objects
+        if (typeof player.toJSON === 'function') {
+          return player.toJSON();
+        } else {
+          // Fallback for plain objects
+          return {
+            id: player.id,
+            name: player.name,
+            civilizationName: player.civilizationName || player.civilization_name,
+            resources: player.resources || {},
+            cities: player.cities || [],
+            armies: player.armies || [],
+            isActive: player.isActive !== false,
+            isOnline: player.isOnline || false
+          };
+        }
+      }),
       map: this.map,
       gameMode: this.gameMode,
       maxPlayers: this.maxPlayers,
@@ -716,6 +769,11 @@ export class Game {
     this.currentPlayerIndex = 0;
     this.updatedAt = new Date();
     
+    console.log(`[GAME] Game started with ${this.players.length} players`);
+    console.log(`[GAME] Current player index: ${this.currentPlayerIndex}`);
+    console.log(`[GAME] Players:`, this.players.map(p => ({ id: p.id, name: p.civilizationName })));
+    console.log(`[GAME] Current player should be:`, this.getCurrentPlayer());
+    
     // Initialize player starting positions and resources
     this.players.forEach((player, index) => {
       // Give starting resources
@@ -753,6 +811,131 @@ export class Game {
         }
       }
     });
+  }
+
+  /**
+   * Reset game to waiting state (for development/testing)
+   */
+  resetToWaiting() {
+    this.status = 'waiting';
+    this.currentTurn = 0;
+    this.currentPlayerIndex = 0;
+    this.history = [];
+    this.updatedAt = new Date();
+    
+    // Reset player resources
+    this.players.forEach(player => {
+      if (player.resources) {
+        delete player.resources;
+      }
+    });
+  }
+
+  /**
+   * Helper methods for action execution without position
+   */
+  findSuitablePosition(player) {
+    // Find a suitable position near player's existing cities or random if none
+    const playerTiles = this.getPlayerTiles(player.id);
+    
+    if (playerTiles.length > 0) {
+      // Try to build near existing cities
+      for (const tile of playerTiles) {
+        const nearbyPositions = this.getNearbyPositions(tile.x, tile.y, 2);
+        for (const pos of nearbyPositions) {
+          if (this.isValidCityPosition(pos.x, pos.y)) {
+            return { x: pos.x, y: pos.y };
+          }
+        }
+      }
+    }
+    
+    // Fallback to random position
+    for (let attempts = 0; attempts < 100; attempts++) {
+      const x = Math.floor(Math.random() * this.mapSize);
+      const y = Math.floor(Math.random() * this.mapSize);
+      if (this.isValidCityPosition(x, y)) {
+        return { x, y };
+      }
+    }
+    
+    // Last resort - use first available position
+    for (let x = 0; x < this.mapSize; x++) {
+      for (let y = 0; y < this.mapSize; y++) {
+        if (this.isValidCityPosition(x, y)) {
+          return { x, y };
+        }
+      }
+    }
+    
+    throw new Error('No suitable position found for city');
+  }
+
+  findResourcePosition(player) {
+    // Find a resource tile owned by the player
+    const playerTiles = this.getPlayerTiles(player.id);
+    const resourceTiles = playerTiles.filter(tile => tile.resources);
+    
+    if (resourceTiles.length > 0) {
+      const tile = resourceTiles[Math.floor(Math.random() * resourceTiles.length)];
+      return { x: tile.x, y: tile.y };
+    }
+    
+    // If no resource tiles, find any tile owned by player
+    if (playerTiles.length > 0) {
+      const tile = playerTiles[0];
+      return { x: tile.x, y: tile.y };
+    }
+    
+    throw new Error('No suitable position found for resource collection');
+  }
+
+  findPlayerCityPosition(player) {
+    // Find a city owned by the player
+    for (let x = 0; x < this.mapSize; x++) {
+      for (let y = 0; y < this.mapSize; y++) {
+        const tile = this.map[x][y];
+        if (tile.owner === player.id && tile.city) {
+          return { x, y };
+        }
+      }
+    }
+    
+    throw new Error('No city found for player');
+  }
+
+  getPlayerCityCount(player) {
+    let count = 0;
+    for (let x = 0; x < this.mapSize; x++) {
+      for (let y = 0; y < this.mapSize; y++) {
+        const tile = this.map[x][y];
+        if (tile.owner === player.id && tile.city) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  isValidCityPosition(x, y) {
+    if (x < 0 || x >= this.mapSize || y < 0 || y >= this.mapSize) {
+      return false;
+    }
+    
+    const tile = this.map[x][y];
+    return !tile.city && tile.terrain !== 'water';
+  }
+
+  getNearbyPositions(centerX, centerY, radius) {
+    const positions = [];
+    for (let x = centerX - radius; x <= centerX + radius; x++) {
+      for (let y = centerY - radius; y <= centerY + radius; y++) {
+        if (x >= 0 && x < this.mapSize && y >= 0 && y < this.mapSize) {
+          positions.push({ x, y });
+        }
+      }
+    }
+    return positions;
   }
 }
 
