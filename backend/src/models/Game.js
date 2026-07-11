@@ -64,21 +64,6 @@ export class Game {
     return null;
   }
 
-  addPlayer(player) {
-    if (this.players.length >= this.maxPlayers) {
-      throw new Error('Game is full');
-    }
-    if (this.status !== 'waiting') {
-      throw new Error('Game has already started');
-    }
-    
-    this.players.push(player);
-    this.updatedAt = new Date();
-    
-    // Assign starting position
-    this.assignStartingPosition(player);
-  }
-
   assignStartingPosition(player) {
     // Find a suitable starting position
     const startingPositions = this.findStartingPositions();
@@ -117,22 +102,6 @@ export class Game {
     }
     
     return positions;
-  }
-
-  discoverSurroundingTiles(centerX, centerY, playerId) {
-    const radius = 2;
-    for (let x = centerX - radius; x <= centerX + radius; x++) {
-      for (let y = centerY - radius; y <= centerY + radius; y++) {
-        if (x >= 0 && x < this.mapSize && y >= 0 && y < this.mapSize) {
-          this.map[x][y].discovered = true;
-        }
-      }
-    }
-  }
-
-  removePlayer(playerId) {
-    this.players = this.players.filter(p => p.id !== playerId);
-    this.updatedAt = new Date();
   }
 
   start() {
@@ -735,6 +704,9 @@ export class Game {
 
     this.players.push(player);
     this.updatedAt = new Date();
+
+    // Assign starting position and capital city
+    this.assignStartingPosition(player);
   }
 
   removePlayer(playerId) {
