@@ -149,6 +149,14 @@ spearman, catapult). Bonos de terreno: los de `ResourceService.getTerrainBonuses
 Un ejército por tile. Daño al perdedor proporcional a la diferencia; unidad con salud 0
 se destruye; ciudad atacada con éxito cambia de dueño (CiudadCapturada).
 
+Reglas de borde (explícitas para evitar ambigüedad):
+- `reclutar` solo en un tile con ciudad propia y sin ejército presente.
+- `moverEjercito` solo a tiles adyacentes (distancia Manhattan 1), gasta 1 punto de
+  movimiento; `atacar` solo a tile adyacente y consume todo el movimiento restante.
+- El movimiento de todas las unidades se restaura al cierre de cada ronda.
+- Mover a tile neutral lo reclama; mover a tile enemigo NO está permitido (hay que
+  `atacar`); el agua es intransitable.
+
 ### Producción y victoria
 
 - Al `terminarTurno()` del último jugador de la ronda se cierra la ronda: producción de
