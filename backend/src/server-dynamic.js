@@ -19,6 +19,7 @@ import { crearMapRoutes } from './routes/mapRoutes.js';
 
 // Import socket handlers
 import { handleGameSocket } from './sockets/gameSocket.js';
+import { registrarMapSocket } from './sockets/mapSocket.js';
 
 // Import dynamic configuration
 import config, { getDatabaseConnection, getCacheConnection } from './config/index.js';
@@ -240,20 +241,7 @@ io.on('connection', (socket) => {
   // Handle game-related socket events
   handleGameSocket(socket, io);
 
-  // Modo mapa: el cliente se une a la sala PRIVADA de su jugador dentro de la
-  // partida (`map:<id>:<jugadorId>`), no a una sala compartida. Sin jugadorId
-  // no hay sala a la que unirse: un socket sin identidad no debe recibir
-  // ninguna vista.
-  socket.on('map:join', (id, jugadorId) => {
-    if (typeof id === 'string' && id && typeof jugadorId === 'string' && jugadorId) {
-      socket.join(`map:${id}:${jugadorId}`);
-    }
-  });
-  socket.on('map:leave', (id, jugadorId) => {
-    if (typeof id === 'string' && id && typeof jugadorId === 'string' && jugadorId) {
-      socket.leave(`map:${id}:${jugadorId}`);
-    }
-  });
+  registrarMapSocket(socket, io, mapGameService);
 
   socket.on('disconnect', () => {
     logger.info(`Player disconnected: ${socket.id}`);
