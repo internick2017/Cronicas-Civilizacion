@@ -104,7 +104,21 @@ describe('vistaJugador', () => {
     expect(vista.config).toEqual(e.config);
     expect(vista.ganador).toBe(e.ganador);
     expect(vista.versionEsquema).toBe(e.versionEsquema);
-    expect(vista.semilla).toBe(e.semilla);
+  });
+
+  it('no incluye semilla (permite recrear posiciones iniciales de rivales offline)', () => {
+    const e = partidaIniciada();
+    const vista = vistaJugador(e, 'p1');
+    expect('semilla' in vista).toBe(false);
+  });
+
+  it('la semilla no aparece en ningun lugar del JSON de la vista', () => {
+    const e = crearEstado({ nombre: 'T', semilla: 'semilla-secreta-xyz' });
+    aplicar(e, unirse(e, j(1)));
+    aplicar(e, unirse(e, j(2)));
+    aplicar(e, iniciar(e));
+    const vista = vistaJugador(e, 'p1');
+    expect(JSON.stringify(vista)).not.toContain('semilla-secreta-xyz');
   });
 
   it('no muta el estado original', () => {
