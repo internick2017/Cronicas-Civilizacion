@@ -45,4 +45,14 @@ describe('posicionesIniciales', () => {
     expect(() => posicionesIniciales(todoAgua, 8, 2, crearRng('x')))
       .toThrowError(expect.objectContaining({ codigo: 'MAPA_SIN_POSICIONES' }));
   });
+  it('nunca devuelve posiciones duplicadas, ni con mapas chicos (minDist 0)', () => {
+    for (const semilla of ['a', 'b', 'c', 'd', 'e']) {
+      const m = generarMapa(semilla, 3);
+      const conTierra = m.filter(t => t.terreno !== 'water').length;
+      if (conTierra < 3) continue; // ese mapa no puede dar 3 posiciones; probamos otro
+      const pos = posicionesIniciales(m, 3, 3, crearRng(`pos-${semilla}`));
+      const claves = new Set(pos.map(p => `${p.x},${p.y}`));
+      expect(claves.size).toBe(pos.length);
+    }
+  });
 });
