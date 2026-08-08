@@ -2,8 +2,7 @@ import { posicionesIniciales } from '../generarMapa.js';
 import { crearRng } from '../rng.js';
 import { jugadorPorId } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
-
-const evento = (tipo, estado, jugadorId, datos = {}) => ({ tipo, turno: estado.turno, jugadorId, datos });
+import { evento, radio1 } from './comun.js';
 
 export function unirse(estado, { id, nombre, civilizacion }) {
   if (estado.estado !== 'esperando') throw new ReglaError('PARTIDA_YA_INICIADA', 'La partida ya inició');
@@ -11,12 +10,6 @@ export function unirse(estado, { id, nombre, civilizacion }) {
   if (jugadorPorId(estado, id)) throw new ReglaError('JUGADOR_DUPLICADO', 'Ese jugador ya está en la partida');
   return [evento('JugadorUnido', estado, null, { id, nombre, civilizacion })];
 }
-
-const radio1 = (x, y) => {
-  const tiles = [];
-  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) tiles.push({ x: x + dx, y: y + dy });
-  return tiles;
-};
 
 export function iniciar(estado) {
   if (estado.estado !== 'esperando') throw new ReglaError('PARTIDA_YA_INICIADA', 'La partida ya inició');
