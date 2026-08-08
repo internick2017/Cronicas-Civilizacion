@@ -39,6 +39,13 @@ describe('aplicar', () => {
     expect(tileEn(e, 3, 4).dueno).toBe('p1');
   });
 
+  it('TerritorioReclamado asigna el dueno del tile', () => {
+    const e = estadoConJugador();
+    expect(tileEn(e, 5, 5).dueno).toBeNull();
+    aplicar(e, [ev('TerritorioReclamado', 'p1', { x: 5, y: 5 })]);
+    expect(tileEn(e, 5, 5).dueno).toBe('p1');
+  });
+
   it('EdificioConstruido agrega el edificio a la ciudad', () => {
     const e = estadoConJugador();
     aplicar(e, [ev('CiudadFundada', 'p1', { x: 3, y: 4, nombre: 'Cusco' })]);
