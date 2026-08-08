@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { MapGameRepo } from '../../src/db/MapGameRepo.js';
-import { crearEstado, toJSON, fromJSON } from '../../src/domain/mapa/MapGame.js';
+import { crearEstado, toJSON, fromJSON, tileEn, jugadorPorId } from '../../src/domain/mapa/MapGame.js';
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
+import { reclutar } from '../../src/domain/mapa/reglas/militar.js';
+import { construir } from '../../src/domain/mapa/reglas/ciudades.js';
 
 let repo;
 beforeEach(() => { repo = new MapGameRepo(new Database(':memory:'), 'sqlite'); repo.init(); });
@@ -13,9 +15,29 @@ it('round-trip completo: partida jugando sobrevive guardar+cargar identica (anti
   aplicar(e, unirse(e, { id: 'p1', nombre: 'A', civilizacion: 'Incas' }));
   aplicar(e, unirse(e, { id: 'p2', nombre: 'B', civilizacion: 'Mayas' }));
   aplicar(e, iniciar(e));
+
+  // Dar recursos de sobra para poder construir y reclutar sin chocar con costos.
+  jugadorPorId(e, 'p1').recursos = { food: 999, gold: 999, wood: 999, stone: 999, science: 999, culture: 999 };
+
+  const capital = e.mapa.find(t => t.ciudad && t.dueno === 'p1');
+  const { x, y } = capital;
+
+  // Edificio construido en una ciudad (cubre `ciudad.edificios`).
+  aplicar(e, construir(e, 'p1', { x, y, edificio: 'granary' }));
+
+  // Ejercito reclutado sobre la capital, con salud y movimiento no-default
+  // (cubre `tile.ejercito`, exactamente donde reapareceria el bug de `ciudad`).
+  aplicar(e, reclutar(e, 'p1', { x, y, tipo: 'warrior' }));
+  const tileConEjercito = tileEn(e, x, y);
+  tileConEjercito.ejercito.salud = 37;
+  tileConEjercito.ejercito.movimientoRestante = 1;
+
+  // Un tile descubierto por DOS jugadores distintos (cubre niebla compartida).
+  if (!capital.descubiertoPor.includes('p2')) capital.descubiertoPor.push('p2');
+
   repo.guardar(e, 'ABC123');
   const cargado = fromJSON(repo.cargar(e.id));
-  expect(cargado).toEqual(e);          // ciudades, recursos, niebla: TODO sobrevive
+  expect(cargado).toEqual(e);          // ciudades, edificios, ejercitos, recursos, niebla: TODO sobrevive
 });
 
 it('round-trip en los tres estados de partida', () => {
