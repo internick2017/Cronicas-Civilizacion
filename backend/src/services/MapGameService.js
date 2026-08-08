@@ -62,47 +62,58 @@ export class MapGameService {
     return estado;
   }
 
-  async _guardar(estado) {
-    this.cache.set(estado.id, estado);
+  /**
+   * Persiste `estado` (y opcionalmente sus eventos) y SOLO si ambas escrituras
+   * tienen exito actualiza el cache. Si `repo.guardar` o `repo.agregarEventos`
+   * tiran, el cache queda intacto (todavia con la version vieja, igual que la
+   * DB) en vez de quedar "adelantado" respecto de una escritura que fallo.
+   */
+  async _persistir(estado, eventos = null) {
     await this.repo.guardar(estado, estado.codigo);
+    if (eventos) await this.repo.agregarEventos(estado.id, eventos);
+    this.cache.set(estado.id, estado);
   }
 
   async crearPartida({ nombre, semilla, config }) {
     const codigo = await this._generarCodigoUnico();
     const estado = crearEstado({ nombre, semilla: semilla ?? codigo, config });
     estado.codigo = codigo;
-    await this._guardar(estado);
+    await this._persistir(estado);
     return { id: estado.id, codigo };
   }
 
   async unirse(idOCodigo, { id, nombre, civilizacion }) {
-    const estado = await this._resolver(idOCodigo);
-    if (!estado) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
+    const original = await this._resolver(idOCodigo);
+    if (!original) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
 
+    // Se muta un CLON, nunca el objeto que vive en el cache: si la persistencia
+    // falla mas abajo, el cache no debe quedar con un estado que la DB no tiene.
+    const estado = structuredClone(original);
     const eventos = unirseRegla(estado, { id, nombre, civilizacion });
     aplicar(estado, eventos);
-    await this._guardar(estado);
-    await this.repo.agregarEventos(estado.id, eventos);
+    await this._persistir(estado, eventos);
 
     return vistaJugador(estado, id);
   }
 
   async iniciar(id) {
-    const estado = await this._resolver(id);
-    if (!estado) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
+    const original = await this._resolver(id);
+    if (!original) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
 
+    const estado = structuredClone(original);
     const eventos = iniciarRegla(estado);
     aplicar(estado, eventos);
-    await this._guardar(estado);
-    await this.repo.agregarEventos(estado.id, eventos);
+    await this._persistir(estado, eventos);
 
     const jugadorActual = estado.jugadores[estado.indiceJugadorActual];
     return vistaJugador(estado, jugadorActual.id);
   }
 
   async accion(id, jugadorId, accion) {
-    const estado = await this._resolver(id);
-    if (!estado) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
+    const original = await this._resolver(id);
+    if (!original) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
+
+    const estado = structuredClone(original);
 
     let eventos;
     if (accion.tipo === 'atacar') {
@@ -115,10 +126,10 @@ export class MapGameService {
       eventos = regla(estado, jugadorId, accion);
     }
 
-    // Si la regla tiro ReglaError, nunca llegamos aca: nada se aplico ni se persistio.
+    // Si la regla tiro ReglaError, nunca llegamos aca: nada se aplico ni se persistio,
+    // y el clon descartado no dejo rastro (el cache sigue apuntando al `original`).
     aplicar(estado, eventos);
-    await this._guardar(estado);
-    await this.repo.agregarEventos(estado.id, eventos);
+    await this._persistir(estado, eventos);
 
     const cerroRonda = eventos.some(e => e.tipo === 'RondaCompletada');
     if (cerroRonda && this.narrador) {
