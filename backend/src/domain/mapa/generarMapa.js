@@ -31,8 +31,9 @@ export function posicionesIniciales(mapa, tamano, cantidad, rng) {
     const y = entero(rng, tamano);
     const tile = mapa[y * tamano + x];
     if (tile.terreno === 'water' || tile.ciudad) continue;
+    const noDuplicado = !pos.some(p => p.x === x && p.y === y);
     const lejos = pos.every(p => Math.abs(p.x - x) + Math.abs(p.y - y) >= minDist);
-    if (lejos) pos.push({ x, y });
+    if (noDuplicado && lejos) pos.push({ x, y });
   }
   if (pos.length < cantidad) {
     throw new ReglaError('MAPA_SIN_POSICIONES', `No hay ${cantidad} posiciones iniciales viables en este mapa`);
