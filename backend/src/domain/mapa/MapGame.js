@@ -5,8 +5,43 @@ import { ReglaError } from './errores.js';
 
 const CONFIG_DEFAULT = { tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial' };
 
+// Limites duros de la config. Viven en el DOMINIO (no solo en el borde HTTP)
+// porque `generarMapa` asigna tamanoMapa^2 objetos: sin cota, un `config`
+// arbitrario (venga de una request, de un test o de otro servicio) puede
+// tumbar el proceso entero. El limite es una regla del juego, no una
+// validacion de transporte.
+const LIMITES_CONFIG = {
+  tamanoMapa: { min: 10, max: 60 },
+  maxJugadores: { min: 2, max: 8 },
+};
+const MODOS_TURNO = ['secuencial']; // unico modo implementado
+
+function validarEntero(cfg, clave) {
+  const { min, max } = LIMITES_CONFIG[clave];
+  const valor = cfg[clave];
+  if (!Number.isInteger(valor) || valor < min || valor > max) {
+    throw new ReglaError(
+      'CONFIG_INVALIDA',
+      `config.${clave} debe ser un entero entre ${min} y ${max} (recibido: ${JSON.stringify(valor)})`
+    );
+  }
+}
+
+export function validarConfig(cfg) {
+  validarEntero(cfg, 'tamanoMapa');
+  validarEntero(cfg, 'maxJugadores');
+  if (!MODOS_TURNO.includes(cfg.modoTurno)) {
+    throw new ReglaError(
+      'CONFIG_INVALIDA',
+      `config.modoTurno debe ser uno de: ${MODOS_TURNO.join(', ')} (recibido: ${JSON.stringify(cfg.modoTurno)})`
+    );
+  }
+  return cfg;
+}
+
 export function crearEstado({ nombre, semilla, config = {} }) {
-  const cfg = { ...CONFIG_DEFAULT, ...config };
+  const cfg = { ...CONFIG_DEFAULT, ...(config ?? {}) };
+  validarConfig(cfg); // antes de generarMapa: nunca asignamos nada sin cota
   return {
     id: randomUUID(),
     nombre,

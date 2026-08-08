@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { crearEstado, toJSON, fromJSON, tileEn, puedePagar } from '../../src/domain/mapa/MapGame.js';
+import { ReglaError } from '../../src/domain/mapa/errores.js';
 
 const estadoBase = () => crearEstado({ nombre: 'Partida', semilla: 's1' });
 
@@ -13,6 +14,49 @@ describe('crearEstado', () => {
     expect(e.mapa).toHaveLength(400);
     expect(e.config).toEqual({ tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial' });
     expect(e.ganador).toBeNull();
+  });
+});
+
+describe('validacion de config (anti-OOM)', () => {
+  const crear = (config) => () => crearEstado({ nombre: 'P', semilla: 's1', config });
+
+  it('los defaults siguen siendo validos', () => {
+    expect(crear(undefined)).not.toThrow();
+    expect(crear({})).not.toThrow();
+    expect(crearEstado({ nombre: 'P', semilla: 's1', config: { tamanoMapa: 10 } }).mapa).toHaveLength(100);
+    expect(crearEstado({ nombre: 'P', semilla: 's1', config: { tamanoMapa: 60 } }).mapa).toHaveLength(3600);
+  });
+
+  it('tamanoMapa gigante (50000) es rechazado con CONFIG_INVALIDA en vez de reventar el proceso', () => {
+    expect(crear({ tamanoMapa: 50000 })).toThrow(ReglaError);
+    try {
+      crearEstado({ nombre: 'P', semilla: 's1', config: { tamanoMapa: 50000 } });
+    } catch (err) {
+      expect(err.codigo).toBe('CONFIG_INVALIDA');
+    }
+  });
+
+  it('tamanoMapa fuera de [10,60] o no entero es rechazado', () => {
+    for (const valor of [9, 61, 600, 20.5, '20', NaN, null]) {
+      expect(crear({ tamanoMapa: valor })).toThrow(ReglaError);
+    }
+  });
+
+  it('maxJugadores 999 (y otros fuera de [2,8]) es rechazado con CONFIG_INVALIDA', () => {
+    expect(crear({ maxJugadores: 999 })).toThrow(ReglaError);
+    try {
+      crearEstado({ nombre: 'P', semilla: 's1', config: { maxJugadores: 999 } });
+    } catch (err) {
+      expect(err.codigo).toBe('CONFIG_INVALIDA');
+    }
+    for (const valor of [1, 9, 2.5, '4', null]) {
+      expect(crear({ maxJugadores: valor })).toThrow(ReglaError);
+    }
+  });
+
+  it('modoTurno distinto de secuencial es rechazado (unico modo implementado)', () => {
+    expect(crear({ modoTurno: 'simultaneo' })).toThrow(ReglaError);
+    expect(crear({ modoTurno: 'secuencial' })).not.toThrow();
   });
 });
 
