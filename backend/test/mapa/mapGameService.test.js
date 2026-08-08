@@ -150,4 +150,44 @@ describe('MapGameService', () => {
     // `terminarTurno` intentaba hacer cuando el guardar fallo)
     expect(vistaPostFallo.turno).toBe(estadoEnDbAntes.turno);
   });
+
+  it('el broadcast por socket NO entrega a un jugador la vista de otro (niebla en la capa socket)', async () => {
+    const emitir = vi.fn();
+    const { svc } = crearServicio({ emitir });
+    const { id } = await crearPartidaConDosJugadores(svc);
+    emitir.mockClear();
+
+    await svc.accion(id, 'p1', { tipo: 'terminarTurno' });
+
+    // Se emite UNA vez por jugador, cada una dirigida a ese jugador.
+    expect(emitir).toHaveBeenCalledTimes(2);
+    const destinatarios = emitir.mock.calls.map(c => c[1]).sort();
+    expect(destinatarios).toEqual(['p1', 'p2']);
+
+    for (const [partidaId, jugadorId, evento, payload] of emitir.mock.calls) {
+      expect(partidaId).toBe(id);
+      expect(evento).toBe('estado');
+      // El payload es la vista de ESE jugador, no un diccionario con todas.
+      expect(payload).not.toHaveProperty('p1');
+      expect(payload).not.toHaveProperty('p2');
+      const esperada = await svc.vista(id, jugadorId);
+      expect(payload).toEqual(esperada);
+      // y nunca contiene la vista del otro jugador
+      const otro = jugadorId === 'p1' ? 'p2' : 'p1';
+      expect(JSON.stringify(payload)).not.toContain(JSON.stringify(await svc.vista(id, otro)));
+    }
+  });
+
+  it('dos unirse concurrentes NO se pisan: ambos jugadores quedan persistidos', async () => {
+    const { svc, repo } = crearServicio();
+    const { id } = await svc.crearPartida({ nombre: 'T', semilla: 's1' });
+
+    await Promise.all([
+      svc.unirse(id, { id: 'a', nombre: 'A', civilizacion: 'Incas' }),
+      svc.unirse(id, { id: 'b', nombre: 'B', civilizacion: 'Mayas' }),
+    ]);
+
+    const persistido = repo.cargar(id);
+    expect(persistido.jugadores.map(j => j.id).sort()).toEqual(['a', 'b']);
+  });
 });

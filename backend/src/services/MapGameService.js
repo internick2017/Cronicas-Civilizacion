@@ -43,6 +43,40 @@ export class MapGameService {
     this.narrador = narrador;
     this.emitir = emitir;
     this.cache = new Map(); // id -> estado (solo aceleracion; la DB manda)
+    this.candados = new Map(); // id -> Promise (cola de operaciones mutantes)
+  }
+
+  /**
+   * Serializa las operaciones MUTANTES por partida. `_resolver` + clonar +
+   * `_persistir` es un read-modify-write: sin esto, dos requests concurrentes
+   * sobre la misma partida leen el mismo estado base y la segunda escritura
+   * pisa a la primera (dos jugadores tocando "Unirse" a la vez = uno
+   * desaparece). Una cadena de promesas en memoria alcanza porque el server
+   * es un solo proceso.
+   *
+   * La cadena guardada es siempre una promesa YA neutralizada (catch a noop),
+   * asi un rechazo no envenena las operaciones siguientes de esa partida.
+   */
+  _conCandado(id, fn) {
+    const previo = this.candados.get(id) ?? Promise.resolve();
+    const resultado = previo.then(fn, fn); // corre igual si la anterior fallo
+    const cola = resultado.then(() => {}, () => {});
+    this.candados.set(id, cola);
+    // Evita que el Map crezca sin limite: si nadie encolo despues, se limpia.
+    cola.then(() => {
+      if (this.candados.get(id) === cola) this.candados.delete(id);
+    });
+    return resultado;
+  }
+
+  /**
+   * El candado tiene que ser por PARTIDA, no por la clave que uso el cliente:
+   * `unirse` acepta id o codigo, y dos claves distintas de la misma partida
+   * deben compartir la misma cola.
+   */
+  async _idCanonico(idOCodigo) {
+    const estado = await this._resolver(idOCodigo);
+    return estado ? estado.id : idOCodigo;
   }
 
   async _generarCodigoUnico() {
@@ -82,7 +116,11 @@ export class MapGameService {
     return { id: estado.id, codigo };
   }
 
-  async unirse(idOCodigo, { id, nombre, civilizacion }) {
+  async unirse(idOCodigo, jugador) {
+    return this._conCandado(await this._idCanonico(idOCodigo), () => this._unirse(idOCodigo, jugador));
+  }
+
+  async _unirse(idOCodigo, { id, nombre, civilizacion }) {
     const original = await this._resolver(idOCodigo);
     if (!original) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
 
@@ -97,6 +135,10 @@ export class MapGameService {
   }
 
   async iniciar(id) {
+    return this._conCandado(await this._idCanonico(id), () => this._iniciar(id));
+  }
+
+  async _iniciar(id) {
     const original = await this._resolver(id);
     if (!original) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
 
@@ -110,6 +152,10 @@ export class MapGameService {
   }
 
   async accion(id, jugadorId, accion) {
+    return this._conCandado(await this._idCanonico(id), () => this._accion(id, jugadorId, accion));
+  }
+
+  async _accion(id, jugadorId, accion) {
     const original = await this._resolver(id);
     if (!original) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
 
@@ -139,10 +185,15 @@ export class MapGameService {
         .catch(() => null); // la narracion nunca puede romper la partida
     }
 
+    // Una emision POR JUGADOR, con SOLO su vista. Antes se mandaba un unico
+    // payload { p1: vista1, p2: vista2 } a la sala de la partida: cualquier
+    // socket de la sala recibia la niebla, ciudades y recursos de todos los
+    // demas, reintroduciendo por socket la fuga que el dominio ya evitaba.
+    // Invariante: un socket del jugador X nunca recibe la vista de Y.
     if (this.emitir) {
-      const vistaPorJugador = {};
-      for (const jugador of estado.jugadores) vistaPorJugador[jugador.id] = vistaJugador(estado, jugador.id);
-      this.emitir(id, 'estado', vistaPorJugador);
+      for (const jugador of estado.jugadores) {
+        this.emitir(id, jugador.id, 'estado', vistaJugador(estado, jugador.id));
+      }
     }
 
     return { vista: vistaJugador(estado, jugadorId), eventos };
