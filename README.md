@@ -195,10 +195,14 @@ Además del modo narrativo, el backend incluye un modo de estrategia por turnos 
 
 - `POST /api/map` - Crear una partida nueva. Body: `{ nombre, semilla, config }`.
 - `GET /api/map` - Listar partidas activas (sólo metadata, no el estado del juego).
-- `POST /api/map/:id/unirse` - Unirse a una partida. Body: `{ id, nombre, civilizacion }`.
-- `POST /api/map/:id/iniciar` - Iniciar la partida (reparte el mapa y arranca el primer turno).
-- `POST /api/map/:id/accion` - Ejecutar una acción de juego. Body: `{ jugadorId, tipo, ...datosDeLaAccion }`, donde `tipo` es una de: `fundarCiudad`, `construir`, `reclutar`, `moverEjercito`, `atacar`, `terminarTurno`.
-- `GET /api/map/:id?jugadorId=` - Obtener la vista del jugador (nunca el mapa completo: siempre filtrada por niebla de guerra).
+- `POST /api/map/:id/unirse` - Unirse a una partida. Body: `{ id, nombre, civilizacion }`. Devuelve `{ vista, token }`: el `token` es el secreto de sesión de ese jugador, se emite **una sola vez** acá y hay que guardarlo del lado del cliente (no hay forma de recuperarlo después).
+- `POST /api/map/:id/iniciar` - Iniciar la partida (reparte el mapa y arranca el primer turno). No requiere token: cualquiera de los jugadores ya unidos puede arrancarla.
+- `POST /api/map/:id/accion` - Ejecutar una acción de juego. Requiere el header `X-Jugador-Token` con el token de quien manda la acción. Body: `{ jugadorId, tipo, ...datosDeLaAccion }`, donde `tipo` es una de: `fundarCiudad`, `construir`, `reclutar`, `moverEjercito`, `atacar`, `terminarTurno`.
+- `GET /api/map/:id?jugadorId=` - Obtener la vista del jugador (nunca el mapa completo: siempre filtrada por niebla de guerra). Requiere el header `X-Jugador-Token` correspondiente a ese `jugadorId`.
+
+### Por qué el token
+
+El `jugadorId` de cada jugador es visible para el resto de los jugadores de la misma partida (aparece en `vistaJugador`, aunque sus recursos no). Sin el token, cualquiera que lo conociera podría leer la vista privada de otro jugador o jugar en su nombre. El token es un secreto de sesión liviano (no hace falta cuenta ni login, consistente con el resto del juego), se genera al `unirse` y se verifica en cada acción, lectura, y en el socket `map:join(gameId, jugadorId, token, ack?)` (la sala de socket también es privada por jugador: `map:<id>:<jugadorId>`).
 
 ## 🎨 Personalización
 
