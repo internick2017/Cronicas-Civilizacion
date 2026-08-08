@@ -168,9 +168,10 @@ export class MapGameService {
   }
 
   async accion(id, jugadorId, accion, token) {
-    const gameId = await this._idCanonico(id);
-    await this.verificarToken(gameId, jugadorId, token);
-    return this._conCandado(gameId, () => this._accion(id, jugadorId, accion));
+    const estado = await this._resolver(id);
+    if (!estado) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
+    await this.verificarToken(estado.id, jugadorId, token);
+    return this._conCandado(estado.id, () => this._accion(id, jugadorId, accion));
   }
 
   async _accion(id, jugadorId, accion) {
@@ -218,10 +219,9 @@ export class MapGameService {
   }
 
   async vista(id, jugadorId, token) {
-    const gameId = await this._idCanonico(id);
-    await this.verificarToken(gameId, jugadorId, token);
     const estado = await this._resolver(id);
     if (!estado) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
+    await this.verificarToken(estado.id, jugadorId, token);
     return vistaJugador(estado, jugadorId);
   }
 }

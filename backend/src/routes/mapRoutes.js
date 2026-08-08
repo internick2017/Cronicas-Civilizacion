@@ -24,6 +24,11 @@ function manejarError(err, res) {
  * directamente para servir un estado de partida: eso sería reintroducir la
  * fuga de informacion (niebla, recursos ajenos, semilla) que el dominio
  * ya se encarga de evitar.
+ *
+ * Toda ruta que actua o lee como un jugador (accion, GET) exige el header
+ * `X-Jugador-Token`, emitido una unica vez por `unirse`. Sin el, cualquiera
+ * que supiera el jugadorId de otro (visible dentro de la partida via
+ * vistaJugador) podria jugar en su nombre o leer su vista privada.
  */
 export function crearMapRoutes(servicio) {
   const router = express.Router();
@@ -53,8 +58,8 @@ export function crearMapRoutes(servicio) {
   router.post('/:id/unirse', async (req, res) => {
     try {
       const { id, nombre, civilizacion } = req.body ?? {};
-      const vista = await servicio.unirse(req.params.id, { id, nombre, civilizacion });
-      res.status(200).json(vista);
+      const resultado = await servicio.unirse(req.params.id, { id, nombre, civilizacion });
+      res.status(200).json(resultado); // { vista, token }
     } catch (err) {
       manejarError(err, res);
     }
@@ -74,7 +79,8 @@ export function crearMapRoutes(servicio) {
   router.post('/:id/accion', async (req, res) => {
     try {
       const { jugadorId, ...accion } = req.body ?? {};
-      const resultado = await servicio.accion(req.params.id, jugadorId, accion);
+      const token = req.headers['x-jugador-token'];
+      const resultado = await servicio.accion(req.params.id, jugadorId, accion, token);
       res.status(200).json(resultado);
     } catch (err) {
       manejarError(err, res);
@@ -84,7 +90,8 @@ export function crearMapRoutes(servicio) {
   // GET /api/map/:id?jugadorId= - vista del jugador (NUNCA el mapa completo)
   router.get('/:id', async (req, res) => {
     try {
-      const vista = await servicio.vista(req.params.id, req.query.jugadorId);
+      const token = req.headers['x-jugador-token'];
+      const vista = await servicio.vista(req.params.id, req.query.jugadorId, token);
       res.status(200).json(vista);
     } catch (err) {
       manejarError(err, res);
