@@ -111,14 +111,25 @@ describe('terminarTurno', () => {
     expect(evsSiguiente[0].datos.indiceJugadorActual).toBe(2);
   });
 
-  it('p1 dueno del 60% del mapa -> PartidaTerminada dominacion en el turno correcto al cerrar la ronda (regresion M5)', () => {
+  it('p1 dueno del 60% de la TIERRA (no del mapa total, agua no cuenta) -> PartidaTerminada dominacion en el turno correcto (regresion M5 + ruling tierra-only)', () => {
+    // 2 de los 9 tiles son agua (nunca son de nadie): (2,0) y (2,1).
+    // Tierra = 7 tiles. p1 posee 5 tiles de tierra -> 5/7 ≈ 71.4% >= 60%.
+    // A proposito, 5/9 (total del mapa) = 55.6% < 60%: si el calculo usara el mapa
+    // completo en vez de solo tierra, esta victoria NO deberia disparar. Este test
+    // verifica explicitamente que el denominador es la tierra, no el mapa entero.
+    e.mapa[0 * 3 + 2].terreno = 'water'; // (2,0)
+    e.mapa[1 * 3 + 2].terreno = 'water'; // (2,1)
+    const tilesDeTierra = e.mapa.filter(t => t.terreno !== 'water');
+    expect(tilesDeTierra.length).toBe(7);
+
     fundarACiudad(e, 'p1', 0, 0);
-    fundarACiudad(e, 'p2', 2, 2);
-    // Mapa 3x3 = 9 tiles; 60% => 5.4, con 6 tiles de p1 se supera el umbral.
-    const coords = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]];
-    for (const [x, y] of coords) {
+    fundarACiudad(e, 'p2', 1, 2);
+    const coordsP1 = [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2]]; // 5 tiles de tierra
+    for (const [x, y] of coordsP1) {
       e.mapa[y * 3 + x].dueno = 'p1';
     }
+    expect(5 / 9).toBeLessThan(0.6); // no alcanzaria el umbral contra el mapa total
+    expect(5 / 7).toBeGreaterThanOrEqual(0.6); // si alcanza el umbral contra la tierra
 
     aplicar(e, terminarTurno(e, 'p1')); // turno de p2, ronda 1 sigue activa (indice 0->1)
     const evsCierre = terminarTurno(e, 'p2'); // cierra ronda: turno actual (1) -> nuevo turno 2
@@ -140,6 +151,62 @@ describe('terminarTurno', () => {
     ]);
     const evVictoria = evsCierre.find(ev => ev.tipo === 'PartidaTerminada');
     expect(evVictoria.datos.ganador).toEqual({ jugadorId: 'p1', tipoVictoria: 'ultimo_en_pie', turno: 1 });
+  });
+
+  it('REGRESION: el jugador del indice 0 eliminado en el mismo cierre no deja el turno trabado', () => {
+    // p1 (indice 0) llega al cierre de ronda sin ciudades y se elimina en ese mismo cierre.
+    // El indice guardado en TurnoAvanzado debe saltear a p1 y apuntar a alguien activo,
+    // para que la partida no quede trabada (nadie podria volver a jugar si quedara en p1).
+    const e3 = crearEstado({ nombre: 'T4', semilla: 's4' });
+    e3.config.tamanoMapa = 3;
+    e3.mapa = mapaChico();
+    aplicar(e3, unirse(e3, { id: 'p1', nombre: 'A', civilizacion: 'Incas' }));
+    aplicar(e3, unirse(e3, { id: 'p2', nombre: 'B', civilizacion: 'Mayas' }));
+    aplicar(e3, unirse(e3, { id: 'p3', nombre: 'C', civilizacion: 'Aztecas' }));
+    aplicar(e3, iniciar(e3));
+    for (const t of e3.mapa) { t.ciudad = null; t.dueno = null; }
+
+    // p1 sin ciudades; p2 y p3 con ciudades para que la partida siga (2 activos post-cierre).
+    fundarACiudad(e3, 'p2', 1, 0);
+    fundarACiudad(e3, 'p3', 2, 0);
+
+    aplicar(e3, terminarTurno(e3, 'p1')); // turno de p2
+    aplicar(e3, terminarTurno(e3, 'p2')); // turno de p3
+    const evsCierre = terminarTurno(e3, 'p3'); // cierra ronda: el avance naive apuntaria a p1 (indice 0), que se elimina aca mismo
+
+    expect(evsCierre.map(ev => ev.tipo)).toEqual([
+      'TurnoAvanzado', 'RecursosProducidos', 'RecursosProducidos', 'RecursosProducidos', 'JugadorEliminado', 'RondaCompletada',
+    ]);
+    expect(evsCierre.find(ev => ev.tipo === 'JugadorEliminado').datos.jugadorId).toBe('p1');
+
+    const indiceFinal = evsCierre[0].datos.indiceJugadorActual;
+    aplicar(e3, evsCierre);
+
+    // (a) el indice guardado apunta a un jugador activo, no al recien eliminado p1.
+    const jugadorFinal = e3.jugadores[indiceFinal];
+    expect(jugadorFinal.id).not.toBe('p1');
+    expect(jugadorFinal.activo).toBe(true);
+
+    // (b) ese jugador puede efectivamente terminar su turno (no da NO_ES_TU_TURNO / soft-lock).
+    expect(() => terminarTurno(e3, jugadorFinal.id)).not.toThrow();
+  });
+
+  it('sin jugadores activos tras las eliminaciones del cierre -> PartidaTerminada como empate (ganador null)', () => {
+    // Ningun jugador fundo ciudad: al cerrar la primera ronda, ambos quedan sin ciudades
+    // y se eliminan en el mismo cierre. No debe quedar la partida "jugando" en silencio:
+    // debe terminar explicitamente como empate.
+    aplicar(e, terminarTurno(e, 'p1')); // turno de p2
+    const evsCierre = terminarTurno(e, 'p2'); // cierra ronda; p1 y p2 sin ciudades
+
+    expect(evsCierre.map(ev => ev.tipo)).toEqual([
+      'TurnoAvanzado', 'RecursosProducidos', 'RecursosProducidos', 'JugadorEliminado', 'JugadorEliminado', 'RondaCompletada', 'PartidaTerminada',
+    ]);
+    const evVictoria = evsCierre.find(ev => ev.tipo === 'PartidaTerminada');
+    expect(evVictoria.datos.ganador).toBeNull();
+
+    aplicar(e, evsCierre);
+    expect(e.estado).toBe('terminado');
+    expect(e.ganador).toBeNull();
   });
 
   it('terminar turno con partida no activa da PARTIDA_NO_ACTIVA', () => {
