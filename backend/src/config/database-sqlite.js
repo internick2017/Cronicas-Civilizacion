@@ -310,4 +310,9 @@ const pool = {
   end: () => db.close()
 };
 
+// Conexion cruda de better-sqlite3, para consumidores (p.ej. MapGameRepo) que
+// necesitan .prepare/.exec/.transaction directamente en vez de la interfaz
+// tipo-postgres de `pool`. Misma conexion/archivo que `pool`, no una nueva.
+export { db };
+
 export default pool; 
