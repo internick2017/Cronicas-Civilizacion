@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { ddl } from './mapSchema.js';
 
 // Convierte SQL escrito con placeholders `?` (estilo sqlite) a `$1, $2, ...`
@@ -18,11 +19,13 @@ export class MapGameRepo {
 
   init() {
     const statements = ddl(this.dialecto);
+    const indiceTokens = 'CREATE UNIQUE INDEX IF NOT EXISTS map_game_tokens_pk ON map_game_tokens (game_id, jugador_id)';
     if (this.dialecto === 'sqlite') {
       for (const stmt of statements) this.db.exec(stmt);
+      this.db.exec(indiceTokens);
       return;
     }
-    return Promise.all(statements.map(stmt => this.db.query(stmt)));
+    return Promise.all([...statements, indiceTokens].map(stmt => this.db.query(stmt)));
   }
 
   guardar(estado, codigo) {
@@ -113,6 +116,28 @@ export class MapGameRepo {
       return mapear(this.db.prepare(sql).all());
     }
     return this.db.query(sql).then(res => mapear(res.rows));
+  }
+
+  guardarToken(gameId, jugadorId, tokenHash) {
+    const sql = `
+      INSERT INTO map_game_tokens (game_id, jugador_id, token_hash, creado)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT (game_id, jugador_id) DO UPDATE SET
+        token_hash = excluded.token_hash,
+        creado = CURRENT_TIMESTAMP
+    `;
+    return this._ejecutar(sql, [gameId, jugadorId, tokenHash]);
+  }
+
+  verificarToken(gameId, jugadorId, tokenPlano) {
+    const hash = crypto.createHash('sha256').update(String(tokenPlano ?? '')).digest('hex');
+    const sql = 'SELECT token_hash FROM map_game_tokens WHERE game_id = ? AND jugador_id = ?';
+    if (this.dialecto === 'sqlite') {
+      const fila = this.db.prepare(sql).get(gameId, jugadorId);
+      return !!fila && fila.token_hash === hash;
+    }
+    return this.db.query(adaptarPlaceholders(sql), [gameId, jugadorId])
+      .then(res => !!res.rows[0] && res.rows[0].token_hash === hash);
   }
 
   _ejecutar(sql, params) {
