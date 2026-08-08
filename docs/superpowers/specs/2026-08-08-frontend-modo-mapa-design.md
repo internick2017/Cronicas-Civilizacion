@@ -30,10 +30,18 @@ del sistema viejo (ítem aparte de la deuda conocida).
    manualmente, de estilar consistente con el resto de la app (que no usa canvas en ningún
    lado), y de hacer clickeable/accesible. Sin zoom/pan en el MVP; scroll nativo alcanza
    para el máximo de 60×60 casillas que valida el backend.
-3. **Sockets desde el MVP**, no REST puro. `StorySession.vue` (modo narrativo) ya tiene el
-   patrón de conectar socket y escuchar eventos de estado; no es una técnica nueva en este
-   codebase. Sin esto, dos jugadores en la misma partida no se enteran de las jugadas del
-   otro sin recargar la página, pobre para un juego pensado para jugarse en la misma sala.
+3. **Sockets desde el MVP**, no REST puro. Corrección tras revisar el código (el diseño
+   original decía erróneamente que `StorySession.vue` ya usaba sockets): el modo narrativo en
+   realidad usa **polling REST con backoff adaptativo y un banner de reconexión**
+   (`StorySession.vue`, variable `pollInterval`), no sockets. El único archivo que hoy importa
+   `socket.io-client` en el frontend es `useGameSocket.js`, legacy y sin uso (nada lo monta).
+   La decisión de usar sockets para el modo mapa se sostiene igual — sin esto, dos jugadores en
+   la misma partida no se enteran de las jugadas del otro sin recargar la página, pobre para un
+   juego pensado para jugarse en la misma sala — pero es una integración nueva en este
+   codebase, no la reutilización de un patrón ya probado. `useMapSocket.js` se escribe desde
+   cero (`socket.io-client` ya es dependencia del proyecto); como mucho, la forma de
+   `useGameSocket.js` (connect/disconnect/emit/on) sirve de referencia de nomenclatura, no de
+   patrón validado.
 4. **Navegación: selector de modo en la pantalla inicial** (narrativo vs mapa beta), delante
    de lo que hoy es directamente `StoryLobby`. Consistente con cómo creció el proyecto
    (agregar sin romper lo que ya funciona).
