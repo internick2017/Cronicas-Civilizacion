@@ -86,7 +86,7 @@ export function aplicar(estado, eventos) {
         const atacanteTile = tileEn(estado, datos.desde.x, datos.desde.y);
         const defensorTile = tileEn(estado, datos.hasta.x, datos.hasta.y);
         atacanteTile.ejercito.salud -= datos.danoAtacante;
-        defensorTile.ejercito.salud -= datos.danoDefensor;
+        if (defensorTile.ejercito) defensorTile.ejercito.salud -= datos.danoDefensor;
         atacanteTile.ejercito.movimientoRestante = 0;
         break;
       }
