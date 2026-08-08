@@ -79,6 +79,18 @@ export class MapGameService {
     return estado ? estado.id : idOCodigo;
   }
 
+  /**
+   * Verifica el token de sesion de un jugador antes de dejarlo leer su vista
+   * o actuar en su nombre. El secreto vive fuera del dominio (tabla
+   * `map_game_tokens`, gestionada por MapGameRepo) precisamente para que
+   * vistaJugador() no tenga forma de filtrarlo por accidente: nunca esta en
+   * lo que esa funcion recorre.
+   */
+  async verificarToken(gameId, jugadorId, token) {
+    const valido = await this.repo.verificarToken(gameId, jugadorId, token);
+    if (!valido) throw new ReglaError('TOKEN_INVALIDO', 'Token invalido o ausente');
+  }
+
   async _generarCodigoUnico() {
     for (let intento = 0; intento < 50; intento++) {
       const codigo = generarCodigo();
@@ -131,7 +143,11 @@ export class MapGameService {
     aplicar(estado, eventos);
     await this._persistir(estado, eventos);
 
-    return vistaJugador(estado, id);
+    const token = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    await this.repo.guardarToken(estado.id, id, hash);
+
+    return { vista: vistaJugador(estado, id), token };
   }
 
   async iniciar(id) {
@@ -151,8 +167,10 @@ export class MapGameService {
     return vistaJugador(estado, jugadorActual.id);
   }
 
-  async accion(id, jugadorId, accion) {
-    return this._conCandado(await this._idCanonico(id), () => this._accion(id, jugadorId, accion));
+  async accion(id, jugadorId, accion, token) {
+    const gameId = await this._idCanonico(id);
+    await this.verificarToken(gameId, jugadorId, token);
+    return this._conCandado(gameId, () => this._accion(id, jugadorId, accion));
   }
 
   async _accion(id, jugadorId, accion) {
@@ -199,7 +217,9 @@ export class MapGameService {
     return { vista: vistaJugador(estado, jugadorId), eventos };
   }
 
-  async vista(id, jugadorId) {
+  async vista(id, jugadorId, token) {
+    const gameId = await this._idCanonico(id);
+    await this.verificarToken(gameId, jugadorId, token);
     const estado = await this._resolver(id);
     if (!estado) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
     return vistaJugador(estado, jugadorId);
