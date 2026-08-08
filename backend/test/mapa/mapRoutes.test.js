@@ -37,13 +37,15 @@ describe('mapRoutes', () => {
       .post(`/api/map/${id}/unirse`)
       .send({ id: 'p1', nombre: 'A', civilizacion: 'Incas' });
     expect(resUnirse1.status).toBe(200);
-    expect(resUnirse1.body.jugadores.some(j => j.id === 'p1')).toBe(true);
+    expect(resUnirse1.body.vista.jugadores.some(j => j.id === 'p1')).toBe(true);
+    expect(resUnirse1.body.token).toMatch(/^[0-9a-f]{64}$/);
+    const tokenP1 = resUnirse1.body.token;
 
     const resUnirse2 = await request(app)
       .post(`/api/map/${id}/unirse`)
       .send({ id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
     expect(resUnirse2.status).toBe(200);
-    expect(resUnirse2.body.jugadores.some(j => j.id === 'p2')).toBe(true);
+    expect(resUnirse2.body.vista.jugadores.some(j => j.id === 'p2')).toBe(true);
 
     const resIniciar = await request(app).post(`/api/map/${id}/iniciar`);
     expect(resIniciar.status).toBe(200);
@@ -52,6 +54,7 @@ describe('mapRoutes', () => {
     // el primer jugador en unirse (p1) es quien arranca
     const resAccion = await request(app)
       .post(`/api/map/${id}/accion`)
+      .set('X-Jugador-Token', tokenP1)
       .send({ jugadorId: 'p1', tipo: 'terminarTurno' });
     expect(resAccion.status).toBe(200);
     expect(resAccion.body).toHaveProperty('vista');
@@ -64,12 +67,14 @@ describe('mapRoutes', () => {
     const resCrear = await request(app).post('/api/map').send({ nombre: 'T', semilla: 's1' });
     const { id } = resCrear.body;
     await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p1', nombre: 'A', civilizacion: 'Incas' });
-    await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
+    const resUnirse2 = await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
+    const tokenP2 = resUnirse2.body.token;
     await request(app).post(`/api/map/${id}/iniciar`);
 
-    // p2 no es el jugador actual (p1 empieza) -> NO_ES_TU_TURNO
+    // p2 no es el jugador actual (p1 empieza) -> NO_ES_TU_TURNO, con SU PROPIO token valido
     const res = await request(app)
       .post(`/api/map/${id}/accion`)
+      .set('X-Jugador-Token', tokenP2)
       .send({ jugadorId: 'p2', tipo: 'terminarTurno' });
 
     expect(res.status).toBe(400);
@@ -77,9 +82,31 @@ describe('mapRoutes', () => {
     expect(res.body).toHaveProperty('mensaje');
   });
 
-  it('GET de un id inexistente devuelve 404', async () => {
+  it('accion sin token o con token incorrecto devuelve 400 con codigo TOKEN_INVALIDO', async () => {
     const { app } = crearServicio();
-    const res = await request(app).get('/api/map/no-existe?jugadorId=p1');
+    const resCrear = await request(app).post('/api/map').send({ nombre: 'T', semilla: 's1' });
+    const { id } = resCrear.body;
+    await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p1', nombre: 'A', civilizacion: 'Incas' });
+    await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
+    await request(app).post(`/api/map/${id}/iniciar`);
+
+    const sinToken = await request(app)
+      .post(`/api/map/${id}/accion`)
+      .send({ jugadorId: 'p1', tipo: 'terminarTurno' });
+    expect(sinToken.status).toBe(400);
+    expect(sinToken.body.codigo).toBe('TOKEN_INVALIDO');
+
+    const tokenFalso = await request(app)
+      .post(`/api/map/${id}/accion`)
+      .set('X-Jugador-Token', 'no-es-un-token-real')
+      .send({ jugadorId: 'p1', tipo: 'terminarTurno' });
+    expect(tokenFalso.status).toBe(400);
+    expect(tokenFalso.body.codigo).toBe('TOKEN_INVALIDO');
+  });
+
+  it('GET de un id inexistente devuelve 404 sin token (no hay token que verificar sobre una partida que no existe)', async () => {
+    const { app } = crearServicio();
+    const res = await request(app).get('/api/map/no-existe?jugadorId=p1').set('X-Jugador-Token', 'x');
     expect(res.status).toBe(404);
     expect(res.body).toHaveProperty('codigo');
     expect(res.body).toHaveProperty('mensaje');
@@ -94,15 +121,35 @@ describe('mapRoutes', () => {
     expect(res.body.length).toBe(1);
   });
 
+  it('GET sin token o con el token de otro jugador devuelve 400 TOKEN_INVALIDO', async () => {
+    const { app } = crearServicio();
+    const resCrear = await request(app).post('/api/map').send({ nombre: 'T', semilla: 's1' });
+    const { id } = resCrear.body;
+    await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p1', nombre: 'A', civilizacion: 'Incas' });
+    const resUnirse2 = await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
+    const tokenP2 = resUnirse2.body.token;
+    await request(app).post(`/api/map/${id}/iniciar`);
+
+    const sinToken = await request(app).get(`/api/map/${id}?jugadorId=p1`);
+    expect(sinToken.status).toBe(400);
+    expect(sinToken.body.codigo).toBe('TOKEN_INVALIDO');
+
+    // token VALIDO pero de otro jugador (p2) intentando leer la vista de p1
+    const tokenAjeno = await request(app).get(`/api/map/${id}?jugadorId=p1`).set('X-Jugador-Token', tokenP2);
+    expect(tokenAjeno.status).toBe(400);
+    expect(tokenAjeno.body.codigo).toBe('TOKEN_INVALIDO');
+  });
+
   it('fuga de informacion: la vista de p1 no revela la ciudad ni la posicion de p2, ni la semilla', async () => {
     const { app } = crearServicio();
     const resCrear = await request(app).post('/api/map').send({ nombre: 'T', semilla: 'semilla-secreta' });
     const { id } = resCrear.body;
-    await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p1', nombre: 'A', civilizacion: 'Incas' });
+    const resUnirse1 = await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p1', nombre: 'A', civilizacion: 'Incas' });
+    const tokenP1 = resUnirse1.body.token;
     await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
     await request(app).post(`/api/map/${id}/iniciar`);
 
-    const res = await request(app).get(`/api/map/${id}?jugadorId=p1`);
+    const res = await request(app).get(`/api/map/${id}?jugadorId=p1`).set('X-Jugador-Token', tokenP1);
     expect(res.status).toBe(200);
 
     // ningun tile no descubierto por p1 debe traer la clave `ciudad`
