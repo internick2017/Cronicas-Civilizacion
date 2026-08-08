@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { MapGameRepo } from '../../src/db/MapGameRepo.js';
 import { MapGameService } from '../../src/services/MapGameService.js';
 import { ReglaError } from '../../src/domain/mapa/errores.js';
+import { vistaJugador } from '../../src/domain/mapa/reglas/visibilidad.js';
 
 function crearServicio(opts = {}) {
   const db = new Database(':memory:');
@@ -119,5 +120,34 @@ describe('MapGameService', () => {
     const { svc } = crearServicio();
     const { codigo } = await svc.crearPartida({ nombre: 'T' });
     expect(codigo).toMatch(/^[A-Z0-9]{6}$/);
+  });
+
+  it('si repo.guardar falla, el cache NO queda adelantado respecto de la DB', async () => {
+    const { svc, repo } = crearServicio();
+    const { id } = await crearPartidaConDosJugadores(svc);
+
+    const estadoEnDbAntes = repo.cargar(id);
+
+    // Falla la proxima escritura (la que dispara `accion`), simulando un
+    // error transitorio de infraestructura.
+    vi.spyOn(repo, 'guardar').mockImplementationOnce(() => {
+      throw new Error('fallo transitorio de DB');
+    });
+
+    await expect(svc.accion(id, 'p1', { tipo: 'terminarTurno' }))
+      .rejects.toThrow('fallo transitorio de DB');
+
+    // La DB no cambio (el guardar que fallo nunca completo)...
+    const estadoEnDbDespues = repo.cargar(id);
+    expect(estadoEnDbDespues).toEqual(estadoEnDbAntes);
+
+    // ...y una lectura posterior en la MISMA instancia del servicio debe reflejar
+    // eso, no el estado a medio mutar que la escritura fallida intento guardar.
+    const vistaPostFallo = await svc.vista(id, 'p1');
+    const vistaEsperada = vistaJugador(estadoEnDbDespues, 'p1');
+    expect(vistaPostFallo).toEqual(vistaEsperada);
+    // en particular, el turno NO debe haber avanzado (eso es lo que
+    // `terminarTurno` intentaba hacer cuando el guardar fallo)
+    expect(vistaPostFallo.turno).toBe(estadoEnDbAntes.turno);
   });
 });
