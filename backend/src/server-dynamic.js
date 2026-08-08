@@ -15,6 +15,7 @@ import resourceRoutes from './routes/resourceRoutes.js';
 import cityRoutes from './routes/cityRoutes.js';
 import militaryRoutes from './routes/militaryRoutes.js';
 import narrativeRoutes from './routes/narrativeRoutes.js';
+import { crearMapRoutes } from './routes/mapRoutes.js';
 
 // Import socket handlers
 import { handleGameSocket } from './sockets/gameSocket.js';
@@ -26,6 +27,8 @@ import { errorHandler, AppError } from './utils/errors.js';
 import { generalLimiter, apiLimiter, narrativeLimiter } from './middleware/rateLimiter.js';
 import aiService from './services/AIService.js';
 import { GameService } from './services/GameService.js';
+import { MapGameService } from './services/MapGameService.js';
+import { MapGameRepo } from './db/MapGameRepo.js';
 
 function getLanIp() {
   for (const ifaces of Object.values(os.networkInterfaces())) {
@@ -46,26 +49,71 @@ const io = new Server(server, {
 });
 
 // Initialize connections
-let pool, redisClient;
+let pool, redisClient, mapGameService;
+
+/**
+ * Narrador simple para el modo mapa: resume los eventos de la ronda en un
+ * prompt corto y lo manda a la IA existente. Si la IA no esta configurada o
+ * falla, devuelve null - MapGameService ya garantiza que un narrador que
+ * falla nunca rompe una accion (ver `.catch(() => null)` en el servicio).
+ */
+function resumirEventos(eventos) {
+  return eventos
+    .map(e => `${e.tipo}${e.jugadorId ? ` (jugador ${e.jugadorId})` : ''}`)
+    .join(', ');
+}
+
+async function narrarRondaMapa(eventos) {
+  const prompt = `Resumi en un parrafo breve, en prosa narrativa, lo que paso en esta ronda de una partida de estrategia por turnos. Eventos: ${resumirEventos(eventos)}`;
+  return await aiService.generateStoryNarrative(prompt, { mode: 'mapa' });
+}
+
+/**
+ * Emite el estado actualizado de una partida de mapa a la sala PRIVADA de un
+ * jugador (`map:<id>:<jugadorId>`). La sala es por jugador, no por partida:
+ * asi el payload que llega a un socket es unicamente la vista filtrada de su
+ * propio jugador y la niebla de guerra se respeta tambien por socket.
+ */
+function emitirMapa(id, jugadorId, evento, payload) {
+  io.to(`map:${id}:${jugadorId}`).emit(evento, payload);
+}
 
 async function initializeConnections() {
   try {
     // Initialize database
     pool = await getDatabaseConnection();
     logger.info(`✅ Database initialized: ${config.database.type.toUpperCase()}`);
-    
+
     // Initialize cache
     redisClient = await getCacheConnection();
     logger.info(`✅ Cache initialized: ${config.database.type === 'sqlite' ? 'MEMORY' : 'REDIS'}`);
-    
+
     // Make connections available globally
     app.locals.pool = pool;
     app.locals.redisClient = redisClient;
-    
+
     // Initialize GameService with cache client
     const gameService = GameService.getInstance();
     gameService.setCacheClient(redisClient);
-    
+
+    // Initialize the map-mode repo with the DB matching the active engine.
+    let mapGameRepo;
+    if (config.database.type === 'sqlite') {
+      const { db: sqliteDb } = await import('./config/database-sqlite.js');
+      mapGameRepo = new MapGameRepo(sqliteDb, 'sqlite');
+      mapGameRepo.init();
+    } else {
+      mapGameRepo = new MapGameRepo(pool, 'postgres');
+      await mapGameRepo.init();
+    }
+    mapGameService = new MapGameService({
+      repo: mapGameRepo,
+      narrador: narrarRondaMapa,
+      emitir: emitirMapa,
+    });
+    mapRoutesListo = crearMapRoutes(mapGameService);
+    logger.info('✅ Map routes ready: /api/map');
+
     return true;
   } catch (error) {
     logger.error('❌ Failed to initialize connections:', error);
@@ -94,6 +142,18 @@ app.use('/api/cities', cityRoutes);
 app.use('/api/military', militaryRoutes);
 // Use special rate limiter for narrative routes during development
 app.use('/api/narrative', narrativeLimiter, narrativeRoutes);
+
+// Map routes need `mapGameService`, which is only ready once initializeConnections()
+// resolves (it needs the active DB engine). Registration order in Express matters -
+// this must be mounted here, before the catch-all 404 handler below - so we mount a
+// thin gate now and swap in the real router once the service exists.
+let mapRoutesListo = null;
+app.use('/api/map', (req, res, next) => {
+  if (!mapRoutesListo) {
+    return res.status(503).json({ codigo: 'SERVIDOR_INICIANDO', mensaje: 'El servidor todavia esta iniciando' });
+  }
+  return mapRoutesListo(req, res, next);
+});
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -179,7 +239,22 @@ io.on('connection', (socket) => {
   
   // Handle game-related socket events
   handleGameSocket(socket, io);
-  
+
+  // Modo mapa: el cliente se une a la sala PRIVADA de su jugador dentro de la
+  // partida (`map:<id>:<jugadorId>`), no a una sala compartida. Sin jugadorId
+  // no hay sala a la que unirse: un socket sin identidad no debe recibir
+  // ninguna vista.
+  socket.on('map:join', (id, jugadorId) => {
+    if (typeof id === 'string' && id && typeof jugadorId === 'string' && jugadorId) {
+      socket.join(`map:${id}:${jugadorId}`);
+    }
+  });
+  socket.on('map:leave', (id, jugadorId) => {
+    if (typeof id === 'string' && id && typeof jugadorId === 'string' && jugadorId) {
+      socket.leave(`map:${id}:${jugadorId}`);
+    }
+  });
+
   socket.on('disconnect', () => {
     logger.info(`Player disconnected: ${socket.id}`);
   });

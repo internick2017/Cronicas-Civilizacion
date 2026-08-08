@@ -187,6 +187,19 @@ const actionResponse = await fetch('/api/narrative/sessions/session-id/action', 
 })
 ```
 
+## 🗺️ Modo mapa (beta, solo API)
+
+Además del modo narrativo, el backend incluye un modo de estrategia por turnos sobre un mapa de casillas ("modo mapa"). Por ahora **sólo existe como API REST**: no tiene interfaz en el frontend todavía. Las reglas de balance (unidades, edificios, combate, condiciones de victoria) están documentadas en detalle en [`docs/reglas-modo-mapa.md`](docs/reglas-modo-mapa.md).
+
+### Endpoints
+
+- `POST /api/map` - Crear una partida nueva. Body: `{ nombre, semilla, config }`.
+- `GET /api/map` - Listar partidas activas (sólo metadata, no el estado del juego).
+- `POST /api/map/:id/unirse` - Unirse a una partida. Body: `{ id, nombre, civilizacion }`.
+- `POST /api/map/:id/iniciar` - Iniciar la partida (reparte el mapa y arranca el primer turno).
+- `POST /api/map/:id/accion` - Ejecutar una acción de juego. Body: `{ jugadorId, tipo, ...datosDeLaAccion }`, donde `tipo` es una de: `fundarCiudad`, `construir`, `reclutar`, `moverEjercito`, `atacar`, `terminarTurno`.
+- `GET /api/map/:id?jugadorId=` - Obtener la vista del jugador (nunca el mapa completo: siempre filtrada por niebla de guerra).
+
 ## 🎨 Personalización
 
 ### Configurar IA
