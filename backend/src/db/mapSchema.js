@@ -29,6 +29,15 @@ const TABLAS = [
       ['creado', { sqlite: 'DATETIME DEFAULT CURRENT_TIMESTAMP', postgres: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' }],
     ],
   },
+  {
+    nombre: 'map_game_tokens',
+    columnas: [
+      ['game_id', { sqlite: 'TEXT NOT NULL', postgres: 'UUID NOT NULL' }],
+      ['jugador_id', { sqlite: 'TEXT NOT NULL', postgres: 'TEXT NOT NULL' }],
+      ['token_hash', { sqlite: 'TEXT NOT NULL', postgres: 'TEXT NOT NULL' }],
+      ['creado', { sqlite: 'DATETIME DEFAULT CURRENT_TIMESTAMP', postgres: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' }],
+    ],
+  },
 ];
 
 const DIALECTOS_VALIDOS = ['sqlite', 'postgres'];
