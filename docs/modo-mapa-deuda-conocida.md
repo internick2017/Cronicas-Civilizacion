@@ -23,13 +23,12 @@ verificaron cerrados con un probe real contra base de datos, no solo con tests:
 
 ## Pendiente, en orden de prioridad
 
-### 1. Autorización de sockets
+### 1. Autorización de sockets y REST — ✅ resuelto (2026-08-08)
 
-`map:join` acepta cualquier `gameId` + `jugadorId` sin verificar identidad. La fuga estructural
-está cerrada (cada jugador tiene su propia sala y recibe solo su vista), pero quien adivine
-ambos identificadores puede entrar a la sala de otro. Las rutas REST tienen el mismo hueco, igual
-que las rutas del modo narrativo, así que conviene resolverlo de forma pareja para todo el
-proyecto y no solo acá.
+`map:join` acepta un tercer argumento con el token de sesión del jugador (emitido una
+única vez por `unirse`); `POST /:id/accion` y `GET /:id` exigen el header
+`X-Jugador-Token`. Diseño en
+`docs/superpowers/specs/2026-08-08-autorizacion-sockets-mapa-design.md`.
 
 ### 2. Los dos lockfiles se contradicen
 
