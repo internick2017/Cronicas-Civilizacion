@@ -135,6 +135,7 @@ export const entero = (rng, max) => Math.floor(rng() * max);
 - Produces (usado por todas las reglas):
   - `TERRENOS = ['plains','forest','mountains','desert','water','hills']`
   - `RECURSOS = ['food','gold','wood','stone','science','culture']`
+  - `RECURSOS_DE_TILE = ['food','gold','wood','stone']` (los que pueden aparecer en el mapa; science y culture solo se producen en ciudades)
   - `RECURSOS_INICIALES = { food:100, gold:50, wood:80, stone:30, science:0, culture:0 }`
   - `COSTO_CIUDAD = { food:50, wood:30, stone:20 }`
   - `EDIFICIOS = { granary:{costo:{food:30,wood:20}, produccion:{food:3}}, market:{costo:{gold:50,wood:30}, produccion:{gold:5}}, library:{costo:{science:20,stone:40}, produccion:{science:3}}, barracks:{costo:{gold:40,stone:30}, produccion:{}} }`
@@ -279,7 +280,7 @@ describe('posicionesIniciales', () => {
 ```js
 // backend/src/domain/mapa/generarMapa.js
 import { crearRng, entero } from './rng.js';
-import { TERRENOS, RECURSOS } from './constantes.js';
+import { TERRENOS, RECURSOS_DE_TILE } from './constantes.js';
 import { ReglaError } from './errores.js';
 
 const TIERRA = TERRENOS.filter(t => t !== 'water');
@@ -296,7 +297,7 @@ export function generarMapa(semilla, tamano) {
         agua++;
         if (agua > maxAgua) terreno = TIERRA[entero(rng, TIERRA.length)];
       }
-      const recurso = rng() < 0.3 ? RECURSOS[entero(rng, 4)] : null; // solo food/gold/wood/stone en tiles
+      const recurso = rng() < 0.3 ? RECURSOS_DE_TILE[entero(rng, RECURSOS_DE_TILE.length)] : null;
       mapa.push({ x, y, terreno, recurso, dueno: null, ciudad: null, ejercito: null, descubiertoPor: [] });
     }
   }
@@ -740,15 +741,19 @@ export function iniciar(estado) {
 ### Task 7: Reglas de ciudades — fundar y construir
 
 **Files:**
+- Create: `backend/src/domain/mapa/reglas/comun.js`
 - Create: `backend/src/domain/mapa/reglas/ciudades.js`
 - Test: `backend/test/mapa/reglas.ciudades.test.js`
 
 **Interfaces:**
 - Consumes: `tileEn`, `jugadorPorId`, `puedePagar` (Task 4); `COSTO_CIUDAD`, `EDIFICIOS` (Task 2).
-- Produces:
+- Produces en `reglas/comun.js` (lo consumen TODOS los módulos de reglas, Tasks 8-11):
+  - `validarTurno(estado, jugadorId) -> void` — `PARTIDA_NO_ACTIVA`, `NO_ES_TU_TURNO` (compara `estado.jugadores[estado.indiceJugadorActual].id`).
+  - `evento(tipo, estado, jugadorId, datos = {}) -> { tipo, turno: estado.turno, jugadorId, datos }`
+  - `radio1(x, y) -> {x,y}[]` — las 9 posiciones del cuadrado 3x3 centrado (incluye el centro).
+- Produces en `reglas/ciudades.js`:
   - `fundarCiudad(estado, jugadorId, { x, y, nombre }) -> [RecursosGastados, CiudadFundada, TerritorioDescubierto]`
   - `construir(estado, jugadorId, { x, y, edificio }) -> [RecursosGastados, EdificioConstruido]`
-  - Validaciones comunes (helper interno `validarTurno(estado, jugadorId)`): `PARTIDA_NO_ACTIVA`, `NO_ES_TU_TURNO` (compara `estado.jugadores[estado.indiceJugadorActual].id`).
   - Fundar: `POSICION_INVALIDA` (tileEn null o agua), `CASILLA_OCUPADA` (ciudad existente o dueño ajeno), `RECURSOS_INSUFICIENTES`.
   - Construir: `POSICION_INVALIDA`, `CIUDAD_AJENA` (tile sin ciudad propia), `EDIFICIO_DESCONOCIDO`, `EDIFICIO_DUPLICADO`, `RECURSOS_INSUFICIENTES`.
 
@@ -787,16 +792,29 @@ it('fundar fuera del mapa da POSICION_INVALIDA, no TypeError (regresion A5)', ()
 ```
 
 - [ ] **Step 2: Correr y ver fallar.**
-- [ ] **Step 3: Implementar `reglas/ciudades.js`** siguiendo exactamente las validaciones del bloque Interfaces. El helper compartido:
+- [ ] **Step 3: Implementar `reglas/comun.js` y `reglas/ciudades.js`** siguiendo exactamente las validaciones del bloque Interfaces.
 
 ```js
-// dentro de reglas/ciudades.js (y se re-exporta para las otras reglas)
+// backend/src/domain/mapa/reglas/comun.js
+import { ReglaError } from '../errores.js';
+
 export function validarTurno(estado, jugadorId) {
   if (estado.estado !== 'jugando') throw new ReglaError('PARTIDA_NO_ACTIVA', 'La partida no está activa');
   const actual = estado.jugadores[estado.indiceJugadorActual];
   if (!actual || actual.id !== jugadorId) throw new ReglaError('NO_ES_TU_TURNO', 'No es tu turno');
 }
+
+export const evento = (tipo, estado, jugadorId, datos = {}) =>
+  ({ tipo, turno: estado.turno, jugadorId, datos });
+
+export function radio1(x, y) {
+  const tiles = [];
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) tiles.push({ x: x + dx, y: y + dy });
+  return tiles;
+}
 ```
+
+Nota: Task 6 (`reglas/partida.js`) definió `evento` y `radio1` localmente. Al implementar esta task, reemplazar esas definiciones locales por imports de `reglas/comun.js` y confirmar que los tests de Task 6 siguen verdes.
 
 - [ ] **Step 4: Correr y ver pasar.**
 - [ ] **Step 5: Commit** — `git commit -m "feat(mapa): reglas de fundar ciudad y construir edificios"`
@@ -810,7 +828,7 @@ export function validarTurno(estado, jugadorId) {
 - Test: `backend/test/mapa/reglas.militar.test.js`
 
 **Interfaces:**
-- Consumes: `validarTurno` (Task 7), `UNIDADES` (Task 2), helpers Task 4.
+- Consumes: `validarTurno`, `evento`, `radio1` de `reglas/comun.js` (Task 7), `UNIDADES` (Task 2), helpers Task 4.
 - Produces: `reclutar(estado, jugadorId, { x, y, tipo }) -> [RecursosGastados, UnidadReclutada]`.
   - Errores: `POSICION_INVALIDA`, `CIUDAD_AJENA` (solo en tile con ciudad propia — spec: reglas de borde), `CASILLA_OCUPADA` (ya hay ejército), `UNIDAD_DESCONOCIDA`, `REQUIERE_BARRACKS` (cavalry/catapult sin barracks en esa ciudad), `RECURSOS_INSUFICIENTES`, `NO_ES_TU_TURNO`, `PARTIDA_NO_ACTIVA`.
 
@@ -829,7 +847,7 @@ export function validarTurno(estado, jugadorId) {
 - Test: `backend/test/mapa/reglas.movimiento.test.js`
 
 **Interfaces:**
-- Consumes: `validarTurno` (Task 7), helpers Task 4.
+- Consumes: `validarTurno`, `evento`, `radio1` de `reglas/comun.js` (Task 7), helpers Task 4.
 - Produces: `moverEjercito(estado, jugadorId, { desde:{x,y}, hasta:{x,y} }) -> [EjercitoMovido, TerritorioDescubierto, TerritorioReclamado?]`.
   - Reglas (spec, reglas de borde): solo adyacente Manhattan 1; gasta 1 punto; agua intransitable; tile enemigo (dueño ajeno O ejército ajeno O ciudad ajena) prohibido → hay que `atacar`; tile neutral sin dueño se reclama; descubre radio 1 alrededor del destino.
   - Errores: `POSICION_INVALIDA`, `SIN_EJERCITO` (no hay ejército propio en `desde`), `DESTINO_NO_ADYACENTE`, `UNIDAD_SIN_MOVIMIENTO`, `TERRENO_INTRANSITABLE` (agua), `OBJETIVO_INVALIDO` (tile enemigo — mover no es atacar), `CASILLA_OCUPADA` (ejército propio en destino).
@@ -849,7 +867,7 @@ export function validarTurno(estado, jugadorId) {
 - Test: `backend/test/mapa/reglas.combate.test.js`
 
 **Interfaces:**
-- Consumes: `validarTurno` (Task 7), `tirada` (Task 1), `UNIDADES`, `bonoDefensa`, `defensaCiudad`, `BONO_DEFENSA_CIUDAD` (Task 2).
+- Consumes: `validarTurno`, `evento`, `radio1` de `reglas/comun.js` (Task 7), `tirada` (Task 1), `UNIDADES`, `bonoDefensa`, `defensaCiudad`, `BONO_DEFENSA_CIUDAD` (Task 2).
 - Produces: `atacar(estado, jugadorId, { desde:{x,y}, hasta:{x,y} }, rng) -> [CombateResuelto, UnidadDestruida?, CiudadCapturada?]`.
   - Fórmula (spec §3): `poderAtaque = UNIDADES[tipo].ataque * tirada(rng)`; `poderDefensa = base * tirada(rng) * bonoDefensa(terreno) * (ciudadPropia ? BONO_DEFENSA_CIUDAD : 1)` donde `base` = defensa de la unidad defensora, o `defensaCiudad(nivel)` si el tile tiene ciudad sin ejército.
   - Daño: `damageMultiplier = |pA - pD| / max(pA, pD)`; perdedor recibe `max(10, round(50 * damageMultiplier))`; ganador no recibe daño. El atacante consume todo su movimiento (evento `CombateResuelto` lleva `danoAtacante`, `danoDefensor`, `ganador`).
@@ -884,7 +902,7 @@ it('combate determinista: mismo rng, mismo resultado', () => {
 - Test: `backend/test/mapa/reglas.turnos.test.js`
 
 **Interfaces:**
-- Consumes: `validarTurno` (Task 7), `PRODUCCION_BASE_CIUDAD`, `BONO_TERRENO_PRODUCCION`, `EDIFICIOS`, `PORCENTAJE_VICTORIA_DOMINACION` (Task 2).
+- Consumes: `validarTurno`, `evento`, `radio1` de `reglas/comun.js` (Task 7), `PRODUCCION_BASE_CIUDAD`, `BONO_TERRENO_PRODUCCION`, `EDIFICIOS`, `PORCENTAJE_VICTORIA_DOMINACION` (Task 2).
 - Produces: `terminarTurno(estado, jugadorId) -> [eventos]`:
   - Siempre: `TurnoAvanzado { datos:{ indiceJugadorActual, turno } }` — avanza al siguiente jugador **activo**; si vuelve al índice 0, incrementa turno.
   - Solo al cerrar la ronda (cuando vuelve al 0), en este orden: por cada jugador activo `RecursosProducidos` (suma por ciudad: base + bono del terreno del tile + producción de edificios); `JugadorEliminado` por cada jugador activo sin ciudades; `RondaCompletada`; y si corresponde `PartidaTerminada` con `tipoVictoria: 'dominacion'` (≥60% de tiles con dueño) o `'ultimo_en_pie'` (queda 1 activo). La victoria se evalúa AL CIERRE, atribuida al turno actual (cierra M5).
