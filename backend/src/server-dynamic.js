@@ -69,12 +69,13 @@ async function narrarRondaMapa(eventos) {
 }
 
 /**
- * Emite el estado actualizado de una partida de mapa a su sala de socket.io
- * (`map:<id>`). Cada jugador conectado a esa sala recibe el payload que
- * MapGameService arma por jugador (ya filtrado por vistaJugador).
+ * Emite el estado actualizado de una partida de mapa a la sala PRIVADA de un
+ * jugador (`map:<id>:<jugadorId>`). La sala es por jugador, no por partida:
+ * asi el payload que llega a un socket es unicamente la vista filtrada de su
+ * propio jugador y la niebla de guerra se respeta tambien por socket.
  */
-function emitirMapa(id, evento, payload) {
-  io.to(`map:${id}`).emit(evento, payload);
+function emitirMapa(id, jugadorId, evento, payload) {
+  io.to(`map:${id}:${jugadorId}`).emit(evento, payload);
 }
 
 async function initializeConnections() {
@@ -239,13 +240,19 @@ io.on('connection', (socket) => {
   // Handle game-related socket events
   handleGameSocket(socket, io);
 
-  // Modo mapa: el cliente se une a la sala de su partida para recibir
-  // actualizaciones de estado (`emitirMapa` las manda a `map:<id>`).
-  socket.on('map:join', (id) => {
-    if (typeof id === 'string' && id) socket.join(`map:${id}`);
+  // Modo mapa: el cliente se une a la sala PRIVADA de su jugador dentro de la
+  // partida (`map:<id>:<jugadorId>`), no a una sala compartida. Sin jugadorId
+  // no hay sala a la que unirse: un socket sin identidad no debe recibir
+  // ninguna vista.
+  socket.on('map:join', (id, jugadorId) => {
+    if (typeof id === 'string' && id && typeof jugadorId === 'string' && jugadorId) {
+      socket.join(`map:${id}:${jugadorId}`);
+    }
   });
-  socket.on('map:leave', (id) => {
-    if (typeof id === 'string' && id) socket.leave(`map:${id}`);
+  socket.on('map:leave', (id, jugadorId) => {
+    if (typeof id === 'string' && id && typeof jugadorId === 'string' && jugadorId) {
+      socket.leave(`map:${id}:${jugadorId}`);
+    }
   });
 
   socket.on('disconnect', () => {
