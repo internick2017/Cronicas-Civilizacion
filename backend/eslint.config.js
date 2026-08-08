@@ -15,6 +15,7 @@ const nodeGlobals = {
   TextEncoder: 'readonly',
   TextDecoder: 'readonly',
   fetch: 'readonly',
+  structuredClone: 'readonly',
 };
 
 export default [
