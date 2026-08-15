@@ -2030,7 +2030,7 @@ git commit -m "feat(mapa-frontend): camara con zoom y paneo, y animaciones de ca
 - Modify: `frontend/src/components/mapa/MapSession.vue`
 
 **Interfaces:**
-- Consumes: `ejecutarAccion` de `MapSession`, `vista.jugadores` (para los recursos propios).
+- Consumes: `ejecutarAccion` de `MapSession`, `vista.jugadores` (para los recursos propios), y `obtenerConstantes()` de la **task 12** (que se ejecuta ANTES que esta).
 - Produces:
   - `MapDialogo.vue`, props: `titulo: String`, `abierto: Boolean`. Slot por defecto para el contenido. Emite `cerrar`.
   - `MapCiudadMenu.vue`, props: `vista: Object`, `jugadorId: String`, `posicion: Object`. Emite `construir` con `edificio: String`, `reclutar` con `unidad: String`, y `cerrar`.
@@ -2096,28 +2096,16 @@ import { computed } from 'vue'
 const props = defineProps({
   vista: { type: Object, required: true },
   jugadorId: { type: String, required: true },
-  posicion: { type: Object, required: true }
+  posicion: { type: Object, required: true },
+  constantes: { type: Object, required: true } // {edificios: [...], unidades: [...]}
 })
 defineEmits(['construir', 'reclutar', 'cerrar'])
 
-// Estos costos son copia de backend/src/domain/mapa/constantes.js. Se
-// duplican a proposito: sirven para DESHABILITAR botones antes de mandar la
-// accion, no para decidir nada. El backend sigue siendo la autoridad y vuelve
-// a validar todo.
-const EDIFICIOS = [
-  { tipo: 'granary', nombre: 'Granero', costo: { food: 30, wood: 20 } },
-  { tipo: 'market', nombre: 'Mercado', costo: { gold: 50, wood: 30 } },
-  { tipo: 'library', nombre: 'Biblioteca', costo: { science: 20, stone: 40 } },
-  { tipo: 'barracks', nombre: 'Cuartel', costo: { gold: 40, stone: 30 } }
-]
-
-const UNIDADES = [
-  { tipo: 'warrior', nombre: 'Guerrero', ataque: 10, defensa: 8, movimiento: 2, costo: { food: 20, gold: 30, wood: 10 }, requiereBarracks: false },
-  { tipo: 'archer', nombre: 'Arquero', ataque: 15, defensa: 5, movimiento: 2, costo: { food: 15, gold: 25, wood: 15 }, requiereBarracks: false },
-  { tipo: 'spearman', nombre: 'Lancero', ataque: 12, defensa: 15, movimiento: 2, costo: { food: 18, gold: 20, wood: 12 }, requiereBarracks: false },
-  { tipo: 'cavalry', nombre: 'Caballería', ataque: 20, defensa: 12, movimiento: 3, costo: { food: 25, gold: 40, wood: 5 }, requiereBarracks: true },
-  { tipo: 'catapult', nombre: 'Catapulta', ataque: 25, defensa: 3, movimiento: 1, costo: { food: 10, gold: 50, wood: 30, stone: 20 }, requiereBarracks: true }
-]
+// Los costos NO se copian del backend: llegan por prop desde MapSession, que
+// los pide a GET /api/map/constantes (task 12). Una sola fuente de verdad.
+// Sirven solo para DESHABILITAR botones; el backend vuelve a validar todo.
+const EDIFICIOS = computed(() => props.constantes.edificios)
+const UNIDADES = computed(() => props.constantes.unidades)
 
 const tile = computed(() =>
   props.vista.mapa[props.posicion.y * props.vista.config.tamanoMapa + props.posicion.x]
@@ -2268,6 +2256,7 @@ En el template, reemplazar el bloque `edificio-menu-overlay` completo por:
         :vista="vista"
         :jugador-id="jugadorId"
         :posicion="edificioMenuAbierto"
+        :constantes="constantes"
         @construir="construir"
         @reclutar="reclutar"
         @cerrar="cerrarMenuEdificio"
@@ -2524,6 +2513,158 @@ Esperado: sin errores.
 ```bash
 git add frontend/src/components/mapa/MapSession.vue
 git commit -m "feat(mapa-frontend): seleccion de ejercito, movimiento y ataque"
+```
+
+---
+
+## Task 12: Endpoint de constantes del juego
+
+> **Orden de ejecución:** esta task se ejecuta DESPUÉS de la 9 y ANTES de la 10.
+
+**Files:**
+- Modify: `backend/src/routes/mapRoutes.js`
+- Modify: `frontend/src/composables/useMapApi.js`
+- Modify: `frontend/src/components/mapa/MapSession.vue`
+- Test: `backend/test/mapa/mapRoutes.test.js`
+
+**Interfaces:**
+- Consumes: `EDIFICIOS` y `UNIDADES` de `backend/src/domain/mapa/constantes.js`.
+- Produces:
+  - `GET /api/map/constantes` → `{edificios: [{tipo, nombre, costo}], unidades: [{tipo, nombre, ataque, defensa, movimiento, costo, requiereBarracks}]}`. Sin autenticación: son reglas públicas del juego, no estado de partida.
+  - `useMapApi().obtenerConstantes()` → la misma estructura.
+  - `MapSession` expone `constantes` para pasárselo a `MapCiudadMenu`.
+
+**Por qué existe esta task:** el menú de ciudad necesita costos para deshabilitar botones. Copiarlos al frontend crearía dos fuentes de verdad que se desincronizan en silencio en cuanto alguien toque el balance del juego.
+
+- [ ] **Step 1: Escribir el test que falla**
+
+Agregar a `backend/test/mapa/mapRoutes.test.js` (reusando el helper de app que ya tenga el archivo):
+
+```js
+describe('GET /api/map/constantes', () => {
+  it('devuelve edificios y unidades con sus costos', async () => {
+    const res = await request(app).get('/api/map/constantes');
+    expect(res.status).toBe(200);
+
+    const granero = res.body.edificios.find(e => e.tipo === 'granary');
+    expect(granero.costo).toEqual({ food: 30, wood: 20 });
+    expect(typeof granero.nombre).toBe('string');
+
+    const caballeria = res.body.unidades.find(u => u.tipo === 'cavalry');
+    expect(caballeria.requiereBarracks).toBe(true);
+    expect(caballeria.ataque).toBe(20);
+    expect(caballeria.costo).toEqual({ food: 25, gold: 40, wood: 5 });
+
+    expect(res.body.edificios).toHaveLength(4);
+    expect(res.body.unidades).toHaveLength(5);
+  });
+
+  it('no exige token: son reglas publicas, no estado de partida', async () => {
+    const res = await request(app).get('/api/map/constantes');
+    expect(res.status).not.toBe(401);
+  });
+});
+```
+
+- [ ] **Step 2: Correr el test y verlo fallar**
+
+```bash
+cd backend && yarn vitest run test/mapa/mapRoutes.test.js
+```
+
+Esperado: FAIL con 404.
+
+- [ ] **Step 3: Implementar el endpoint**
+
+En `backend/src/routes/mapRoutes.js`, importar las constantes y agregar la ruta **antes** de cualquier ruta con parámetro `/:id`, para que `constantes` no se interprete como un id:
+
+```js
+import { EDIFICIOS, UNIDADES } from '../domain/mapa/constantes.js';
+
+// Nombres en espanol para la interfaz. Viven aca y no en el dominio porque
+// son presentacion, no regla de juego.
+const NOMBRE_EDIFICIO = { granary: 'Granero', market: 'Mercado', library: 'Biblioteca', barracks: 'Cuartel' };
+const NOMBRE_UNIDAD = { warrior: 'Guerrero', archer: 'Arquero', spearman: 'Lancero', cavalry: 'Caballería', catapult: 'Catapulta' };
+```
+
+y dentro de la función que arma el router, antes de las rutas con `:id`:
+
+```js
+  // Reglas publicas del juego. Sin token: no exponen estado de ninguna partida,
+  // y el frontend las necesita para no ofrecer acciones impagables.
+  router.get('/constantes', (_req, res) => {
+    res.json({
+      edificios: Object.entries(EDIFICIOS).map(([tipo, datos]) => ({
+        tipo,
+        nombre: NOMBRE_EDIFICIO[tipo] || tipo,
+        costo: datos.costo
+      })),
+      unidades: Object.entries(UNIDADES).map(([tipo, datos]) => ({
+        tipo,
+        nombre: NOMBRE_UNIDAD[tipo] || tipo,
+        ataque: datos.ataque,
+        defensa: datos.defensa,
+        movimiento: datos.movimiento,
+        costo: datos.costo,
+        requiereBarracks: datos.requiereBarracks
+      }))
+    });
+  });
+```
+
+- [ ] **Step 4: Correr el test y verlo pasar**
+
+```bash
+cd backend && yarn vitest run test/mapa/mapRoutes.test.js
+```
+
+Esperado: PASS. Si el test de "partida no encontrada" con id inventado empieza a fallar, es que `/constantes` quedó después de `/:id`: moverla arriba.
+
+- [ ] **Step 5: Consumirlo desde el frontend**
+
+En `frontend/src/composables/useMapApi.js`, agregar junto a las otras funciones (siguiendo el mismo estilo de llamada con axios que ya usa el archivo):
+
+```js
+  const obtenerConstantes = async () => {
+    const { data } = await api.get('/constantes')
+    return data
+  }
+```
+
+y exportarla en el objeto de retorno.
+
+En `frontend/src/components/mapa/MapSession.vue`:
+
+```js
+const { accion, vista: pedirVista, obtenerConstantes } = useMapApi()
+
+// Reglas del juego (costos, stats). Vienen del backend para no duplicarlas.
+const constantes = ref({ edificios: [], unidades: [] })
+```
+
+y dentro de `onMounted`, antes de conectar el socket:
+
+```js
+  try {
+    constantes.value = await obtenerConstantes()
+  } catch {
+    // Sin constantes el menu de ciudad se muestra vacio; la partida sigue.
+  }
+```
+
+- [ ] **Step 6: Verificar a mano**
+
+```bash
+curl http://localhost:3000/api/map/constantes
+```
+
+Esperado: JSON con `edificios` (4) y `unidades` (5), con costos y `requiereBarracks`.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add backend/src/routes/mapRoutes.js backend/test/mapa/mapRoutes.test.js frontend/src/composables/useMapApi.js frontend/src/components/mapa/MapSession.vue
+git commit -m "feat(mapa): expone constantes del juego por API para no duplicarlas en el frontend"
 ```
 
 ---
