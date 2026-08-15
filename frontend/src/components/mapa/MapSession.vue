@@ -1,6 +1,6 @@
 <!-- frontend/src/components/mapa/MapSession.vue -->
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useMapApi } from '../../composables/useMapApi.js'
 import { useMapSocket } from '../../composables/useMapSocket.js'
 import MapCanvas from './MapCanvas.vue'
@@ -55,13 +55,22 @@ const esMiTurno = computed(() =>
   vista.value.jugadores[vista.value.indiceJugadorActual]?.id === jugadorId
 )
 
-// Adyacentes ortogonales (Manhattan 1), descubiertas, no acuaticas. Es la
-// misma condicion que valida `reglas/movimiento.js` en el backend (distancia
-// Manhattan === 1, movimientoRestante > 0, terreno !== 'water'); aca solo se
-// anticipa para no ofrecer movimientos que van a ser rechazados. La
-// distincion entre mover y atacar (destino enemigo vs. libre) NO se filtra
-// aca: se resuelve en onClickTile, porque ambas acciones comparten las
-// mismas casillas alcanzables (la unica diferencia es si hay un enemigo).
+// Adyacentes ortogonales (Manhattan 1) que el backend va a aceptar. Replica
+// las validaciones de `reglas/movimiento.js` y `reglas/combate.js` (distancia
+// Manhattan === 1, movimientoRestante > 0, destino no acuatico, destino con
+// objetivo enemigo real o libre) para no ofrecer acciones que van a ser
+// rechazadas. La distincion entre mover y atacar NO se filtra aca: se
+// resuelve en onClickTile, porque ambas acciones comparten las mismas
+// casillas alcanzables (la unica diferencia es si hay un enemigo).
+//
+// IMPORTANTE: una casilla en niebla SI es alcanzable. `moverEjercito` no
+// exige que el destino este descubierto; al contrario, mover hacia lo
+// desconocido es el mecanismo de exploracion y de reclamo de territorio (la
+// regla emite TerritorioDescubierto y TerritorioReclamado). Del backend una
+// casilla no descubierta llega como {x, y, descubierto: false}: sin terreno,
+// sin dueno, sin ciudad y sin ejercito. No se puede saber si es agua, y NO se
+// adivina: inferir el terreno oculto filtraria al jugador informacion que la
+// niebla debe ocultar. Se ofrece como candidata y decide el backend.
 const alcanzables = computed(() => {
   if (!seleccion.value || !esMiTurno.value) return []
   const { x, y } = seleccion.value
@@ -76,7 +85,10 @@ const alcanzables = computed(() => {
       const t = vista.value.config.tamanoMapa
       if (p.x < 0 || p.y < 0 || p.x >= t || p.y >= t) return false
       const tile = tileEn(p.x, p.y)
-      if (!tile || !tile.descubierto || tile.terreno === 'water') return false
+      if (!tile) return false
+      // Niebla: sin datos para filtrar nada. Candidata (ver comentario arriba).
+      if (!tile.descubierto) return true
+      if (tile.terreno === 'water') return false
       // Un ejercito propio ya ocupando el destino: movimiento.js lo rechaza
       // con CASILLA_OCUPADA (y no es ataque, asi que tampoco es un objetivo
       // valido). No se ofrece como alcanzable.
@@ -91,6 +103,30 @@ const alcanzables = computed(() => {
       return true
     })
 })
+
+// La seleccion se invalida sola cuando deja de tener sentido: cambio el turno
+// (ya no puede actuar) o el ejercito que estaba seleccionado ya no esta en esa
+// casilla (se movio, murio, o llego una vista nueva por socket). Sin esto el
+// borde blanco queda pintado sobre la casilla durante el turno del rival hasta
+// el proximo click.
+watch(
+  () => {
+    if (!seleccion.value) return null
+    const { x, y } = seleccion.value
+    const tile = tileEn(x, y)
+    return {
+      miTurno: esMiTurno.value,
+      hayEjercitoPropio: Boolean(tile?.ejercito && tile.ejercito.dueno === jugadorId)
+    }
+  },
+  (estadoSeleccion) => {
+    if (!estadoSeleccion) return
+    if (!estadoSeleccion.miTurno || !estadoSeleccion.hayEjercitoPropio) {
+      seleccion.value = null
+      ataqueAbierto.value = null
+    }
+  }
+)
 
 const guardarSesion = () => {
   localStorage.setItem('cronicas-mapa-id', id)
@@ -175,8 +211,14 @@ const onClickTile = (posicion) => {
     seleccion.value = null
   }
 
-  // 2. Ejercito propio: seleccionar.
+  // 2. Ejercito propio: seleccionar. Un ejercito sin movimiento restante NO
+  // se selecciona: no tendria ninguna casilla alcanzable y quedaria marcado
+  // sin poder hacer nada. Se avisa por que en vez de ignorar el click.
   if (tile.ejercito && tile.ejercito.dueno === jugadorId && esMiTurno.value) {
+    if ((tile.ejercito.movimientoRestante ?? 1) <= 0) {
+      emit('error', 'Ese ejército ya no tiene movimiento este turno.')
+      return
+    }
     seleccion.value = { x: posicion.x, y: posicion.y }
     return
   }
