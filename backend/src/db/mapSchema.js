@@ -54,3 +54,11 @@ export function ddl(dialecto) {
 }
 
 export const TABLAS_NOMBRES = TABLAS.map(t => t.nombre);
+
+// Se expone la declaracion completa (no solo los nombres) para que el
+// migrador (ver MapGameRepo.migrar) pueda comparar, tabla por tabla, las
+// columnas declaradas aqui contra las que realmente tiene la base y agregar
+// las que falten. Asi CREATE TABLE IF NOT EXISTS y el migrador comparten una
+// unica fuente de verdad: agregar una columna nueva a este archivo alcanza
+// para que se cree tanto en bases nuevas como en bases existentes.
+export { TABLAS };

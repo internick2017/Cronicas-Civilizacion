@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { ddl } from './mapSchema.js';
+import { ddl, TABLAS } from './mapSchema.js';
 
 // Convierte SQL escrito con placeholders `?` (estilo sqlite) a `$1, $2, ...`
 // (estilo postgres). Permite mantener una sola redaccion de cada query.
@@ -23,9 +23,47 @@ export class MapGameRepo {
     if (this.dialecto === 'sqlite') {
       for (const stmt of statements) this.db.exec(stmt);
       this.db.exec(indiceTokens);
+      return this._migrar();
+    }
+    return Promise.all([...statements, indiceTokens].map(stmt => this.db.query(stmt)))
+      .then(() => this._migrar());
+  }
+
+  // CREATE TABLE IF NOT EXISTS no toca una tabla que ya existia, asi que una
+  // columna nueva agregada a mapSchema.js nunca aparece en una base con datos
+  // previos (bug real: ver commit 8421b5c, jugador_id en map_game_eventos).
+  // Este migrador es GENERAL, no puntual a esa columna: para cada tabla
+  // declarada, compara sus columnas contra las que la base realmente tiene y
+  // agrega (ALTER TABLE ... ADD COLUMN) las que falten. Se resuelve asi en
+  // vez de puntualmente porque va a haber mas cambios de esquema a futuro y
+  // este mismo mecanismo los cubre sin tocar el migrador de nuevo.
+  // Es idempotente: si ya no falta ninguna columna, no ejecuta ningun ALTER.
+  _migrar() {
+    if (this.dialecto === 'sqlite') {
+      for (const tabla of TABLAS) {
+        const existentes = new Set(this.db.prepare(`PRAGMA table_info(${tabla.nombre})`).all().map(c => c.name));
+        for (const [nombre, tipos] of tabla.columnas) {
+          if (!existentes.has(nombre)) {
+            this.db.exec(`ALTER TABLE ${tabla.nombre} ADD COLUMN ${nombre} ${tipos.sqlite}`);
+          }
+        }
+      }
       return;
     }
-    return Promise.all([...statements, indiceTokens].map(stmt => this.db.query(stmt)));
+    return (async () => {
+      for (const tabla of TABLAS) {
+        const res = await this.db.query(
+          'SELECT column_name FROM information_schema.columns WHERE table_name = $1',
+          [tabla.nombre],
+        );
+        const existentes = new Set(res.rows.map(r => r.column_name));
+        for (const [nombre, tipos] of tabla.columnas) {
+          if (!existentes.has(nombre)) {
+            await this.db.query(`ALTER TABLE ${tabla.nombre} ADD COLUMN ${nombre} ${tipos.postgres}`);
+          }
+        }
+      }
+    })();
   }
 
   guardar(estado, codigo) {
