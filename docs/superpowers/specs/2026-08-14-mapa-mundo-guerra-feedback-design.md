@@ -19,6 +19,9 @@ El modo mapa está completo de punta a punta (backend en `master`, frontend en
    escribe en `map_game_eventos.narrativa` y ningún endpoint ni campo de la vista la
    devuelve.
 4. El único narrador es Gemini. Con `GEMINI_API_KEY` vacía la partida queda muda.
+5. El mapa se ve como un boceto: cuadrados de color plano, sin sprites, sin distinguir
+   una ciudad de un ejército más allá de un emoji, y sin forma de recorrer un mapa que
+   puede llegar a 60x60 casillas.
 
 ## Objetivo
 
@@ -28,9 +31,9 @@ final de la partida.
 
 ## Fuera de alcance
 
-- Capa visual avanzada (iconos de terreno, zoom/pan, animaciones). Queda anotada en el
-  backlog como iteración siguiente, y se beneficia de hacerse después de esta.
 - Unidades navales. El mapa sigue siendo intransitable por agua.
+- Perspectiva isométrica. La vista es cenital con tiles cuadrados.
+- Sonido y música.
 - Oponentes controlados por bots o por LLM.
 - Cualquier cosa del sistema legacy (`GameMap.vue`, `useGameApi.js`, `CityService.js`,
   `MilitaryService.js`, `cityRoutes.js`) y del modo narrativo.
@@ -43,6 +46,9 @@ final de la partida.
 | Narrador | Gemini si hay API key; narrador local por plantillas como fallback. Una sola voz por ronda |
 | Control militar | Seleccionar ejército y clickear destino, con casillas válidas resaltadas. Sin drag and drop |
 | Determinismo | Se mantiene: mismo `crearRng` namespaced, misma semilla, mismo mapa |
+| Renderizado | PixiJS (renderizador, no motor de juego) sobre `<canvas>`, reemplazando la grilla de divs |
+| Arte | Sprites CC0 de Kenney (Medieval RTS + Tower Defense Top-Down) |
+| Perspectiva | Cenital con tiles cuadrados, 1 a 1 con la grilla del backend |
 
 ---
 
@@ -117,8 +123,9 @@ namespaced `combate:<semilla>:<turno>:<n>`).
 Estado nuevo `seleccion` en `MapSession.vue`:
 
 - Click en casilla propia con ejército, siendo tu turno → queda seleccionada.
-- `MapGrid.vue` recibe la lista de casillas alcanzables (adyacentes con distancia
-  Manhattan 1, no agua, con movimiento restante) y `MapTile.vue` las pinta con halo.
+- `MapCanvas.vue` (sección 4) recibe la lista de casillas alcanzables (adyacentes con
+  distancia Manhattan 1, no agua, con movimiento restante) y las pinta resaltadas en la
+  capa de superposición.
 - Click en alcanzable vacía → acción `moverEjercito {desde, hasta}`.
 - Click en alcanzable con ejército o ciudad enemiga → diálogo de confirmación que
   muestra atacante contra defensor con los modificadores visibles (bono de terreno,
@@ -182,6 +189,75 @@ simplemente deja de responder a las acciones sin explicar por qué.
 
 ---
 
+## Sección 4 — Capa visual
+
+El mapa hoy es una grilla de `div`s de color plano. El objetivo no es un juego
+comercial, pero sí que se distingan a simple vista el terreno, las ciudades y los
+ejércitos, y que no parezca un dibujo.
+
+### Por qué PixiJS y no Phaser
+
+Toda la lógica vive en el backend: reglas puras, event sourcing, servidor autoritativo.
+No hay físicas, colisiones ni bucle de juego en el cliente. Phaser es un motor completo
+cuyo valor está justo en lo que este proyecto no usa, y además compite con Vue por el
+control del DOM. Lo que hace falta es un renderizador que dibuje sprites a partir de un
+estado y reporte clicks: eso es PixiJS.
+
+### Arte
+
+Sprites CC0 de Kenney: [Medieval RTS](https://kenney.nl/assets/medieval-rts) (estructuras,
+unidades y tiles) y [Tower Defense Top-Down](https://kenney.nl/assets/tower-defense-top-down).
+CC0 permite uso comercial sin atribución y permite redistribuir, así que los PNG se
+versionan en el repo bajo `frontend/public/assets/mapa/`. Se incluye igual un
+`CREDITS.md` con la fuente, por cortesía.
+
+Mapeo de sprites: uno por cada valor de `TERRENOS` (plains, forest, mountains, desert,
+water, hills), uno de ciudad con variante por nivel, y uno por cada unidad de `UNIDADES`
+(warrior, archer, spearman, cavalry, catapult). El color del jugador se aplica como
+tinte sobre el sprite de ciudad y unidad, para que los bandos se distingan sin necesitar
+cinco juegos de arte.
+
+### Componente
+
+`MapCanvas.vue` reemplaza a `MapGrid.vue` y `MapTile.vue`, que se eliminan. Mantiene el
+mismo contrato hacia afuera que ya usa `MapSession.vue`: recibe la vista del jugador y
+emite `click-tile` con `{x, y}`. Toda la integración con Pixi queda encerrada ahí; el
+resto del frontend no sabe que existe un canvas.
+
+Capas de dibujo, de abajo hacia arriba:
+
+1. **Terreno** — un sprite por casilla. Es estático entre turnos, así que se cachea como
+   textura y solo se reconstruye cuando cambia el mapa.
+2. **Territorio** — tinte suave del color del dueño sobre las casillas reclamadas.
+3. **Ciudades y ejércitos** — sprites tinteados por jugador, con una barra de salud sobre
+   el ejército cuando está dañado.
+4. **Superposición de interacción** — casilla seleccionada, casillas alcanzables, casilla
+   bajo el cursor.
+5. **Niebla de guerra** — velo oscuro sobre las casillas no descubiertas, reemplazando el
+   negro plano actual.
+
+### Cámara
+
+Zoom con la rueda del mouse acotado entre límites sensatos, paneo arrastrando sobre una
+zona vacía, y encuadre inicial centrado en la capital propia. Es la razón principal para
+usar canvas: con `tamanoMapa` de hasta 60 el mapa no entra en pantalla y hoy no hay forma
+de recorrerlo.
+
+### Animaciones
+
+Deliberadamente pocas y cortas, para dar sensación de vida sin entorpecer el turno:
+desplazamiento del ejército entre casillas al mover, sacudida y destello en el combate,
+y aparición de la ciudad al fundarse. Se disparan comparando el estado nuevo contra el
+anterior, que es lo que `MapSession` ya recibe por socket.
+
+### Rendimiento
+
+El peor caso es 60x60 = 3600 casillas. Pixi dibuja eso sin problema con la capa de
+terreno cacheada. Si aparece un cuello de botella, la salida conocida es descartar del
+dibujado lo que queda fuera de cámara.
+
+---
+
 ## Verificación
 
 **Backend**, tests automatizados en `backend/test/mapa/` siguiendo la convención
@@ -193,7 +269,9 @@ existente (18 archivos, ~168 casos):
 - Repo: el método de lectura de narrativas.
 
 **Frontend**, verificación manual en navegador por task, que es la convención del
-proyecto (no hay tests de frontend en ningún modo).
+proyecto (no hay tests de frontend en ningún modo). Para el canvas eso incluye revisar
+con dos navegadores en paralelo que los bandos se distingan por color, que la niebla
+oculte lo que debe, y que zoom y paneo respondan en un mapa grande.
 
 **Deuda conocida**: `docs/modo-mapa-deuda-conocida.md` documenta un problema con
 `better-sqlite3` y lockfiles contradictorios que puede impedir ejecutar vitest. Si
@@ -207,5 +285,11 @@ hay verificación posible.
 
 1. Sección 1 (backend aislado, tests primero, no toca la interfaz).
 2. Sección 3 (backend del narrador y la lectura, después la interfaz).
-3. Sección 2 (la más grande de interfaz; se beneficia de que ya exista el diálogo
-   reutilizable y el log para ver los resultados de combate).
+3. Sección 4 (el canvas con terreno, ciudades y ejércitos, sin interacción militar
+   todavía: reemplaza la grilla manteniendo lo que hoy ya se puede hacer).
+4. Sección 2 (la guerra, encima del canvas ya funcionando; se beneficia de que existan
+   el diálogo reutilizable, el log para ver los resultados de combate y las capas de
+   superposición donde resaltar las casillas alcanzables).
+
+El orden importa: la sección 4 se hace antes que la 2 para no construir el resaltado de
+casillas y la selección dos veces, una en divs y otra en canvas.
