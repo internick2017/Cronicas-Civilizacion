@@ -14,6 +14,8 @@ const props = defineProps({
 const emit = defineEmits(['click-tile'])
 
 const TILE = 48 // pixeles por casilla en zoom 1
+const ZOOM_MIN = 0.35
+const ZOOM_MAX = 2.5
 
 const contenedor = ref(null)
 let app = null
@@ -31,6 +33,31 @@ let tamanoAnterior = null
 let claveTerritorioAnterior = null
 let clavePiezasAnterior = null
 let claveNieblaAnterior = null
+
+// Snapshot liviano (no la vista entera, solo lo que animarCambios necesita)
+// del estado de ciudades/ejercitos en la ultima vez que se redibujo la capa
+// de piezas. Se usa exclusivamente para decidir que animar; el diffeo real
+// de "hace falta redibujar" lo sigue haciendo clavePiezasAnterior de arriba.
+let piezasAnterior = null
+
+// Sprites de ciudad actualmente en el mapa, indexados por "x:y". Se
+// reconstruye en cada dibujarPiezas() y le permite a animarCambios() ubicar
+// el sprite recien creado sin comparar por posicion (fragil: dos ciudades
+// nunca comparten x/y, pero comparar floats de x/y invita a bugs sutiles).
+let spritesCiudad = new Map()
+
+// Estado de arrastre del mapa (paneo) vs. click en una casilla. Ver
+// onPointerDown/Move/Up: un click real no debe mover el mouse mas de unos
+// pocos pixeles, si no fue paneo y no debe emitir click-tile.
+let arrastrando = false
+let arrastreInicio = null
+let huboArrastre = false
+
+// Ids de requestAnimationFrame en vuelo (animarEscala/destellar), para poder
+// cancelarlos en onUnmounted. Sin esto, una animacion en curso cuando el
+// jugador sale de la partida sigue corriendo y termina tocando sprites ya
+// destruidos por app.destroy().
+const animacionesActivas = new Set()
 
 // Set de claves "x:y" de las casillas que ya tienen sprite de terreno creado.
 // El terreno es aditivo (ver comentario en actualizarTerreno): una vez que una
@@ -112,6 +139,7 @@ function dibujarPiezas() {
   // vuelo). Sin esto, limpiar(capaPiezas) revienta contra null.
   if (!capaPiezas) return
   limpiar(capaPiezas)
+  spritesCiudad.clear()
   for (const tile of props.vista.mapa) {
     if (!tile.descubierto) continue
 
@@ -123,6 +151,7 @@ function dibujarPiezas() {
       sprite.y = tile.y * TILE
       if (tile.dueno) sprite.tint = colorDeJugador(props.vista.jugadores, tile.dueno)
       capaPiezas.addChild(sprite)
+      spritesCiudad.set(`${tile.x}:${tile.y}`, sprite)
     }
 
     if (tile.ejercito) {
@@ -172,6 +201,115 @@ function dibujarNiebla() {
     g.rect(tile.x * TILE, tile.y * TILE, TILE, TILE).fill({ color: 0x0a0a0f, alpha: 0.96 })
   }
   capaNiebla.addChild(g)
+}
+
+// --- Animaciones --------------------------------------------------------
+
+// Snapshot liviano de ciudades/ejercitos: solo lo que animarCambios necesita
+// para detectar "aparecio" / "perdio salud", no la vista completa (evita un
+// structuredClone caro de un mapa de hasta 60x60 en cada accion).
+function snapshotPiezas(vista) {
+  const mapa = new Map()
+  for (const tile of vista.mapa) {
+    if (!tile.descubierto) continue
+    if (tile.ciudad || tile.ejercito) {
+      mapa.set(`${tile.x}:${tile.y}`, {
+        ciudad: !!tile.ciudad,
+        salud: tile.ejercito ? tile.ejercito.salud : null
+      })
+    }
+  }
+  return mapa
+}
+
+// Compara el estado nuevo contra el snapshot anterior para saber que animar.
+// El backend no manda "que paso", manda "como quedo todo": hay que inferir
+// el evento comparando. Se llama DESPUES de dibujarPiezas(), asi
+// spritesCiudad ya tiene el sprite recien creado para animar.
+function animarCambios(vista, previa) {
+  if (!previa) return // primer dibujado: nada que comparar todavia
+  for (const tile of vista.mapa) {
+    if (!tile.descubierto) continue
+    const clave = `${tile.x}:${tile.y}`
+    const antes = previa.get(clave)
+
+    // Ciudad nueva: aparece creciendo.
+    if (tile.ciudad && !(antes && antes.ciudad)) {
+      const sprite = spritesCiudad.get(clave)
+      if (sprite) animarEscala(sprite, 0.2, 1, 250)
+    }
+
+    // Ejercito danado: destello rojo.
+    if (tile.ejercito && antes && antes.salud != null && tile.ejercito.salud < antes.salud) {
+      destellar(tile.x, tile.y, 0xe74c3c)
+    }
+  }
+}
+
+function animarEscala(sprite, desde, hasta, ms) {
+  const anchoFinal = sprite.width
+  const altoFinal = sprite.height
+  const inicio = performance.now()
+  let rafId = null
+  const paso = () => {
+    rafId = null
+    if (sprite.destroyed) return // componente/capa destruidos a mitad de animacion
+    const t = Math.min(1, (performance.now() - inicio) / ms)
+    const escala = desde + (hasta - desde) * t
+    sprite.width = anchoFinal * escala
+    sprite.height = altoFinal * escala
+    if (t < 1) {
+      rafId = requestAnimationFrame(paso)
+      animacionesActivas.add(rafId)
+    }
+  }
+  paso()
+}
+
+function destellar(x, y, color) {
+  if (!capaOverlay) return
+  const g = new Graphics()
+  g.rect(x * TILE, y * TILE, TILE, TILE).fill({ color, alpha: 0.6 })
+  capaOverlay.addChild(g)
+  const inicio = performance.now()
+  let rafId = null
+  const paso = () => {
+    rafId = null
+    if (g.destroyed) return
+    const t = Math.min(1, (performance.now() - inicio) / 350)
+    g.alpha = 0.6 * (1 - t)
+    if (t < 1) {
+      rafId = requestAnimationFrame(paso)
+      animacionesActivas.add(rafId)
+    } else {
+      g.destroy()
+    }
+  }
+  paso()
+}
+
+// --- Camara: zoom y paneo ------------------------------------------------
+
+function aplicarZoom(delta, centro) {
+  const anterior = mundo.scale.x
+  const nuevo = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, anterior * (delta > 0 ? 0.9 : 1.1)))
+  if (nuevo === anterior) return
+  // Se hace zoom hacia el puntero, no hacia el origen: si no, el mapa se
+  // escapa de la pantalla apenas te acercas.
+  const factor = nuevo / anterior
+  mundo.x = centro.x - (centro.x - mundo.x) * factor
+  mundo.y = centro.y - (centro.y - mundo.y) * factor
+  mundo.scale.set(nuevo)
+}
+
+function centrarEn(x, y) {
+  mundo.x = app.screen.width / 2 - x * TILE * mundo.scale.x
+  mundo.y = app.screen.height / 2 - y * TILE * mundo.scale.y
+}
+
+function capitalPropia() {
+  const tile = props.vista.mapa.find(t => t.descubierto && t.ciudad && t.dueno === props.jugadorId)
+  return tile ? { x: tile.x, y: tile.y } : { x: tamano() / 2, y: tamano() / 2 }
 }
 
 // Claves de comparacion: strings compactos con solo los datos que le importan
@@ -232,7 +370,10 @@ function actualizarDesdeVista() {
   const cp = clavePiezas(vista)
   if (cp !== clavePiezasAnterior) {
     clavePiezasAnterior = cp
+    const previa = piezasAnterior
     dibujarPiezas()
+    animarCambios(vista, previa)
+    piezasAnterior = snapshotPiezas(vista)
   }
 
   const cn = claveNiebla(vista)
@@ -244,7 +385,29 @@ function actualizarDesdeVista() {
 
 // --- Interaccion ------------------------------------------------------
 
+// El paneo y el click en una casilla comparten el mismo gesto (pointer
+// down -> up). Se distinguen por umbral de movimiento: si el puntero se
+// movio mas de unos pixeles entre down y up, fue arrastre y NO se emite
+// click-tile. Sin esto, cada vez que el jugador mueve el mapa se le abriria
+// el dialogo de accion de la casilla donde solto el mouse.
 function onPointerDown(evento) {
+  arrastrando = true
+  huboArrastre = false
+  arrastreInicio = { x: evento.global.x - mundo.x, y: evento.global.y - mundo.y }
+}
+
+function onPointerMove(evento) {
+  if (!arrastrando) return
+  const nx = evento.global.x - arrastreInicio.x
+  const ny = evento.global.y - arrastreInicio.y
+  if (Math.abs(nx - mundo.x) > 3 || Math.abs(ny - mundo.y) > 3) huboArrastre = true
+  mundo.x = nx
+  mundo.y = ny
+}
+
+function onPointerUp(evento) {
+  arrastrando = false
+  if (huboArrastre) return // fue un paneo, no un click en la casilla
   const local = mundo.toLocal(evento.global)
   const x = Math.floor(local.x / TILE)
   const y = Math.floor(local.y / TILE)
@@ -294,15 +457,30 @@ onMounted(async () => {
   app.stage.eventMode = 'static'
   app.stage.hitArea = app.screen
   app.stage.on('pointerdown', onPointerDown)
+  app.stage.on('pointermove', onPointerMove)
+  app.stage.on('pointerup', onPointerUp)
+  app.stage.on('pointerupoutside', () => { arrastrando = false })
+  app.canvas.addEventListener('wheel', (e) => {
+    e.preventDefault()
+    aplicarZoom(e.deltaY, { x: e.offsetX, y: e.offsetY })
+  }, { passive: false })
 
   // Primer dibujado: fuerza las 4 capas (las claves "anterior" arrancan en
   // null, asi que actualizarDesdeVista() las redibuja todas la primera vez).
+  // piezasAnterior sigue siendo null en ese primer paso, asi que
+  // animarCambios() no tiene nada contra que comparar: no tiene sentido
+  // animar la aparicion de todo el mapa al entrar a la partida.
   actualizarDesdeVista()
   dibujarOverlay()
+
+  const capital = capitalPropia()
+  centrarEn(capital.x, capital.y)
 })
 
 onUnmounted(() => {
   desmontado = true
+  animacionesActivas.forEach(id => cancelAnimationFrame(id))
+  animacionesActivas.clear()
   if (app) {
     app.destroy(true, { children: true })
     app = null
