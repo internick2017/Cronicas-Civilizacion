@@ -250,17 +250,21 @@ function animarEscala(sprite, desde, hasta, ms) {
   const anchoFinal = sprite.width
   const altoFinal = sprite.height
   const inicio = performance.now()
-  let rafId = null
+  // idPropio guarda el id del frame que esta por ejecutarse (no el
+  // siguiente): se borra de animacionesActivas apenas ese frame corre, sea
+  // que la animacion siga o termine aca. Si no se borrara, el Set crece para
+  // siempre con ids de frames que ya se ejecutaron y nunca van a cancelarse.
+  let idPropio = null
   const paso = () => {
-    rafId = null
+    if (idPropio !== null) animacionesActivas.delete(idPropio)
     if (sprite.destroyed) return // componente/capa destruidos a mitad de animacion
     const t = Math.min(1, (performance.now() - inicio) / ms)
     const escala = desde + (hasta - desde) * t
     sprite.width = anchoFinal * escala
     sprite.height = altoFinal * escala
     if (t < 1) {
-      rafId = requestAnimationFrame(paso)
-      animacionesActivas.add(rafId)
+      idPropio = requestAnimationFrame(paso)
+      animacionesActivas.add(idPropio)
     }
   }
   paso()
@@ -272,15 +276,15 @@ function destellar(x, y, color) {
   g.rect(x * TILE, y * TILE, TILE, TILE).fill({ color, alpha: 0.6 })
   capaOverlay.addChild(g)
   const inicio = performance.now()
-  let rafId = null
+  let idPropio = null
   const paso = () => {
-    rafId = null
+    if (idPropio !== null) animacionesActivas.delete(idPropio)
     if (g.destroyed) return
     const t = Math.min(1, (performance.now() - inicio) / 350)
     g.alpha = 0.6 * (1 - t)
     if (t < 1) {
-      rafId = requestAnimationFrame(paso)
-      animacionesActivas.add(rafId)
+      idPropio = requestAnimationFrame(paso)
+      animacionesActivas.add(idPropio)
     } else {
       g.destroy()
     }
@@ -390,19 +394,33 @@ function actualizarDesdeVista() {
 // movio mas de unos pixeles entre down y up, fue arrastre y NO se emite
 // click-tile. Sin esto, cada vez que el jugador mueve el mapa se le abriria
 // el dialogo de accion de la casilla donde solto el mouse.
+//
+// OJO (bug real detectado en review): el umbral tiene que medirse contra el
+// punto FIJO donde empezo el gesto (puntoDown), no contra la posicion de
+// mundo actualizada en el evento anterior. Si se compara contra mundo.x/y ya
+// movido, cada pointermove individual vuelve a arrancar de "cero" y un
+// arrastre lento hecho de muchos pasos chicos (cualquier mouse/trackpad de
+// alta frecuencia de reporte) nunca acumula lo suficiente para superar el
+// umbral: huboArrastre queda en false y se emite click-tile igual. Por eso
+// puntoDown guarda la posicion GLOBAL del puntero en el pointerdown y se
+// mantiene fija durante todo el gesto; arrastreInicio, aparte, guarda el
+// offset necesario para mover mundo.
+let puntoDown = null
+
 function onPointerDown(evento) {
   arrastrando = true
   huboArrastre = false
+  puntoDown = { x: evento.global.x, y: evento.global.y }
   arrastreInicio = { x: evento.global.x - mundo.x, y: evento.global.y - mundo.y }
 }
 
 function onPointerMove(evento) {
   if (!arrastrando) return
-  const nx = evento.global.x - arrastreInicio.x
-  const ny = evento.global.y - arrastreInicio.y
-  if (Math.abs(nx - mundo.x) > 3 || Math.abs(ny - mundo.y) > 3) huboArrastre = true
-  mundo.x = nx
-  mundo.y = ny
+  if (Math.abs(evento.global.x - puntoDown.x) > 3 || Math.abs(evento.global.y - puntoDown.y) > 3) {
+    huboArrastre = true
+  }
+  mundo.x = evento.global.x - arrastreInicio.x
+  mundo.y = evento.global.y - arrastreInicio.y
 }
 
 function onPointerUp(evento) {
