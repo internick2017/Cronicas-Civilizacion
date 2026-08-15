@@ -24,6 +24,14 @@ let capaPiezas = null  // ciudades y ejercitos
 let capaOverlay = null // seleccion, alcanzables
 let capaNiebla = null
 
+// Claves usadas para diffear la vista anterior contra la nueva y redibujar
+// solo las capas cuyos datos relevantes realmente cambiaron. Ver comentario
+// en actualizarDesdeVista() para la justificacion de esta estrategia.
+let tamanoAnterior = null
+let claveTerritorioAnterior = null
+let clavePiezasAnterior = null
+let claveNieblaAnterior = null
+
 const tamano = () => props.vista.config.tamanoMapa
 
 // Salud maxima de un tipo de unidad, segun las constantes del backend. Si
@@ -36,6 +44,12 @@ function saludMaximaDe(tipo) {
 // --- Dibujado ---------------------------------------------------------
 
 function limpiar(capa) {
+  // destroy() SIN opciones, a proposito: las texturas vienen de Assets.get()
+  // y son compartidas entre sprites (ej. todos los tiles "plains" usan la
+  // misma textura cacheada por PixiJS). Si se pasara destroy({texture: true})
+  // se destruiria esa textura compartida y romperia cualquier otro sprite del
+  // mapa que todavia la este usando. No "mejorar" esto sin cambiar tambien a
+  // texturas no compartidas por sprite.
   capa.removeChildren().forEach(hijo => hijo.destroy())
 }
 
@@ -66,6 +80,11 @@ function dibujarTerritorio() {
 }
 
 function dibujarPiezas() {
+  // Guarda: el watcher de props.constantes puede disparar esta funcion antes
+  // de que onMounted haya terminado de crear las capas de Pixi (ej. si las
+  // constantes llegan mientras cargarSprites()/app.init() todavia estan en
+  // vuelo). Sin esto, limpiar(capaPiezas) revienta contra null.
+  if (!capaPiezas) return
   limpiar(capaPiezas)
   for (const tile of props.vista.mapa) {
     if (!tile.descubierto) continue
@@ -129,13 +148,69 @@ function dibujarNiebla() {
   capaNiebla.addChild(g)
 }
 
-function redibujar() {
+// Claves de comparacion: strings compactos con solo los datos que le importan
+// a cada capa. Si la clave no cambio respecto de la vista anterior, esa capa
+// ni se toca. Evita reconstruir sprites de casillas que no cambiaron.
+function claveTerritorio(vista) {
+  return vista.mapa.map(t => (t.descubierto && t.dueno) ? `${t.x}:${t.y}:${t.dueno}` : '').join('|')
+}
+function clavePiezas(vista) {
+  return vista.mapa.map(t => {
+    if (!t.descubierto || (!t.ciudad && !t.ejercito)) return ''
+    const c = t.ciudad ? `c${t.dueno || ''}` : ''
+    const e = t.ejercito ? `e${t.ejercito.tipo}${t.ejercito.dueno || ''}:${t.ejercito.salud}` : ''
+    return `${t.x}:${t.y}:${c}${e}`
+  }).join('|')
+}
+function claveNiebla(vista) {
+  return vista.mapa.map(t => (t.descubierto ? '1' : '0')).join('')
+}
+
+// Estrategia de redibujado incremental (CRITICO, ver review de task-8):
+// el watch profundo sobre props.vista se dispara con cada accion de
+// cualquier jugador (llega por socket), y en un mapa de 60x60 eso puede ser
+// muchas veces por minuto. Redibujar TODO el arbol de sprites (destruir +
+// recrear terreno + territorio + piezas + niebla) en cada una de esas
+// actualizaciones es carisimo y ademas innecesario: el terreno jamas cambia
+// despues de generado, y territorio/piezas/niebla normalmente solo cambian
+// en unas pocas casillas por accion (ej. una unidad se mueve, se revela
+// niebla alrededor de un explorador).
+//
+// Se eligio diffear por clave (string derivado de los campos relevantes de
+// cada capa) contra la vista anterior, en vez de reusar/mutar sprites
+// existentes casilla por casilla. Es mas simple de razonar y mantener que un
+// reconciliador tipo virtual-DOM, y ya reduce el costo real de ~O(casillas)
+// objetos Pixi por accion a ~O(casillas) SOLO cuando esa capa especifica
+// cambio, y a practicamente cero cuando no cambio nada en esa capa. La capa
+// de terreno queda directamente fuera del ciclo de actualizacion normal: se
+// dibuja una unica vez (o si cambia el tamano del mapa).
+function actualizarDesdeVista() {
   if (!app) return
-  dibujarTerreno()
-  dibujarTerritorio()
-  dibujarPiezas()
-  dibujarOverlay()
-  dibujarNiebla()
+  const vista = props.vista
+  const tam = vista.config.tamanoMapa
+
+  if (tam !== tamanoAnterior) {
+    tamanoAnterior = tam
+    dibujarTerreno()
+  }
+
+  const ct = claveTerritorio(vista)
+  if (ct !== claveTerritorioAnterior) {
+    claveTerritorioAnterior = ct
+    dibujarTerritorio()
+  }
+
+  const cp = clavePiezas(vista)
+  if (cp !== clavePiezasAnterior) {
+    clavePiezasAnterior = cp
+    dibujarPiezas()
+  }
+
+  const cn = claveNiebla(vista)
+  if (cn !== claveNieblaAnterior) {
+    claveNieblaAnterior = cn
+    dibujarNiebla()
+  }
 }
 
 // --- Interaccion ------------------------------------------------------
@@ -150,15 +225,32 @@ function onPointerDown(evento) {
 
 // --- Ciclo de vida ----------------------------------------------------
 
+// Bandera de desmontaje: onMounted tiene dos await (cargarSprites, app.init)
+// antes de los cuales el jugador puede salir de la partida y desmontar este
+// componente. Si eso pasa, onUnmounted corre con app todavia null y no limpia
+// nada; sin esta bandera, el onMounted que sigue en vuelo terminaria creando
+// la Application, haciendo appendChild sobre un ref ya desmontado (o null,
+// crash), y dejando un contexto WebGL vivo que nunca se destruye (fuga de
+// GPU). Se chequea despues de CADA await.
+let desmontado = false
+
 onMounted(async () => {
   await cargarSprites()
+  if (desmontado) return
 
-  app = new Application()
-  await app.init({
+  const nuevaApp = new Application()
+  await nuevaApp.init({
     background: 0x0f1419,
     resizeTo: contenedor.value,
     antialias: false
   })
+  if (desmontado) {
+    // Ya se desmonto mientras esperabamos app.init(): el contexto WebGL ya
+    // fue creado, hay que destruirlo para no dejarlo vivo sin dueno.
+    nuevaApp.destroy(true, { children: true })
+    return
+  }
+  app = nuevaApp
   contenedor.value.appendChild(app.canvas)
 
   mundo = new Container()
@@ -174,17 +266,21 @@ onMounted(async () => {
   app.stage.hitArea = app.screen
   app.stage.on('pointerdown', onPointerDown)
 
-  redibujar()
+  // Primer dibujado: fuerza las 4 capas (las claves "anterior" arrancan en
+  // null, asi que actualizarDesdeVista() las redibuja todas la primera vez).
+  actualizarDesdeVista()
+  dibujarOverlay()
 })
 
 onUnmounted(() => {
+  desmontado = true
   if (app) {
     app.destroy(true, { children: true })
     app = null
   }
 })
 
-watch(() => props.vista, redibujar, { deep: true })
+watch(() => props.vista, actualizarDesdeVista, { deep: true })
 watch(() => [props.seleccion, props.alcanzables], dibujarOverlay, { deep: true })
 watch(() => props.constantes, dibujarPiezas, { deep: true })
 
