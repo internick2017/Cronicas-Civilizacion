@@ -4,6 +4,7 @@ import StoryLobby from './components/StoryLobby.vue'
 import StorySession from './components/StorySession.vue'
 import ModeSelect from './components/mapa/ModeSelect.vue'
 import MapLobby from './components/mapa/MapLobby.vue'
+import MapSession from './components/mapa/MapSession.vue'
 
 // App state
 const currentMode = ref(null) // null | 'narrativo' | 'mapa'
@@ -154,7 +155,12 @@ onMounted(() => {
         v-if="!mapaPartida"
         @partida-unida="handlePartidaUnida"
       />
-      <div v-else class="loading-placeholder">Cargando partida…</div>
+      <MapSession
+        v-else
+        :partida-inicial="mapaPartida"
+        @error="handleError"
+        @salir="mapaPartida = null"
+      />
     </template>
   </div>
 </template>
