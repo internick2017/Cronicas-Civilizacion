@@ -32,6 +32,13 @@ let claveTerritorioAnterior = null
 let clavePiezasAnterior = null
 let claveNieblaAnterior = null
 
+// Set de claves "x:y" de las casillas que ya tienen sprite de terreno creado.
+// El terreno es aditivo (ver comentario en actualizarTerreno): una vez que una
+// casilla se descubre nunca vuelve a ocultarse, asi que no hace falta volver a
+// dibujarla. Este set es lo que permite distinguir "ya tiene sprite" de
+// "todavia no", sin comparar contra la vista anterior completa.
+let terrenoDibujado = null
+
 const tamano = () => props.vista.config.tamanoMapa
 
 // Salud maxima de un tipo de unidad, segun las constantes del backend. Si
@@ -53,10 +60,28 @@ function limpiar(capa) {
   capa.removeChildren().forEach(hijo => hijo.destroy())
 }
 
-function dibujarTerreno() {
+// Reconstruccion completa de la capa de terreno: destruye todos los sprites
+// existentes y arranca de cero. Solo corresponde usar esto cuando el mapa en
+// si cambio (tamano distinto / otra partida), nunca en el ciclo normal de
+// actualizacion por accion (ver actualizarTerreno mas abajo).
+function dibujarTerrenoCompleto() {
   limpiar(capaTerreno)
+  terrenoDibujado = new Set()
+  actualizarTerreno()
+}
+
+// El terreno es ADITIVO: una casilla descubierta nunca vuelve a ocultarse
+// (a diferencia de territorio/piezas/niebla, que si pueden cambiar de un lado
+// a otro). Por eso no hace falta diffear con clave ni reconstruir la capa en
+// cada actualizacion: alcanza con recorrer la vista y agregar sprite SOLO
+// para las casillas descubiertas que todavia no tienen uno (rastreado en
+// terrenoDibujado). Esto es lo que corrige el bug de "agujeros negros" al
+// explorar sin reintroducir el costo de redibujar todo el mapa por accion.
+function actualizarTerreno() {
   for (const tile of props.vista.mapa) {
     if (!tile.descubierto) continue
+    const clave = `${tile.x}:${tile.y}`
+    if (terrenoDibujado.has(clave)) continue
     const url = SPRITE_TERRENO[tile.terreno]
     if (!url) continue
     const sprite = new Sprite(Assets.get(url))
@@ -65,6 +90,7 @@ function dibujarTerreno() {
     sprite.x = tile.x * TILE
     sprite.y = tile.y * TILE
     capaTerreno.addChild(sprite)
+    terrenoDibujado.add(clave)
   }
 }
 
@@ -182,8 +208,9 @@ function claveNiebla(vista) {
 // reconciliador tipo virtual-DOM, y ya reduce el costo real de ~O(casillas)
 // objetos Pixi por accion a ~O(casillas) SOLO cuando esa capa especifica
 // cambio, y a practicamente cero cuando no cambio nada en esa capa. La capa
-// de terreno queda directamente fuera del ciclo de actualizacion normal: se
-// dibuja una unica vez (o si cambia el tamano del mapa).
+// de terreno usa una estrategia distinta (aditiva, ver actualizarTerreno):
+// se reconstruye entera solo si cambia el tamano del mapa, y en el resto de
+// los casos solo se agregan sprites para las casillas recien descubiertas.
 function actualizarDesdeVista() {
   if (!app) return
   const vista = props.vista
@@ -191,7 +218,9 @@ function actualizarDesdeVista() {
 
   if (tam !== tamanoAnterior) {
     tamanoAnterior = tam
-    dibujarTerreno()
+    dibujarTerrenoCompleto()
+  } else {
+    actualizarTerreno()
   }
 
   const ct = claveTerritorio(vista)
