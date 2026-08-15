@@ -33,5 +33,7 @@ export function useMapApi() {
 
   const listarPartidas = () => api.get('/')
 
-  return { crearPartida, unirse, iniciar, accion, vista, listarPartidas }
+  const obtenerConstantes = () => api.get('/constantes')
+
+  return { crearPartida, unirse, iniciar, accion, vista, listarPartidas, obtenerConstantes }
 }
