@@ -3,6 +3,7 @@ import { crearRng } from '../rng.js';
 import { jugadorPorId } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
 import { evento, radio1 } from './comun.js';
+import { MIN_JUGADORES } from '../constantes.js';
 
 export function unirse(estado, { id, nombre, civilizacion }) {
   if (estado.estado !== 'esperando') throw new ReglaError('PARTIDA_YA_INICIADA', 'La partida ya inició');
@@ -13,7 +14,7 @@ export function unirse(estado, { id, nombre, civilizacion }) {
 
 export function iniciar(estado) {
   if (estado.estado !== 'esperando') throw new ReglaError('PARTIDA_YA_INICIADA', 'La partida ya inició');
-  if (estado.jugadores.length < 2) throw new ReglaError('JUGADORES_INSUFICIENTES', 'Se necesitan al menos 2 jugadores');
+  if (estado.jugadores.length < MIN_JUGADORES) throw new ReglaError('JUGADORES_INSUFICIENTES', `Se necesitan al menos ${MIN_JUGADORES} jugadores`);
   const rng = crearRng(`inicio:${estado.semilla}`);
   const pos = posicionesIniciales(estado.mapa, estado.config.tamanoMapa, estado.jugadores.length, rng);
   const eventos = [{ tipo: 'PartidaIniciada', turno: 1, jugadorId: null, datos: {} }];

@@ -107,6 +107,12 @@ export const PRODUCCION_BASE_CIUDAD = {
 
 export const PORCENTAJE_VICTORIA_DOMINACION = 0.6;
 
+// Cantidad minima de jugadores para poder iniciar una partida (ver
+// reglas/partida.js#iniciar). Vive aca, junto al resto de las constantes
+// publicas del juego, para que el frontend pueda leerla de /api/map/constantes
+// en vez de tener que adivinarla o copiarla a mano.
+export const MIN_JUGADORES = 2;
+
 export const BONO_DEFENSA_CIUDAD = 1.5;
 
 // Helper functions for terrain and city defense bonuses

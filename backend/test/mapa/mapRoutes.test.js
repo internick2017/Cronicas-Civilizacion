@@ -227,4 +227,10 @@ describe('GET /api/map/constantes', () => {
     const res = await request(app).get('/api/map/constantes');
     expect(res.status).not.toBe(401);
   });
+
+  it('incluye el minimo de jugadores para iniciar', async () => {
+    const { app } = crearServicio();
+    const res = await request(app).get('/api/map/constantes');
+    expect(res.body.minJugadores).toBe(2);
+  });
 });
