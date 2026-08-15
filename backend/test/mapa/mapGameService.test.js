@@ -114,6 +114,28 @@ describe('MapGameService', () => {
     expect(eventosPasados.some(e => e.tipo === 'RondaCompletada')).toBe(true);
   });
 
+  it('narrador recibe TODOS los eventos de la ronda, no solo los de terminarTurno', async () => {
+    const narrador = vi.fn().mockResolvedValue('una narrativa cualquiera');
+    const { svc } = crearServicio({ narrador });
+    const { id, tokenP1, tokenP2 } = await crearPartidaConDosJugadores(svc);
+
+    // p1 recluta una unidad en su capital antes de terminar el turno: ese
+    // evento (UnidadReclutada) ocurre ANTES del terminarTurno que cierra la
+    // ronda, asi que el narrador tiene que verlo igual.
+    const vistaP1 = await svc.vista(id, 'p1', tokenP1);
+    const capitalP1 = vistaP1.mapa.find(t => t.ciudad && t.dueno === 'p1');
+    await svc.accion(id, 'p1', { tipo: 'reclutar', x: capitalP1.x, y: capitalP1.y, unidad: 'warrior' }, tokenP1);
+    await svc.accion(id, 'p1', { tipo: 'terminarTurno' }, tokenP1);
+    await svc.accion(id, 'p2', { tipo: 'terminarTurno' }, tokenP2); // cierra la ronda
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(narrador).toHaveBeenCalledTimes(1);
+    const eventosPasados = narrador.mock.calls[0][0];
+    expect(eventosPasados.some(e => e.tipo === 'UnidadReclutada')).toBe(true);
+    expect(eventosPasados.some(e => e.tipo === 'RondaCompletada')).toBe(true);
+  });
+
   it('un narrador que rechaza NO rompe la accion', async () => {
     const narrador = vi.fn().mockRejectedValue(new Error('IA caida'));
     const { svc } = crearServicio({ narrador });

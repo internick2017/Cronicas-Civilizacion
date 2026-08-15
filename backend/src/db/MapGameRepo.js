@@ -64,8 +64,8 @@ export class MapGameRepo {
 
   agregarEventos(gameId, eventos) {
     const sql = `
-      INSERT INTO map_game_eventos (game_id, turno, orden, tipo, datos_json)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO map_game_eventos (game_id, turno, orden, tipo, jugador_id, datos_json)
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
     if (this.dialecto === 'sqlite') {
       const siguienteOrden = this.db
@@ -74,7 +74,7 @@ export class MapGameRepo {
       const stmt = this.db.prepare(sql);
       const insertarTodos = this.db.transaction((filas) => {
         filas.forEach((evento, i) => {
-          stmt.run(gameId, evento.turno, siguienteOrden + i, evento.tipo, JSON.stringify(evento.datos));
+          stmt.run(gameId, evento.turno, siguienteOrden + i, evento.tipo, evento.jugadorId ?? null, JSON.stringify(evento.datos));
         });
       });
       insertarTodos(eventos);
@@ -87,7 +87,7 @@ export class MapGameRepo {
       );
       let orden = actual.rows[0].n;
       for (const evento of eventos) {
-        await this.db.query(adaptarPlaceholders(sql), [gameId, evento.turno, orden, evento.tipo, JSON.stringify(evento.datos)]);
+        await this.db.query(adaptarPlaceholders(sql), [gameId, evento.turno, orden, evento.tipo, evento.jugadorId ?? null, JSON.stringify(evento.datos)]);
         orden += 1;
       }
     })();
@@ -99,6 +99,27 @@ export class MapGameRepo {
       return this.db.prepare(sql).all(gameId);
     }
     return this.db.query(adaptarPlaceholders(sql), [gameId]).then(res => res.rows);
+  }
+
+  // Devuelve los eventos de UNA ronda (mismo `turno`) ya reconstruidos con la
+  // forma que espera el narrador: {tipo, jugadorId, datos}. Todas las acciones
+  // de todos los jugadores que ocurrieron mientras esa ronda estaba abierta
+  // comparten el mismo `turno` (ver evento() en reglas/comun.js: usa
+  // estado.turno, que solo avanza al CERRAR la ronda), asi que filtrar por
+  // turno alcanza para juntar todo lo que paso en la ronda, no solo la ultima
+  // accion (que siempre es terminarTurno, cuyos eventos son de contabilidad).
+  eventosDeRonda(gameId, turno) {
+    const sql = 'SELECT * FROM map_game_eventos WHERE game_id = ? AND turno = ? ORDER BY orden ASC';
+    const mapear = (filas) => filas.map(f => ({
+      tipo: f.tipo,
+      turno: f.turno,
+      jugadorId: f.jugador_id,
+      datos: JSON.parse(f.datos_json),
+    }));
+    if (this.dialecto === 'sqlite') {
+      return mapear(this.db.prepare(sql).all(gameId, turno));
+    }
+    return this.db.query(adaptarPlaceholders(sql), [gameId, turno]).then(res => mapear(res.rows));
   }
 
   guardarNarrativa(gameId, turno, narrativa) {

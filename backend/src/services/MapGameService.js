@@ -206,7 +206,14 @@ export class MapGameService {
     const cerroRonda = eventos.some(e => e.tipo === 'RondaCompletada');
     if (cerroRonda && this.narrador) {
       const turnoRonda = eventos.find(e => e.tipo === 'RondaCompletada').turno;
-      Promise.resolve(this.narrador(eventos, estado.jugadores))
+      // Se narra la RONDA completa, no solo la ultima accion: esta ultima siempre
+      // es terminarTurno (eventos de contabilidad, que el narrador no narra), y
+      // todo lo interesante (fundaciones, construcciones, combates) ocurrio en
+      // acciones anteriores de la misma ronda. Esa lectura a la DB queda DENTRO
+      // de esta cadena protegida por el .catch de abajo: si falla, se cae al
+      // mismo lugar que un fallo de narracion y nunca rompe la partida.
+      Promise.resolve(this.repo.eventosDeRonda(estado.id, turnoRonda))
+        .then(eventosRonda => this.narrador(eventosRonda, estado.jugadores))
         .then(async (narrativa) => {
           if (!narrativa) return;
           await this.repo.guardarNarrativa(estado.id, turnoRonda, narrativa);
