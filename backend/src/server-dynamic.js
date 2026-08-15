@@ -30,7 +30,7 @@ import aiService from './services/AIService.js';
 import { GameService } from './services/GameService.js';
 import { MapGameService } from './services/MapGameService.js';
 import { MapGameRepo } from './db/MapGameRepo.js';
-import { narrarRonda } from './domain/mapa/narradorLocal.js';
+import { narrarRondaMapa as narrarRondaMapaImpl } from './domain/mapa/narracionRonda.js';
 
 function getLanIp() {
   for (const ifaces of Object.values(os.networkInterfaces())) {
@@ -53,28 +53,11 @@ const io = new Server(server, {
 // Initialize connections
 let pool, redisClient, mapGameService;
 
-/**
- * Narrador simple para el modo mapa: resume los eventos de la ronda en un
- * prompt corto y lo manda a la IA existente. Si la IA no esta configurada o
- * falla, devuelve null - MapGameService ya garantiza que un narrador que
- * falla nunca rompe una accion (ver `.catch(() => null)` en el servicio).
- */
-function resumirEventos(eventos) {
-  return eventos
-    .map(e => `${e.tipo}${e.jugadorId ? ` (jugador ${e.jugadorId})` : ''}`)
-    .join(', ');
-}
-
-async function narrarRondaMapa(eventos, jugadores = []) {
-  const prompt = `Resumi en un parrafo breve, en prosa narrativa, lo que paso en esta ronda de una partida de estrategia por turnos. Eventos: ${resumirEventos(eventos)}`;
-  try {
-    const conIa = await aiService.generateStoryNarrative(prompt, { mode: 'mapa' });
-    if (conIa) return conIa;
-  } catch {
-    // sin conexion o sin cuota: cae al narrador local
-  }
-  // Sin GEMINI_API_KEY el modo mapa igual narra. Una sola voz por ronda.
-  return narrarRonda(eventos, jugadores);
+// Ata la bisagra Gemini/narrador-local (definida en domain/mapa/narracionRonda.js)
+// al singleton real de AIService. La logica en si vive fuera de este archivo
+// para poder testearla sin los efectos secundarios de importar server-dynamic.js.
+function narrarRondaMapa(eventos, jugadores = []) {
+  return narrarRondaMapaImpl(eventos, jugadores, aiService);
 }
 
 /**

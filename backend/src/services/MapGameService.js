@@ -10,6 +10,7 @@ import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
 import { atacar } from '../domain/mapa/reglas/combate.js';
 import { terminarTurno } from '../domain/mapa/reglas/turnos.js';
 import { vistaJugador } from '../domain/mapa/reglas/visibilidad.js';
+import logger from '../utils/logger.js';
 
 // Sin caracteres ambiguos necesarios: codigo corto, solo mayusculas y digitos.
 const ALFABETO_CODIGO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -212,7 +213,14 @@ export class MapGameService {
             }
           }
         })
-        .catch(() => null); // la narracion nunca puede romper la partida
+        .catch((error) => {
+          // Se loguea antes de tragar el error: la narracion nunca puede
+          // romper la partida, pero un fallo silencioso es invisible en
+          // produccion. El invariante (nunca romper) se mantiene: seguimos
+          // devolviendo null / sin propagar la excepcion.
+          logger.error('Fallo al narrar/guardar la narrativa de la ronda de mapa:', error);
+          return null;
+        });
     }
 
     // Una emision POR JUGADOR, con SOLO su vista. Antes se mandaba un unico
@@ -222,6 +230,9 @@ export class MapGameService {
     // Invariante: un socket del jugador X nunca recibe la vista de Y.
     // Se adjuntan las narrativas tambien aca para que la vista emitida por
     // socket sea consistente con la que devuelve `vista()` (misma forma).
+    // UNA sola lectura de narrativas por accion, reutilizada para TODOS los
+    // jugadores (loop de abajo) y para el `return` de mas abajo: no se hace
+    // una lectura extra por jugador emitido (N jugadores => 1 lectura, no N).
     const narrativas = await this.repo.narrativasDe(estado.id);
     if (this.emitir) {
       for (const jugador of estado.jugadores) {
