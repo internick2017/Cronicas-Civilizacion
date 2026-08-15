@@ -1,23 +1,46 @@
-import { crearRng, entero } from './rng.js';
-import { TERRENOS, RECURSOS_DE_TILE } from './constantes.js';
+import { entero } from './rng.js';
+import { crearRuido } from './ruido.js';
 import { ReglaError } from './errores.js';
 
-const TIERRA = TERRENOS.filter(t => t !== 'water');
+// Umbrales sobre el campo de elevacion, en [0, 1]. Calibrados para dejar
+// aproximadamente 25-35% de agua con costas irregulares.
+const NIVEL_MAR = 0.42;
+const NIVEL_COLINA = 0.62;
+const NIVEL_MONTANA = 0.78;
+
+// Umbrales sobre el campo de humedad para la tierra baja.
+const HUMEDAD_BOSQUE = 0.6;
+const HUMEDAD_DESIERTO = 0.35;
+
+function terrenoDe(elevacion, humedad) {
+  if (elevacion < NIVEL_MAR) return 'water';
+  if (elevacion >= NIVEL_MONTANA) return 'mountains';
+  if (elevacion >= NIVEL_COLINA) return 'hills';
+  if (humedad >= HUMEDAD_BOSQUE) return 'forest';
+  if (humedad < HUMEDAD_DESIERTO) return 'desert';
+  return 'plains';
+}
 
 export function generarMapa(semilla, tamano) {
-  const rng = crearRng(`mapa:${semilla}`);
+  // Dos campos independientes: el relieve decide mar/colina/montana, la
+  // humedad decide que crece en la tierra baja. Pasos distintos para que los
+  // biomas no calquen la forma del relieve.
+  const elevacion = crearRuido(`elev:${semilla}`, tamano, 4);
+  const humedad = crearRuido(`humedad:${semilla}`, tamano, 6);
+
   const mapa = [];
-  let agua = 0;
-  const maxAgua = Math.floor(tamano * tamano * 0.15);
   for (let y = 0; y < tamano; y++) {
     for (let x = 0; x < tamano; x++) {
-      let terreno = TERRENOS[entero(rng, TERRENOS.length)];
-      if (terreno === 'water') {
-        agua++;
-        if (agua > maxAgua) terreno = TIERRA[entero(rng, TIERRA.length)];
-      }
-      const recurso = rng() < 0.3 ? RECURSOS_DE_TILE[entero(rng, RECURSOS_DE_TILE.length)] : null;
-      mapa.push({ x, y, terreno, recurso, dueno: null, ciudad: null, ejercito: null, descubiertoPor: [] });
+      mapa.push({
+        x,
+        y,
+        terreno: terrenoDe(elevacion(x, y), humedad(x, y)),
+        recurso: null,
+        dueno: null,
+        ciudad: null,
+        ejercito: null,
+        descubiertoPor: []
+      });
     }
   }
   return mapa;
