@@ -106,6 +106,30 @@ export class MapGameRepo {
     return this._ejecutar(sql, [narrativa, gameId, turno]);
   }
 
+  // Lee las ultimas rondas narradas. Hasta ahora la narrativa se escribia y
+  // nunca se leia: sin este metodo el jugador jamas veia el texto.
+  // El GROUP BY evita duplicados cuando una ronda tiene varias filas con la
+  // misma narrativa (una fila por evento de esa ronda, todas actualizadas al
+  // mismo texto por `guardarNarrativa`); es valido tanto en sqlite como en
+  // postgres porque ambas columnas seleccionadas (turno, narrativa) estan en
+  // el GROUP BY, sin columnas sueltas fuera de el.
+  narrativasDe(gameId, limite = 5) {
+    const sql = `
+      SELECT turno, narrativa FROM map_game_eventos
+      WHERE game_id = ? AND narrativa IS NOT NULL
+      GROUP BY turno, narrativa
+      ORDER BY turno ASC
+    `;
+    const mapear = (filas) => filas
+      .map(f => ({ ronda: f.turno, texto: f.narrativa }))
+      .slice(-limite);
+
+    if (this.dialecto === 'sqlite') {
+      return Promise.resolve(mapear(this.db.prepare(sql).all(gameId)));
+    }
+    return this.db.query(adaptarPlaceholders(sql), [gameId]).then(res => mapear(res.rows));
+  }
+
   listarActivas() {
     const sql = 'SELECT id, codigo, estado_json FROM map_games';
     const mapear = (filas) => filas.map(f => {

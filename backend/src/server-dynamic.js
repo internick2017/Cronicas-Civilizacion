@@ -30,6 +30,7 @@ import aiService from './services/AIService.js';
 import { GameService } from './services/GameService.js';
 import { MapGameService } from './services/MapGameService.js';
 import { MapGameRepo } from './db/MapGameRepo.js';
+import { narrarRonda } from './domain/mapa/narradorLocal.js';
 
 function getLanIp() {
   for (const ifaces of Object.values(os.networkInterfaces())) {
@@ -64,9 +65,16 @@ function resumirEventos(eventos) {
     .join(', ');
 }
 
-async function narrarRondaMapa(eventos) {
+async function narrarRondaMapa(eventos, jugadores = []) {
   const prompt = `Resumi en un parrafo breve, en prosa narrativa, lo que paso en esta ronda de una partida de estrategia por turnos. Eventos: ${resumirEventos(eventos)}`;
-  return await aiService.generateStoryNarrative(prompt, { mode: 'mapa' });
+  try {
+    const conIa = await aiService.generateStoryNarrative(prompt, { mode: 'mapa' });
+    if (conIa) return conIa;
+  } catch {
+    // sin conexion o sin cuota: cae al narrador local
+  }
+  // Sin GEMINI_API_KEY el modo mapa igual narra. Una sola voz por ronda.
+  return narrarRonda(eventos, jugadores);
 }
 
 /**
