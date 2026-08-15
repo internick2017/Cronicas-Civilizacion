@@ -192,6 +192,13 @@ describe('GET /api/map/constantes', () => {
     expect(res.body.unidades).toHaveLength(5);
   });
 
+  it('incluye el costo de fundar ciudad', async () => {
+    const { app } = crearServicio();
+    const res = await request(app).get('/api/map/constantes');
+    expect(res.status).toBe(200);
+    expect(res.body.costoCiudad).toEqual({ food: 50, wood: 30, stone: 20 });
+  });
+
   it('no exige token: son reglas publicas, no estado de partida', async () => {
     const { app } = crearServicio();
     const res = await request(app).get('/api/map/constantes');
