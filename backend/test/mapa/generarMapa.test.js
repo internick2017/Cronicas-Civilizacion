@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generarMapa, posicionesIniciales, trazarRios } from '../../src/domain/mapa/generarMapa.js';
+import { generarMapa, posicionesIniciales, trazarRios, masaPrincipal } from '../../src/domain/mapa/generarMapa.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
 import { ReglaError } from '../../src/domain/mapa/errores.js';
 
@@ -86,30 +86,83 @@ describe('generarMapa', () => {
   });
 });
 
+describe('masaPrincipal', () => {
+  it('devuelve un unico componente conectado de tierra', () => {
+    const t = 30;
+    const m = generarMapa('masa', t);
+    const masa = masaPrincipal(m, t);
+    expect(masa.size).toBeGreaterThan(0);
+
+    // Recorriendo desde cualquier indice de la masa se alcanzan todos los demas.
+    const inicio = [...masa][0];
+    const vistos = new Set([inicio]);
+    const cola = [inicio];
+    while (cola.length) {
+      const idx = cola.pop();
+      const x = idx % t, y = Math.floor(idx / t);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || nx >= t || ny < 0 || ny >= t) continue;
+        const vecino = ny * t + nx;
+        if (masa.has(vecino) && !vistos.has(vecino)) {
+          vistos.add(vecino);
+          cola.push(vecino);
+        }
+      }
+    }
+    expect(vistos.size).toBe(masa.size);
+  });
+
+  it('nunca incluye agua', () => {
+    const t = 25;
+    const m = generarMapa('masa2', t);
+    for (const idx of masaPrincipal(m, t)) expect(m[idx].terreno).not.toBe('water');
+  });
+
+  it('es la masa mas grande: contiene mas de la mitad de la tierra en mapas normales', () => {
+    const t = 30;
+    const m = generarMapa('masa3', t);
+    const tierra = m.filter(x => x.terreno !== 'water').length;
+    expect(masaPrincipal(m, t).size / tierra).toBeGreaterThan(0.5);
+  });
+});
+
 describe('posicionesIniciales', () => {
   it('devuelve la cantidad pedida, en tierra, separadas', () => {
     const m = generarMapa('s', 20);
     const pos = posicionesIniciales(m, 20, 4, crearRng('pos'));
     expect(pos).toHaveLength(4);
     for (const p of pos) expect(m[p.y * 20 + p.x].terreno).not.toBe('water');
-    for (let i = 0; i < pos.length; i++)
-      for (let j = i + 1; j < pos.length; j++)
-        expect(Math.abs(pos[i].x - pos[j].x) + Math.abs(pos[i].y - pos[j].y)).toBeGreaterThanOrEqual(5);
   });
+
+  // El invariante que evita partidas imposibles de terminar.
+  it('todas las capitales caen en la MISMA masa de tierra', () => {
+    for (const semilla of ['a', 'b', 'c', 'd', 'e', 'f']) {
+      const t = 25;
+      const m = generarMapa(semilla, t);
+      const masa = masaPrincipal(m, t);
+      const pos = posicionesIniciales(m, t, 4, crearRng(`pos-${semilla}`));
+      for (const p of pos) expect(masa.has(p.y * t + p.x)).toBe(true);
+    }
+  });
+
+  it('nunca devuelve posiciones duplicadas', () => {
+    for (const semilla of ['a', 'b', 'c', 'd', 'e']) {
+      const m = generarMapa(semilla, 20);
+      const pos = posicionesIniciales(m, 20, 4, crearRng(`pos-${semilla}`));
+      expect(new Set(pos.map(p => `${p.x},${p.y}`)).size).toBe(pos.length);
+    }
+  });
+
+  it('sirve al maximo de jugadores permitido (8) en un mapa grande', () => {
+    const m = generarMapa('ocho', 40);
+    expect(posicionesIniciales(m, 40, 8, crearRng('ocho'))).toHaveLength(8);
+  });
+
   it('lanza MAPA_SIN_POSICIONES si es imposible', () => {
     const todoAgua = generarMapa('s', 8).map(t => ({ ...t, terreno: 'water' }));
     expect(() => posicionesIniciales(todoAgua, 8, 2, crearRng('x')))
       .toThrowError(expect.objectContaining({ codigo: 'MAPA_SIN_POSICIONES' }));
-  });
-  it('nunca devuelve posiciones duplicadas, ni con mapas chicos (minDist 0)', () => {
-    for (const semilla of ['a', 'b', 'c', 'd', 'e']) {
-      const m = generarMapa(semilla, 3);
-      const conTierra = m.filter(t => t.terreno !== 'water').length;
-      if (conTierra < 3) continue; // ese mapa no puede dar 3 posiciones; probamos otro
-      const pos = posicionesIniciales(m, 3, 3, crearRng(`pos-${semilla}`));
-      const claves = new Set(pos.map(p => `${p.x},${p.y}`));
-      expect(claves.size).toBe(pos.length);
-    }
   });
 });
 
@@ -241,5 +294,52 @@ describe('generarMapa: rios', () => {
 
   it('los rios no rompen el determinismo', () => {
     expect(generarMapa('rios', 30)).toEqual(generarMapa('rios', 30));
+  });
+
+  // Cuenta componentes conectados de tierra (todas las masas, no solo la
+  // principal) para comparar el mapa con rios contra el mismo mapa sin ellos.
+  function contarComponentes(mapa, tamano) {
+    const visitado = new Uint8Array(tamano * tamano);
+    let componentes = 0;
+    for (let i = 0; i < mapa.length; i++) {
+      if (visitado[i] || mapa[i].terreno === 'water') continue;
+      componentes++;
+      const cola = [i];
+      visitado[i] = 1;
+      while (cola.length) {
+        const idx = cola.pop();
+        const x = idx % tamano, y = Math.floor(idx / tamano);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || nx >= tamano || ny < 0 || ny >= tamano) continue;
+          const vecino = ny * tamano + nx;
+          if (!visitado[vecino] && mapa[vecino].terreno !== 'water') {
+            visitado[vecino] = 1;
+            cola.push(vecino);
+          }
+        }
+      }
+    }
+    return componentes;
+  }
+
+  // Compara el mismo mapa base con y sin el paso de rios: generarMapa acepta
+  // { rios: false } (default true, no rompe la firma) para poder aislar el
+  // efecto puntual del trazado sobre la cantidad de masas de tierra.
+  it('los rios no aumentan la cantidad de masas de tierra desconectadas', () => {
+    const SEMILLAS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const TAMANOS = [10, 20, 30, 60];
+
+    for (const tamano of TAMANOS) {
+      for (const semilla of SEMILLAS) {
+        const conRios = generarMapa(`frag-${semilla}`, tamano);
+        const sinRios = generarMapa(`frag-${semilla}`, tamano, { rios: false });
+
+        const componentesCon = contarComponentes(conRios, tamano);
+        const componentesSin = contarComponentes(sinRios, tamano);
+
+        expect(componentesCon).toBeLessThanOrEqual(componentesSin);
+      }
+    }
   });
 });

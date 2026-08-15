@@ -152,7 +152,11 @@ function terrenoDe(elevacion, humedad, cortes) {
   return 'plains';
 }
 
-export function generarMapa(semilla, tamano) {
+// El parametro `rios` es opcional (default true) para no romper la firma
+// existente. Se usa desde los tests para aislar el efecto del trazado de
+// rios sobre la conectividad del terreno, comparando el mismo mapa base con
+// y sin ese paso.
+export function generarMapa(semilla, tamano, { rios = true } = {}) {
   // Dos campos independientes: el relieve decide mar/colina/montana, la
   // humedad decide que crece en la tierra baja. Pasos distintos para que los
   // biomas no calquen la forma del relieve.
@@ -198,25 +202,77 @@ export function generarMapa(semilla, tamano) {
   }
 
   const rng = crearRng(`mapa:${semilla}`);
-  trazarRios(mapa, tamano, elevacion, cortes.colina, rng);
+  if (rios) trazarRios(mapa, tamano, elevacion, cortes.colina, rng);
   sembrarRecursos(mapa, tamano, rng);
   return mapa;
 }
 
-export function posicionesIniciales(mapa, tamano, cantidad, rng) {
-  const minDist = Math.floor(tamano / 4);
-  const pos = [];
-  for (let intentos = 0; intentos < 500 && pos.length < cantidad; intentos++) {
-    const x = entero(rng, tamano);
-    const y = entero(rng, tamano);
-    const tile = mapa[y * tamano + x];
-    if (tile.terreno === 'water' || tile.ciudad) continue;
-    const noDuplicado = !pos.some(p => p.x === x && p.y === y);
-    const lejos = pos.every(p => Math.abs(p.x - x) + Math.abs(p.y - y) >= minDist);
-    if (noDuplicado && lejos) pos.push({ x, y });
+// Todas las masas de tierra conectadas por vecinos ortogonales. Devuelve la
+// mas grande. Es la unica zona donde se pueden repartir capitales: sin
+// unidades navales, un jugador en otra isla nunca podria ser alcanzado ni
+// alcanzar a nadie, y la partida no podria terminar.
+export function masaPrincipal(mapa, tamano) {
+  const visitado = new Uint8Array(tamano * tamano);
+  let mayor = new Set();
+
+  for (let i = 0; i < mapa.length; i++) {
+    if (visitado[i] || mapa[i].terreno === 'water') continue;
+
+    const componente = new Set();
+    const cola = [i];
+    visitado[i] = 1;
+
+    while (cola.length > 0) {
+      const idx = cola.pop();
+      componente.add(idx);
+      const x = idx % tamano;
+      const y = Math.floor(idx / tamano);
+
+      for (const [dx, dy] of VECINOS) {
+        const nx = x + dx, ny = y + dy;
+        if (!dentro(nx, ny, tamano)) continue;
+        const vecino = ny * tamano + nx;
+        if (visitado[vecino] || mapa[vecino].terreno === 'water') continue;
+        visitado[vecino] = 1;
+        cola.push(vecino);
+      }
+    }
+
+    if (componente.size > mayor.size) mayor = componente;
   }
-  if (pos.length < cantidad) {
+
+  return mayor;
+}
+
+export function posicionesIniciales(mapa, tamano, cantidad, rng) {
+  const masa = masaPrincipal(mapa, tamano);
+  const candidatos = [...masa].filter(idx => !mapa[idx].ciudad);
+  if (candidatos.length < cantidad) {
     throw new ReglaError('MAPA_SIN_POSICIONES', `No hay ${cantidad} posiciones iniciales viables en este mapa`);
   }
-  return pos;
+
+  // Se intenta la separacion ideal y se va aflojando. Antes eran 500 intentos
+  // ciegos con una distancia fija: en mapas ajustados fallaba de mas.
+  const distancias = [
+    Math.floor(tamano / 4),
+    Math.floor(tamano / 5),
+    Math.floor(tamano / 6),
+    2,
+    0
+  ];
+
+  for (const minDist of distancias) {
+    const pos = [];
+    for (let intentos = 0; intentos < 2000 && pos.length < cantidad; intentos++) {
+      const idx = candidatos[entero(rng, candidatos.length)];
+      const x = idx % tamano;
+      const y = Math.floor(idx / tamano);
+      const noDuplicado = !pos.some(p => p.x === x && p.y === y);
+      const lejos = pos.every(p => Math.abs(p.x - x) + Math.abs(p.y - y) >= minDist);
+      if (noDuplicado && lejos) pos.push({ x, y });
+    }
+    if (pos.length === cantidad) return pos;
+  }
+
+  throw new ReglaError('MAPA_SIN_POSICIONES', `No hay ${cantidad} posiciones iniciales viables en este mapa`);
 }
