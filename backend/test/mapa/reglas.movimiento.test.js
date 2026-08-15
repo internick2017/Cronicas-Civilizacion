@@ -9,7 +9,6 @@ import { evento } from '../../src/domain/mapa/reglas/comun.js';
 // Con semilla 's1' la capital de p1 queda en (19,1), terreno forest.
 // Vecinos verificados manualmente: (18,1) forest neutral, (17,1) desert neutral (adyacente a (18,1)),
 // (19,0) plains neutral, (19,2) forest neutral. Ninguno es agua.
-// Tile de agua conocido para esta semilla: (8,0), con vecino de tierra neutral en (9,0) hills.
 let e, capitalP1;
 beforeEach(() => {
   e = crearEstado({ nombre: 'T', semilla: 's1' });
@@ -69,12 +68,11 @@ describe('moverEjercito', () => {
   });
 
   it('a un tile de agua da TERRENO_INTRANSITABLE', () => {
-    // Reubicamos el ejército a mano en (9,0) hills, vecino de agua en (8,0), para esta semilla.
-    tileEn(e, 19, 1).ejercito = null;
-    aplicar(e, [evento('UnidadReclutada', e, 'p1', { x: 9, y: 0, tipo: 'warrior' })]);
-    expect(tileEn(e, 8, 0).terreno).toBe('water');
+    // Forzamos el terreno del destino a agua en vez de depender de que el
+    // generador de mapas produzca agua en una coordenada fija con esta semilla.
+    tileEn(e, 18, 1).terreno = 'water';
 
-    expect(() => moverEjercito(e, 'p1', { desde: { x: 9, y: 0 }, hasta: { x: 8, y: 0 } }))
+    expect(() => moverEjercito(e, 'p1', { desde: { x: 19, y: 1 }, hasta: { x: 18, y: 1 } }))
       .toThrowError(expect.objectContaining({ codigo: 'TERRENO_INTRANSITABLE' }));
   });
 
