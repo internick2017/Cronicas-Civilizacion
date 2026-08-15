@@ -27,7 +27,7 @@ it('round-trip completo: partida jugando sobrevive guardar+cargar identica (anti
 
   // Ejercito reclutado sobre la capital, con salud y movimiento no-default
   // (cubre `tile.ejercito`, exactamente donde reapareceria el bug de `ciudad`).
-  aplicar(e, reclutar(e, 'p1', { x, y, tipo: 'warrior' }));
+  aplicar(e, reclutar(e, 'p1', { x, y, unidad: 'warrior' }));
   const tileConEjercito = tileEn(e, x, y);
   tileConEjercito.ejercito.salud = 37;
   tileConEjercito.ejercito.movimientoRestante = 1;

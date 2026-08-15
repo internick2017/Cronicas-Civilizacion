@@ -252,6 +252,35 @@ describe('MapGameService', () => {
     await expect(svc.vista(id, 'p1', undefined)).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO' });
   });
 
+  it('reclutar a traves del servicio (como la API real) recluta la unidad pedida, no "reclutar"', async () => {
+    // Reproduce el bug real: MapGameService._accion enruta con `accion.tipo`
+    // ('reclutar', 'construir', ...) y pasa el objeto `accion` COMPLETO, sin
+    // modificar, a la regla elegida (ver REGLAS_POR_TIPO). Si la regla
+    // `reclutar` tambien leyera su unidad bajo el nombre `tipo`, ese campo ya
+    // valdria 'reclutar' (el de enrutamiento) y jamas el tipo de unidad
+    // pedido: UNIDADES['reclutar'] no existe, asi que la accion fallaria
+    // SIEMPRE con UNIDAD_DESCONOCIDA sin importar que mande el cliente. Los
+    // tests de reglas/militar.js llaman a reclutar() directo, salteando este
+    // enrutamiento, por eso el bug sobrevivio. Este test pasa por
+    // svc.accion(), igual que la ruta POST /:id/accion real.
+    const { svc } = crearServicio();
+    const { id, tokenP1 } = await crearPartidaConDosJugadores(svc);
+
+    const antes = await svc.vista(id, 'p1', tokenP1);
+    const capital = antes.mapa.find(t => t.ciudad && t.dueno === 'p1');
+
+    const r = await svc.accion(
+      id,
+      'p1',
+      { tipo: 'reclutar', x: capital.x, y: capital.y, unidad: 'warrior' },
+      tokenP1
+    );
+
+    expect(r.eventos.map(e => e.tipo)).toEqual(['RecursosGastados', 'UnidadReclutada']);
+    const tileReclutado = r.vista.mapa.find(t => t.x === capital.x && t.y === capital.y);
+    expect(tileReclutado.ejercito).toMatchObject({ tipo: 'warrior', dueno: 'p1' });
+  });
+
   describe('narrativas en la vista', () => {
     it('la vista incluye las narrativas guardadas de la partida', async () => {
       const { svc, repo } = crearServicio();
