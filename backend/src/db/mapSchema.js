@@ -24,6 +24,9 @@ const TABLAS = [
       ['turno', { sqlite: 'INTEGER NOT NULL', postgres: 'INTEGER NOT NULL' }],
       ['orden', { sqlite: 'INTEGER NOT NULL', postgres: 'INTEGER NOT NULL' }],
       ['tipo', { sqlite: 'TEXT NOT NULL', postgres: 'TEXT NOT NULL' }],
+      // Nullable: hay eventos de contabilidad (RondaCompletada, TurnoAvanzado) cuyo
+      // jugadorId es null porque no son la accion de un jugador en particular.
+      ['jugador_id', { sqlite: 'TEXT', postgres: 'TEXT' }],
       ['datos_json', { sqlite: 'TEXT NOT NULL', postgres: 'TEXT NOT NULL' }],
       ['narrativa', { sqlite: 'TEXT', postgres: 'TEXT' }],
       ['creado', { sqlite: 'DATETIME DEFAULT CURRENT_TIMESTAMP', postgres: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' }],
