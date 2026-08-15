@@ -66,6 +66,13 @@ const animacionesActivas = new Set()
 // "todavia no", sin comparar contra la vista anterior completa.
 let terrenoDibujado = null
 
+// Se pone en true la primera vez que la camara se centra sobre una capital
+// propia real (no el centro de fallback del mapa). Ver comentario en
+// centrarEnCapitalSiCorresponde: sin esta bandera, cada actualizacion de
+// vista volveria a recentrar y pelearia contra el jugador moviendo el mapa
+// a proposito.
+let yaSeCentroEnCapital = false
+
 const tamano = () => props.vista.config.tamanoMapa
 
 // Salud maxima de un tipo de unidad, segun las constantes del backend. Si
@@ -180,6 +187,11 @@ function dibujarPiezas() {
 }
 
 function dibujarOverlay() {
+  // Guarda: igual que en dibujarPiezas, el watcher de seleccion/alcanzables
+  // puede disparar esta funcion antes de que onMounted termine de crear las
+  // capas de Pixi (cargarSprites()/app.init() todavia en vuelo). Sin esto,
+  // limpiar(capaOverlay) revienta contra null.
+  if (!capaOverlay) return
   limpiar(capaOverlay)
   const g = new Graphics()
   for (const pos of props.alcanzables) {
@@ -311,9 +323,42 @@ function centrarEn(x, y) {
   mundo.y = app.screen.height / 2 - y * TILE * mundo.scale.y
 }
 
+// Devuelve null si la capital propia todavia no existe (partida en
+// 'esperando', o el jugador headed con codigo antes de que el anfitrion
+// inicie). A diferencia de antes, NO cae a un fallback del centro del mapa:
+// ese fallback es responsabilidad de quien llama (ver centrarEnCapitalSiCorresponde
+// y recentrar), porque "no hay capital todavia" y "la capital esta en el
+// centro" son cosas distintas y conviene no confundirlas.
 function capitalPropia() {
   const tile = props.vista.mapa.find(t => t.descubierto && t.ciudad && t.dueno === props.jugadorId)
-  return tile ? { x: tile.x, y: tile.y } : { x: tamano() / 2, y: tamano() / 2 }
+  return tile ? { x: tile.x, y: tile.y } : null
+}
+
+// Centra la camara en la capital propia la PRIMERA VEZ que aparece (por
+// ejemplo, quien se unio con codigo entra con la partida en 'esperando', sin
+// ciudad todavia; cuando el anfitrion inicia y su capital aparece en el
+// proximo actualizarDesdeVista, recien ahi hay algo real para centrar). No
+// vuelve a centrar despues de la primera vez: si lo hiciera, pelearia contra
+// el jugador cada vez que el mueve el mapa a proposito (paneo/zoom). El
+// recentrado manual posterior lo cubre el boton (ver recentrar()).
+function centrarEnCapitalSiCorresponde() {
+  if (yaSeCentroEnCapital || !app) return
+  const capital = capitalPropia()
+  if (!capital) return
+  centrarEn(capital.x, capital.y)
+  yaSeCentroEnCapital = true
+}
+
+// Recentrado manual (boton "Ir a mi capital"): siempre centra, sin importar
+// si ya se centro antes. Si todavia no hay capital (partida 'esperando'),
+// cae al centro del mapa en vez de no hacer nada, para que el boton nunca
+// quede sin efecto visible.
+function recentrar() {
+  if (!app) return
+  const capital = capitalPropia()
+  const destino = capital || { x: tamano() / 2, y: tamano() / 2 }
+  centrarEn(destino.x, destino.y)
+  yaSeCentroEnCapital = true
 }
 
 // Claves de comparacion: strings compactos con solo los datos que le importan
@@ -385,6 +430,8 @@ function actualizarDesdeVista() {
     claveNieblaAnterior = cn
     dibujarNiebla()
   }
+
+  centrarEnCapitalSiCorresponde()
 }
 
 // --- Interaccion ------------------------------------------------------
@@ -491,8 +538,18 @@ onMounted(async () => {
   actualizarDesdeVista()
   dibujarOverlay()
 
+  // Si ya hay capital propia (ej. quien crea la partida y la inicia de una),
+  // se centra de entrada. Si no (quien se unio con codigo y todavia esta en
+  // 'esperando'), actualizarDesdeVista() se encarga de centrar apenas
+  // aparezca en una vista posterior; hasta entonces se arranca en el centro
+  // del mapa via recentrar(), mejor que quedar en (0,0).
   const capital = capitalPropia()
-  centrarEn(capital.x, capital.y)
+  if (capital) {
+    centrarEn(capital.x, capital.y)
+    yaSeCentroEnCapital = true
+  } else {
+    centrarEn(tamano() / 2, tamano() / 2)
+  }
 })
 
 onUnmounted(() => {
@@ -509,14 +566,23 @@ watch(() => props.vista, actualizarDesdeVista, { deep: true })
 watch(() => [props.seleccion, props.alcanzables], dibujarOverlay, { deep: true })
 watch(() => props.constantes, dibujarPiezas, { deep: true })
 
-defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app })
+defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar })
 </script>
 
 <template>
-  <div ref="contenedor" class="map-canvas" />
+  <div class="map-canvas-wrap">
+    <div ref="contenedor" class="map-canvas" />
+    <button type="button" class="btn-recentrar" title="Ir a mi capital" @click="recentrar">
+      🏠 Mi capital
+    </button>
+  </div>
 </template>
 
 <style scoped>
+.map-canvas-wrap {
+  position: relative;
+}
+
 .map-canvas {
   width: 100%;
   height: 70vh;
@@ -524,5 +590,22 @@ defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app })
   border-radius: 8px;
   overflow: hidden;
   touch-action: none;
+}
+
+.btn-recentrar {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  background: rgba(15, 20, 25, 0.85);
+  color: #ecf0f1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-recentrar:hover {
+  background: rgba(52, 152, 219, 0.35);
 }
 </style>
