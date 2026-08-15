@@ -49,7 +49,11 @@ describe('mapRoutes', () => {
 
     const resIniciar = await request(app).post(`/api/map/${id}/iniciar`);
     expect(resIniciar.status).toBe(200);
-    expect(resIniciar.body.estado).toBe('jugando');
+    expect(resIniciar.body.iniciada).toBe(true);
+    // iniciar no exige token (ver problema 2 del review) por lo que NO puede
+    // devolver la vista privada de ningun jugador: sin mapa, sin jugadores.
+    expect(resIniciar.body).not.toHaveProperty('mapa');
+    expect(resIniciar.body).not.toHaveProperty('jugadores');
 
     // el primer jugador en unirse (p1) es quien arranca
     const resAccion = await request(app)
@@ -169,6 +173,25 @@ describe('mapRoutes', () => {
     const serializado = JSON.stringify(res.body);
     expect(serializado).not.toContain('semilla-secreta');
     expect(res.body).not.toHaveProperty('semilla');
+  });
+
+  it('POST /:id/iniciar no expone la vista de ningun jugador (sin token, sin mapa)', async () => {
+    const { app } = crearServicio();
+    const resCrear = await request(app).post('/api/map').send({ nombre: 'T', semilla: 'semilla-secreta' });
+    const { id } = resCrear.body;
+    await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p1', nombre: 'A', civilizacion: 'Incas' });
+    await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
+
+    // Se llama sin X-Jugador-Token a proposito: iniciar la partida es una
+    // accion de sala de espera, no requiere credenciales de un jugador
+    // puntual, asi que el endpoint tiene que ser seguro incluso sin token.
+    const resIniciar = await request(app).post(`/api/map/${id}/iniciar`);
+    expect(resIniciar.status).toBe(200);
+    expect(resIniciar.body).not.toHaveProperty('mapa');
+    expect(resIniciar.body).not.toHaveProperty('jugadores');
+    expect(resIniciar.body).not.toHaveProperty('recursos');
+    const serializado = JSON.stringify(resIniciar.body);
+    expect(serializado).not.toContain('semilla-secreta');
   });
 });
 
