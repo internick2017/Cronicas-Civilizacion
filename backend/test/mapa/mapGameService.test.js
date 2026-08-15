@@ -43,15 +43,42 @@ describe('MapGameService', () => {
   it('crear+unirse+iniciar feliz devuelve vista con niebla', async () => {
     const { svc } = crearServicio();
     const { id } = await svc.crearPartida({ nombre: 'Mi Partida' });
-    const { vista: vistaUnion } = await svc.unirse(id, { id: 'p1', nombre: 'A', civilizacion: 'Incas' });
+    const { vista: vistaUnion, token: tokenP1 } = await svc.unirse(id, { id: 'p1', nombre: 'A', civilizacion: 'Incas' });
     expect(vistaUnion.jugadores.some(j => j.id === 'p1')).toBe(true);
     // niebla: la mayoria de tiles no estan descubiertos todavia
     expect(vistaUnion.mapa.some(t => t.descubierto === false)).toBe(true);
 
     await svc.unirse(id, { id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
-    const vistaInicio = await svc.iniciar(id);
+
+    const confirmacion = await svc.iniciar(id);
+    // iniciar() ya NO devuelve una vista privada de ningun jugador (ver
+    // problema 2 del review): solo confirma que la partida arranco. La vista
+    // real se pide despues via svc.vista(id, jugadorId, token), con token.
+    expect(confirmacion.iniciada).toBe(true);
+    expect(confirmacion).not.toHaveProperty('mapa');
+    expect(confirmacion).not.toHaveProperty('jugadores');
+
+    const vistaInicio = await svc.vista(id, 'p1', tokenP1);
     expect(vistaInicio.estado).toBe('jugando');
     expect(vistaInicio.mapa.some(t => t.descubierto === true)).toBe(true);
+  });
+
+  it('iniciar no filtra la vista privada de ningun jugador (problema 2 del review)', async () => {
+    const { svc } = crearServicio();
+    const { id } = await svc.crearPartida({ nombre: 'T', semilla: 'semilla-secreta' });
+    await svc.unirse(id, { id: 'p1', nombre: 'A', civilizacion: 'Incas' });
+    await svc.unirse(id, { id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
+
+    const confirmacion = await svc.iniciar(id);
+
+    // Nada de mapa, ciudades, recursos ni semilla debe viajar en la respuesta
+    // de iniciar: cualquiera que conozca el id de la partida puede llamar a
+    // este endpoint sin token, asi que no puede devolver datos de juego.
+    expect(confirmacion).not.toHaveProperty('mapa');
+    expect(confirmacion).not.toHaveProperty('jugadores');
+    expect(confirmacion).not.toHaveProperty('recursos');
+    const serializado = JSON.stringify(confirmacion);
+    expect(serializado).not.toContain('semilla-secreta');
   });
 
   it('accion con ReglaError no persiste nada (atomicidad)', async () => {

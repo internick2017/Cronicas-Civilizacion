@@ -164,8 +164,14 @@ export class MapGameService {
     aplicar(estado, eventos);
     await this._persistir(estado, eventos);
 
-    const jugadorActual = estado.jugadores[estado.indiceJugadorActual];
-    return vistaJugador(estado, jugadorActual.id);
+    // OJO: nunca devolver vistaJugador(estado, X) aca. Este endpoint no exige
+    // token (arrancar la partida es una accion de "sala de espera", no de un
+    // jugador puntual) y devolver la vista privada de un jugador (aunque sea
+    // solo la del jugador de turno) filtraria mapa descubierto y recursos
+    // ajenos a quien sea que llame a /iniciar, sin credenciales. El frontend
+    // vuelve a pedir el estado via GET /:id (con token) despues de iniciar,
+    // asi que alcanza con una confirmacion minima sin datos de juego.
+    return { iniciada: true, turno: estado.turno };
   }
 
   async accion(id, jugadorId, accion, token) {
