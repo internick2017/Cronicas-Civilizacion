@@ -45,7 +45,7 @@ beforeEach(() => {
   tileEn(e, ax, ay).terreno = 'plains';
   tileEn(e, bx, by).terreno = 'plains';
 
-  aplicar(e, reclutar(e, 'p1', { x: cx, y: cy, tipo: 'warrior' }));
+  aplicar(e, reclutar(e, 'p1', { x: cx, y: cy, unidad: 'warrior' }));
 });
 
 describe('moverEjercito', () => {
