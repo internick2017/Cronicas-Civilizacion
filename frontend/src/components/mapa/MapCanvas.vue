@@ -318,9 +318,54 @@ function aplicarZoom(delta, centro) {
   mundo.scale.set(nuevo)
 }
 
-function centrarEn(x, y) {
+function centrarEn(x, y, zoom) {
+  if (zoom != null) mundo.scale.set(zoom)
   mundo.x = app.screen.width / 2 - x * TILE * mundo.scale.x
   mundo.y = app.screen.height / 2 - y * TILE * mundo.scale.y
+}
+
+// Calcula el rectangulo (en casillas) que contiene todas las casillas
+// descubiertas, con un margen para que no quede pegado al borde de la
+// pantalla, y el zoom que hace entrar ese rectangulo en el lienzo actual
+// (respetando ZOOM_MIN/ZOOM_MAX). Devuelve null si todavia no hay NADA
+// descubierto (partida en 'esperando' antes de que exista la capital): en
+// ese caso no hay rectangulo posible y quien llama debe usar un fallback.
+const MARGEN_ENCUADRE = 1.5 // casillas de aire alrededor de la zona descubierta
+
+function calcularEncuadre() {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const tile of props.vista.mapa) {
+    if (!tile.descubierto) continue
+    if (tile.x < minX) minX = tile.x
+    if (tile.x > maxX) maxX = tile.x
+    if (tile.y < minY) minY = tile.y
+    if (tile.y > maxY) maxY = tile.y
+  }
+  if (minX === Infinity) return null
+
+  const anchoCasillas = (maxX - minX + 1) + MARGEN_ENCUADRE * 2
+  const altoCasillas = (maxY - minY + 1) + MARGEN_ENCUADRE * 2
+  const centroX = (minX + maxX + 1) / 2
+  const centroY = (minY + maxY + 1) / 2
+
+  const zoomAncho = app.screen.width / (anchoCasillas * TILE)
+  const zoomAlto = app.screen.height / (altoCasillas * TILE)
+  const zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.min(zoomAncho, zoomAlto)))
+
+  return { x: centroX, y: centroY, zoom }
+}
+
+// Reencuadra la camara para que la zona descubierta ocupe el lienzo (en vez
+// de arrancar siempre en zoom 1, que deja un parche minusculo de terreno
+// perdido en un mar de niebla). Si todavia no hay nada descubierto, cae al
+// centro del mapa completo sin tocar el zoom.
+function reencuadrarZonaDescubierta() {
+  const encuadre = calcularEncuadre()
+  if (!encuadre) {
+    centrarEn(tamano() / 2, tamano() / 2)
+    return
+  }
+  centrarEn(encuadre.x, encuadre.y, encuadre.zoom)
 }
 
 // Devuelve null si la capital propia todavia no existe (partida en
@@ -345,19 +390,17 @@ function centrarEnCapitalSiCorresponde() {
   if (yaSeCentroEnCapital || !app) return
   const capital = capitalPropia()
   if (!capital) return
-  centrarEn(capital.x, capital.y)
+  reencuadrarZonaDescubierta()
   yaSeCentroEnCapital = true
 }
 
-// Recentrado manual (boton "Ir a mi capital"): siempre centra, sin importar
-// si ya se centro antes. Si todavia no hay capital (partida 'esperando'),
-// cae al centro del mapa en vez de no hacer nada, para que el boton nunca
-// quede sin efecto visible.
+// Recentrado manual (boton "Ir a mi capital"): siempre reencuadra, sin
+// importar si ya se centro antes. Si todavia no hay nada descubierto
+// (partida 'esperando'), reencuadrarZonaDescubierta() cae al centro del
+// mapa, para que el boton nunca quede sin efecto visible.
 function recentrar() {
   if (!app) return
-  const capital = capitalPropia()
-  const destino = capital || { x: tamano() / 2, y: tamano() / 2 }
-  centrarEn(destino.x, destino.y)
+  reencuadrarZonaDescubierta()
   yaSeCentroEnCapital = true
 }
 
@@ -539,13 +582,14 @@ onMounted(async () => {
   dibujarOverlay()
 
   // Si ya hay capital propia (ej. quien crea la partida y la inicia de una),
-  // se centra de entrada. Si no (quien se unio con codigo y todavia esta en
-  // 'esperando'), actualizarDesdeVista() se encarga de centrar apenas
-  // aparezca en una vista posterior; hasta entonces se arranca en el centro
-  // del mapa via recentrar(), mejor que quedar en (0,0).
+  // se reencuadra de entrada sobre la zona descubierta. Si no (quien se unio
+  // con codigo y todavia esta en 'esperando'), actualizarDesdeVista() se
+  // encarga de reencuadrar apenas aparezca en una vista posterior; hasta
+  // entonces se arranca en el centro del mapa completo, mejor que quedar en
+  // (0,0).
   const capital = capitalPropia()
   if (capital) {
-    centrarEn(capital.x, capital.y)
+    reencuadrarZonaDescubierta()
     yaSeCentroEnCapital = true
   } else {
     centrarEn(tamano() / 2, tamano() / 2)
