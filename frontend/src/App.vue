@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import StoryLobby from './components/StoryLobby.vue'
 import StorySession from './components/StorySession.vue'
 import ModeSelect from './components/mapa/ModeSelect.vue'
+import MapLobby from './components/mapa/MapLobby.vue'
 
 // App state
 const currentMode = ref(null) // null | 'narrativo' | 'mapa'
@@ -66,6 +67,13 @@ const clearSavedSession = () => {
 // Methods
 const elegirModo = (modo) => {
   currentMode.value = modo
+}
+
+// Map mode state
+const mapaPartida = ref(null) // { id, codigo, jugadorId, token, vista } | null
+
+const handlePartidaUnida = (datos) => {
+  mapaPartida.value = datos
 }
 
 const handleSessionCreated = (sessionData) => {
@@ -141,9 +149,13 @@ onMounted(() => {
     </template>
 
     <!-- Map mode -->
-    <div v-else-if="currentMode === 'mapa'" class="loading-placeholder">
-      Cargando modo mapa…
-    </div>
+    <template v-else-if="currentMode === 'mapa'">
+      <MapLobby
+        v-if="!mapaPartida"
+        @partida-unida="handlePartidaUnida"
+      />
+      <div v-else class="loading-placeholder">Cargando partida…</div>
+    </template>
   </div>
 </template>
 
