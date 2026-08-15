@@ -22,9 +22,19 @@ const jugadorId = props.partidaInicial.jugadorId
 const token = props.partidaInicial.token
 const vista = ref(props.partidaInicial.vista)
 
-// La narrativa llega por su propio evento porque se genera despues de la
-// accion; el estado que llega por 'estado' todavia no la tiene.
+// La narrativa llega por dos caminos: el evento 'narrativa' (apenas se genera)
+// y el campo 'narrativas' que viaja en el payload de 'estado' y en la vista
+// pedida por REST. Los dos conviven por union (por numero de ronda) para no
+// perder ni duplicar entradas, sin importar cual llegue primero.
 const narrativas = ref(props.partidaInicial.vista?.narrativas || [])
+
+const fusionarNarrativas = (actuales, entrantes) => {
+  const porRonda = new Map(actuales.map((n) => [n.ronda, n]))
+  for (const entrada of entrantes) {
+    if (!porRonda.has(entrada.ronda)) porRonda.set(entrada.ronda, entrada)
+  }
+  return [...porRonda.values()].sort((a, b) => a.ronda - b.ronda)
+}
 
 const edificioMenuAbierto = ref(null) // {x, y} | null
 let pollEspera = null
@@ -52,7 +62,7 @@ const limpiarSesion = () => {
 
 const refrescarVista = async () => {
   vista.value = await pedirVista(id, jugadorId, token)
-  if (vista.value.narrativas) narrativas.value = vista.value.narrativas
+  if (vista.value.narrativas) narrativas.value = fusionarNarrativas(narrativas.value, vista.value.narrativas)
   return vista.value
 }
 
@@ -142,11 +152,11 @@ onMounted(async () => {
     await unirseAPartida(id, jugadorId, token)
     onEstado((payload) => {
       vista.value = payload
+      if (payload.narrativas) narrativas.value = fusionarNarrativas(narrativas.value, payload.narrativas)
       detenerVigilancia()
     })
     onNarrativa((entrada) => {
-      if (narrativas.value.some(n => n.ronda === entrada.ronda)) return
-      narrativas.value = [...narrativas.value, entrada]
+      narrativas.value = fusionarNarrativas(narrativas.value, [entrada])
     })
   } catch {
     // El socket es solo para actualizaciones en vivo; si falla la conexion,
