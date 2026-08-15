@@ -15,7 +15,10 @@ const emit = defineEmits(['click-tile'])
 
 const TILE = 48 // pixeles por casilla en zoom 1
 const ZOOM_MIN = 0.35
-const ZOOM_MAX = 2.5
+// Tope alto a proposito: al empezar solo hay 3x3 casillas descubiertas y con
+// un tope bajo el encuadre no puede acercarse lo suficiente como para que
+// llenen la pantalla.
+const ZOOM_MAX = 4.5
 
 const contenedor = ref(null)
 let app = null
@@ -330,7 +333,10 @@ function centrarEn(x, y, zoom) {
 // (respetando ZOOM_MIN/ZOOM_MAX). Devuelve null si todavia no hay NADA
 // descubierto (partida en 'esperando' antes de que exista la capital): en
 // ese caso no hay rectangulo posible y quien llama debe usar un fallback.
-const MARGEN_ENCUADRE = 1.5 // casillas de aire alrededor de la zona descubierta
+// Media casilla de aire por lado. Con margenes mas grandes, una zona
+// descubierta chica (al empezar son 3x3) se convierte en un rectangulo del
+// doble de tamano y el zoom resultante deja el terreno diminuto.
+const MARGEN_ENCUADRE = 0.5
 
 function calcularEncuadre() {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
