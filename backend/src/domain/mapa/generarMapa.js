@@ -1,4 +1,4 @@
-import { entero } from './rng.js';
+import { entero, crearRng } from './rng.js';
 import { crearRuido } from './ruido.js';
 import { ReglaError } from './errores.js';
 
@@ -28,6 +28,91 @@ function cuantil(valoresOrdenados, proporcion) {
     Math.max(0, Math.floor(proporcion * valoresOrdenados.length))
   );
   return valoresOrdenados[i];
+}
+
+// Que recurso puede aparecer en cada terreno. El primero es el mas probable.
+const RECURSO_POR_TERRENO = {
+  mountains: ['stone', 'stone', 'gold'],
+  hills: ['stone', 'gold'],
+  forest: ['wood', 'wood', 'food'],
+  plains: ['food', 'food', 'wood'],
+  desert: ['gold'],
+  water: []
+};
+
+const dentro = (x, y, tamano) => x >= 0 && x < tamano && y >= 0 && y < tamano;
+const VECINOS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+// Traza rios desde puntos altos: se baja siempre al vecino de menor elevacion
+// hasta tocar agua, el borde, o quedarse sin pendiente. "Terreno alto" se
+// define por el mismo cuantil que decide colinas/montanas (cortes.colina),
+// no por un umbral absoluto: el corte de colina ya es el punto de la
+// distribucion de elevacion que separa "alto" de "bajo" en este mapa.
+function trazarRios(mapa, tamano, elevacion, umbralAlto, rng) {
+  const cantidad = Math.max(1, Math.floor(tamano / 8));
+  const largoMax = tamano * 2;
+
+  for (let i = 0; i < cantidad; i++) {
+    let x = entero(rng, tamano);
+    let y = entero(rng, tamano);
+    // Solo nacen en terreno alto; si el sorteo cayo bajo, se descarta el rio.
+    if (elevacion(x, y) < umbralAlto) continue;
+
+    const visitados = new Set();
+    for (let paso = 0; paso < largoMax; paso++) {
+      const clave = `${x},${y}`;
+      if (visitados.has(clave)) break; // se mordio la cola
+      visitados.add(clave);
+
+      const tile = mapa[y * tamano + x];
+      if (tile.terreno === 'water') break; // llego al mar
+      tile.terreno = 'water';
+
+      let mejor = null;
+      let mejorElev = Infinity;
+      for (const [dx, dy] of VECINOS) {
+        const nx = x + dx, ny = y + dy;
+        if (!dentro(nx, ny, tamano)) { mejor = null; break; } // llego al borde
+        const e = elevacion(nx, ny);
+        if (e < mejorElev) { mejorElev = e; mejor = { x: nx, y: ny }; }
+      }
+      if (!mejor || mejorElev >= elevacion(x, y)) break; // sin pendiente
+      x = mejor.x;
+      y = mejor.y;
+    }
+  }
+}
+
+// Siembra focos y los hace crecer por casillas contiguas del mismo recurso.
+function sembrarRecursos(mapa, tamano, rng) {
+  const focos = Math.max(2, Math.floor((tamano * tamano) / 40));
+
+  for (let i = 0; i < focos; i++) {
+    const x = entero(rng, tamano);
+    const y = entero(rng, tamano);
+    const semillaTile = mapa[y * tamano + x];
+    const opciones = RECURSO_POR_TERRENO[semillaTile.terreno];
+    if (!opciones || opciones.length === 0) continue;
+
+    const recurso = opciones[entero(rng, opciones.length)];
+    const tamanoYacimiento = 2 + entero(rng, 4); // 2 a 5 casillas
+    const pendientes = [semillaTile];
+    let puestos = 0;
+
+    while (pendientes.length > 0 && puestos < tamanoYacimiento) {
+      const actual = pendientes.shift();
+      const permitidos = RECURSO_POR_TERRENO[actual.terreno] || [];
+      if (actual.recurso !== null || !permitidos.includes(recurso)) continue;
+
+      actual.recurso = recurso;
+      puestos++;
+
+      for (const [dx, dy] of VECINOS) {
+        const nx = actual.x + dx, ny = actual.y + dy;
+        if (dentro(nx, ny, tamano)) pendientes.push(mapa[ny * tamano + nx]);
+      }
+    }
+  }
 }
 
 function terrenoDe(elevacion, humedad, cortes) {
@@ -83,6 +168,10 @@ export function generarMapa(semilla, tamano) {
       i++;
     }
   }
+
+  const rng = crearRng(`mapa:${semilla}`);
+  trazarRios(mapa, tamano, elevacion, cortes.colina, rng);
+  sembrarRecursos(mapa, tamano, rng);
   return mapa;
 }
 

@@ -112,3 +112,76 @@ describe('posicionesIniciales', () => {
     }
   });
 });
+
+describe('generarMapa: recursos en yacimientos', () => {
+  it('solo usa recursos de tile validos, y nunca en agua', () => {
+    const validos = new Set(['food', 'gold', 'wood', 'stone']);
+    for (const t of generarMapa('rec', 30)) {
+      if (t.recurso === null) continue;
+      expect(validos.has(t.recurso)).toBe(true);
+      expect(t.terreno).not.toBe('water');
+    }
+  });
+
+  it('hay recursos, pero no en todas partes', () => {
+    const m = generarMapa('rec', 30);
+    const conRecurso = m.filter(t => t.recurso !== null).length;
+    expect(conRecurso).toBeGreaterThan(10);
+    expect(conRecurso / m.length).toBeLessThan(0.35);
+  });
+
+  // La diferencia contra el 30% independiente del algoritmo viejo: los
+  // recursos vienen en yacimientos, no salpicados uno por uno.
+  it('los recursos se agrupan: la mayoria toca otro tile del mismo recurso', () => {
+    const t = 30;
+    const m = generarMapa('yacimiento', t);
+    const conRecurso = m.filter(x => x.recurso !== null);
+    let acompanados = 0;
+    for (const tile of conRecurso) {
+      const pega = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+        const nx = tile.x + dx, ny = tile.y + dy;
+        if (nx < 0 || nx >= t || ny < 0 || ny >= t) return false;
+        return m[ny * t + nx].recurso === tile.recurso;
+      });
+      if (pega) acompanados++;
+    }
+    expect(acompanados / conRecurso.length).toBeGreaterThan(0.6);
+  });
+
+  it('el recurso es coherente con el terreno', () => {
+    const permitido = {
+      mountains: ['stone', 'gold'],
+      hills: ['stone', 'gold'],
+      forest: ['wood', 'food'],
+      plains: ['food', 'wood'],
+      desert: ['gold']
+    };
+    for (const t of generarMapa('coherente', 40)) {
+      if (t.recurso === null) continue;
+      expect(permitido[t.terreno]).toContain(t.recurso);
+    }
+  });
+
+  it('los recursos son deterministas por semilla', () => {
+    const a = generarMapa('det', 20).map(t => t.recurso);
+    const b = generarMapa('det', 20).map(t => t.recurso);
+    expect(a).toEqual(b);
+  });
+});
+
+describe('generarMapa: rios', () => {
+  it('un mapa grande tiene mas agua que el mismo mapa sin rios', () => {
+    // Los rios agregan agua sobre el mar base: si el mapa de 40 tiene mas
+    // casillas de agua que las que dan los umbrales de elevacion solos, es
+    // porque los cauces se dibujaron.
+    const m = generarMapa('rios', 40);
+    const agua = m.filter(t => t.terreno === 'water').length;
+    expect(agua).toBeGreaterThan(0);
+    // Los rios no pueden inundar el mapa.
+    expect(agua / m.length).toBeLessThan(0.45);
+  });
+
+  it('los rios no rompen el determinismo', () => {
+    expect(generarMapa('rios', 30)).toEqual(generarMapa('rios', 30));
+  });
+});
