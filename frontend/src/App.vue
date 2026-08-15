@@ -97,10 +97,35 @@ const loadSavedMapSession = async () => {
     currentMode.value = 'mapa'
     return true
   } catch (error) {
-    // Partida inexistente (404) o token invalido: no hay forma de recuperar
-    // la sesion, asi que se limpia y el jugador vuelve al selector de modo.
     console.warn('No se pudo restaurar la sesion de mapa guardada:', error)
-    limpiarSesionMapaGuardada()
+
+    // El interceptor de useMapApi.js rechaza con `error.response?.data || error`:
+    // - Si el backend respondio (aunque sea con un error), `response.data` es
+    //   el JSON { codigo, mensaje } armado por manejarError() en mapRoutes.js.
+    //   Su presencia (un string en `.codigo`) es justamente lo que distingue
+    //   "el backend nos dijo algo" de "no llego respuesta".
+    // - Si fue un error de red (backend caido, sin conexion, timeout), axios
+    //   nunca recibe response y lo que se propaga es el Error crudo: no tiene
+    //   `.codigo`, tiene en cambio `.message`/`.isAxiosError`/`.code` (ej.
+    //   'ERR_NETWORK', 'ECONNABORTED'), que es un campo DISTINTO al `.codigo`
+    //   de dominio que manda el backend.
+    //
+    // Solo se limpia la sesion guardada cuando el backend identifico, con
+    // certeza, que la partida no existe o que el token ya no sirve. Ante
+    // cualquier otra cosa (error de red, timeout, 500 generico) NO se borra
+    // nada: es preferible dejar la sesion y que el jugador reintente
+    // recargando, a destruir su unica forma de volver a entrar (el token se
+    // emite una unica vez al unirse).
+    const identificaSesionInvalida =
+      error?.codigo === 'PARTIDA_NO_ENCONTRADA' || error?.codigo === 'TOKEN_INVALIDO'
+
+    if (identificaSesionInvalida) {
+      limpiarSesionMapaGuardada()
+    }
+
+    // De cualquier forma (se haya limpiado o no) no hay sesion que restaurar
+    // ahora: cae al selector de modo normal en vez de una pantalla rota. Si
+    // no se limpio, las claves siguen en localStorage para el proximo intento.
     return false
   }
 }
