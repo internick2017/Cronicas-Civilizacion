@@ -159,6 +159,26 @@ describe('posicionesIniciales', () => {
     expect(posicionesIniciales(m, 40, 8, crearRng('ocho'))).toHaveLength(8);
   });
 
+  // La combinacion mas ajustada del rango permitido: tamano minimo (10) con
+  // la cantidad maxima de jugadores (8). Un mapa de 100 casillas, ~30% agua,
+  // deja poco margen para separar 8 capitales dentro de una sola masa de
+  // tierra. Se prueban varias semillas porque el caso limite es de peor
+  // caso, no de promedio: sin este test, alguien podria ajustar los
+  // umbrales de terreno o el algoritmo de posicionesIniciales y romper
+  // silenciosamente el extremo mas apretado del rango soportado.
+  it('sirve al maximo de jugadores (8) en el tamano minimo (10x10)', () => {
+    const t = 10;
+    for (const semilla of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
+      const m = generarMapa(`chico8-${semilla}`, t);
+      const masa = masaPrincipal(m, t);
+      const pos = posicionesIniciales(m, t, 8, crearRng(`chico8-${semilla}`));
+
+      expect(pos).toHaveLength(8);
+      expect(new Set(pos.map(p => `${p.x},${p.y}`)).size).toBe(8);
+      for (const p of pos) expect(masa.has(p.y * t + p.x)).toBe(true);
+    }
+  });
+
   it('lanza MAPA_SIN_POSICIONES si es imposible', () => {
     const todoAgua = generarMapa('s', 8).map(t => ({ ...t, terreno: 'water' }));
     expect(() => posicionesIniciales(todoAgua, 8, 2, crearRng('x')))

@@ -28,9 +28,18 @@ beforeEach(() => {
   ax = cx - 1;
   ay = cy;
   // Vecino a 2 de distancia en linea recta desde la capital, usado para el
-  // segundo paso de movimiento y para el caso "no adyacente".
+  // segundo paso de movimiento y para el caso "no adyacente". Se asume que
+  // la capital de p1 con semilla 's1' no cae a menos de 2 casillas del
+  // borde izquierdo del mapa: si esa semilla o el generador cambian y el
+  // supuesto deja de cumplirse, esta asercion falla con un mensaje claro en
+  // vez de con "expected -1 to be 0" o un TypeError raro mas abajo.
+  if (cx < 2) throw new Error(`supuesto roto: la capital de p1 quedo en x=${cx}, se necesita x>=2 para el vecino a distancia 2`);
   bx = cx - 2;
   by = cy;
+
+  // El test de "diagonal" usa (ax, ay-1) como destino invalido: mismo
+  // supuesto de margen respecto del borde superior.
+  if (cy < 1) throw new Error(`supuesto roto: la capital de p1 quedo en y=${cy}, se necesita y>=1 para el destino diagonal del test`);
 
   tileEn(e, cx, cy).terreno = 'plains';
   tileEn(e, ax, ay).terreno = 'plains';
