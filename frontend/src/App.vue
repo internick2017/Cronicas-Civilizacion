@@ -5,6 +5,7 @@ import StorySession from './components/StorySession.vue'
 import ModeSelect from './components/mapa/ModeSelect.vue'
 import MapLobby from './components/mapa/MapLobby.vue'
 import MapSession from './components/mapa/MapSession.vue'
+import { useMapApi } from './composables/useMapApi.js'
 
 // App state
 const currentMode = ref(null) // null | 'narrativo' | 'mapa'
@@ -65,6 +66,45 @@ const clearSavedSession = () => {
   localStorage.removeItem('cronicas-player')
 }
 
+// --- Restaurar sesion de mapa guardada -----------------------------------
+// MapSession.vue guarda estas 4 claves en cada onMounted (ver guardarSesion),
+// pero hasta ahora nadie las leia: un F5 a mitad de partida dejaba al
+// jugador varado, porque el token solo se emite una vez al unirse y unirse
+// de nuevo a una partida ya iniciada se rechaza (PARTIDA_YA_INICIADA). Aca
+// se intenta re-entrar con las credenciales guardadas; si la partida ya no
+// existe o el token ya no es valido, se limpia la sesion guardada y se
+// vuelve al inicio en vez de dejar una pantalla rota.
+const { vista: pedirVistaMapa } = useMapApi()
+
+const limpiarSesionMapaGuardada = () => {
+  localStorage.removeItem('cronicas-mapa-id')
+  localStorage.removeItem('cronicas-mapa-codigo')
+  localStorage.removeItem('cronicas-mapa-jugadorId')
+  localStorage.removeItem('cronicas-mapa-token')
+}
+
+const loadSavedMapSession = async () => {
+  const id = localStorage.getItem('cronicas-mapa-id')
+  const codigo = localStorage.getItem('cronicas-mapa-codigo')
+  const jugadorId = localStorage.getItem('cronicas-mapa-jugadorId')
+  const token = localStorage.getItem('cronicas-mapa-token')
+
+  if (!id || !codigo || !jugadorId || !token) return false
+
+  try {
+    const vista = await pedirVistaMapa(id, jugadorId, token)
+    mapaPartida.value = { id, codigo, jugadorId, token, vista }
+    currentMode.value = 'mapa'
+    return true
+  } catch (error) {
+    // Partida inexistente (404) o token invalido: no hay forma de recuperar
+    // la sesion, asi que se limpia y el jugador vuelve al selector de modo.
+    console.warn('No se pudo restaurar la sesion de mapa guardada:', error)
+    limpiarSesionMapaGuardada()
+    return false
+  }
+}
+
 // Methods
 const elegirModo = (modo) => {
   currentMode.value = modo
@@ -110,8 +150,12 @@ const clearError = () => {
 }
 
 // Lifecycle
-onMounted(() => {
-  // Load any saved session on app start
+onMounted(async () => {
+  // Se intenta primero restaurar una sesion de mapa guardada; si no hay
+  // ninguna (o no se pudo restaurar), se cae al intento de sesion narrativa,
+  // igual que antes.
+  const restauroMapa = await loadSavedMapSession()
+  if (restauroMapa) return
   loadSavedSession()
 })
 </script>
