@@ -199,8 +199,19 @@ export class MapGameService {
     const cerroRonda = eventos.some(e => e.tipo === 'RondaCompletada');
     if (cerroRonda && this.narrador) {
       const turnoRonda = eventos.find(e => e.tipo === 'RondaCompletada').turno;
-      Promise.resolve(this.narrador(eventos))
-        .then(narrativa => this.repo.guardarNarrativa(estado.id, turnoRonda, narrativa))
+      Promise.resolve(this.narrador(eventos, estado.jugadores))
+        .then(async (narrativa) => {
+          if (!narrativa) return;
+          await this.repo.guardarNarrativa(estado.id, turnoRonda, narrativa);
+          // La narracion tarda (puede pegarle a la IA), asi que llega despues
+          // de la emision del estado. Se avisa por su propio evento para que
+          // el jugador la vea en esta ronda y no en la siguiente.
+          if (this.emitir) {
+            for (const jugador of estado.jugadores) {
+              this.emitir(id, jugador.id, 'narrativa', { ronda: turnoRonda, texto: narrativa });
+            }
+          }
+        })
         .catch(() => null); // la narracion nunca puede romper la partida
     }
 
@@ -209,19 +220,25 @@ export class MapGameService {
     // socket de la sala recibia la niebla, ciudades y recursos de todos los
     // demas, reintroduciendo por socket la fuga que el dominio ya evitaba.
     // Invariante: un socket del jugador X nunca recibe la vista de Y.
+    // Se adjuntan las narrativas tambien aca para que la vista emitida por
+    // socket sea consistente con la que devuelve `vista()` (misma forma).
+    const narrativas = await this.repo.narrativasDe(estado.id);
     if (this.emitir) {
       for (const jugador of estado.jugadores) {
-        this.emitir(id, jugador.id, 'estado', vistaJugador(estado, jugador.id));
+        this.emitir(id, jugador.id, 'estado', { ...vistaJugador(estado, jugador.id), narrativas });
       }
     }
 
-    return { vista: vistaJugador(estado, jugadorId), eventos };
+    return { vista: { ...vistaJugador(estado, jugadorId), narrativas }, eventos };
   }
 
   async vista(id, jugadorId, token) {
     const estado = await this._resolver(id);
     if (!estado) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
     await this.verificarToken(estado.id, jugadorId, token);
-    return vistaJugador(estado, jugadorId);
+    // Las narrativas se adjuntan aca y no en `vistaJugador`: esa funcion es
+    // dominio puro y no tiene acceso al repo.
+    const narrativas = await this.repo.narrativasDe(estado.id);
+    return { ...vistaJugador(estado, jugadorId), narrativas };
   }
 }

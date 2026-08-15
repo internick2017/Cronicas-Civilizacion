@@ -144,7 +144,7 @@ describe('MapGameService', () => {
     // ...y una lectura posterior en la MISMA instancia del servicio debe reflejar
     // eso, no el estado a medio mutar que la escritura fallida intento guardar.
     const vistaPostFallo = await svc.vista(id, 'p1', tokenP1);
-    const vistaEsperada = vistaJugador(estadoEnDbDespues, 'p1');
+    const vistaEsperada = { ...vistaJugador(estadoEnDbDespues, 'p1'), narrativas: [] };
     expect(vistaPostFallo).toEqual(vistaEsperada);
     // en particular, el turno NO debe haber avanzado (eso es lo que
     // `terminarTurno` intentaba hacer cuando el guardar fallo)
@@ -250,5 +250,23 @@ describe('MapGameService', () => {
 
     await expect(svc.vista(id, 'p1', t2)).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO' });
     await expect(svc.vista(id, 'p1', undefined)).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO' });
+  });
+
+  describe('narrativas en la vista', () => {
+    it('la vista incluye las narrativas guardadas de la partida', async () => {
+      const { svc, repo } = crearServicio();
+      const { id, tokenP1 } = await crearPartidaConDosJugadores(svc);
+      await repo.guardarNarrativa(id, 1, 'Algo paso.');
+
+      const vista = await svc.vista(id, 'p1', tokenP1);
+      expect(vista.narrativas).toEqual([{ ronda: 1, texto: 'Algo paso.' }]);
+    });
+
+    it('sin narrativas, el campo existe y esta vacio', async () => {
+      const { svc } = crearServicio();
+      const { id, tokenP1 } = await crearPartidaConDosJugadores(svc);
+      const vista = await svc.vista(id, 'p1', tokenP1);
+      expect(vista.narrativas).toEqual([]);
+    });
   });
 });
