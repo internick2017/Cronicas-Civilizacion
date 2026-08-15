@@ -1,6 +1,6 @@
 import express from 'express';
 import { ReglaError } from '../domain/mapa/errores.js';
-import { EDIFICIOS, UNIDADES } from '../domain/mapa/constantes.js';
+import { EDIFICIOS, UNIDADES, COSTO_CIUDAD } from '../domain/mapa/constantes.js';
 
 // Nombres en espanol para la interfaz. Viven aca y no en el dominio porque
 // son presentacion, no regla de juego.
@@ -44,6 +44,7 @@ export function crearMapRoutes(servicio) {
   // acciones impagables. DEBE ir antes de las rutas con :id.
   router.get('/constantes', (_req, res) => {
     res.json({
+      costoCiudad: COSTO_CIUDAD,
       edificios: Object.entries(EDIFICIOS).map(([tipo, datos]) => ({
         tipo,
         nombre: NOMBRE_EDIFICIO[tipo] || tipo,
