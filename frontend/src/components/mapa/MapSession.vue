@@ -8,6 +8,8 @@ import MapPlayerPanel from './MapPlayerPanel.vue'
 import MapActionBar from './MapActionBar.vue'
 import MapRoundLog from './MapRoundLog.vue'
 import MapVictory from './MapVictory.vue'
+import MapDialogo from './MapDialogo.vue'
+import MapCiudadMenu from './MapCiudadMenu.vue'
 
 const props = defineProps({
   partidaInicial: { type: Object, required: true }
@@ -37,17 +39,12 @@ const fusionarNarrativas = (actuales, entrantes) => {
 }
 
 const edificioMenuAbierto = ref(null) // {x, y} | null
+const fundarAbierto = ref(null) // {x, y} | null
+const nombreCiudad = ref('')
 let pollEspera = null
 
 // Reglas del juego (costos, stats). Vienen del backend para no duplicarlas.
 const constantes = ref({ edificios: [], unidades: [] })
-
-const EDIFICIOS = [
-  { tipo: 'granary', nombre: 'Granero' },
-  { tipo: 'market', nombre: 'Mercado' },
-  { tipo: 'library', nombre: 'Biblioteca' },
-  { tipo: 'barracks', nombre: 'Cuartel' }
-]
 
 const guardarSesion = () => {
   localStorage.setItem('cronicas-mapa-id', id)
@@ -113,10 +110,17 @@ const onClickTile = (posicion) => {
   }
 
   if (!tile.ciudad && (tile.dueno === jugadorId || tile.dueno === null)) {
-    const nombre = window.prompt('Nombre de la ciudad:')
-    if (!nombre) return
-    ejecutarAccion({ tipo: 'fundarCiudad', x: posicion.x, y: posicion.y, nombre })
+    nombreCiudad.value = ''
+    fundarAbierto.value = posicion
   }
+}
+
+const confirmarFundar = () => {
+  const nombre = nombreCiudad.value.trim()
+  if (!nombre || !fundarAbierto.value) return
+  const { x, y } = fundarAbierto.value
+  fundarAbierto.value = null
+  ejecutarAccion({ tipo: 'fundarCiudad', x, y, nombre })
 }
 
 const construir = (edificio) => {
@@ -124,6 +128,13 @@ const construir = (edificio) => {
   const { x, y } = edificioMenuAbierto.value
   edificioMenuAbierto.value = null
   ejecutarAccion({ tipo: 'construir', x, y, edificio })
+}
+
+const reclutar = (unidad) => {
+  if (!edificioMenuAbierto.value) return
+  const { x, y } = edificioMenuAbierto.value
+  edificioMenuAbierto.value = null
+  ejecutarAccion({ tipo: 'reclutar', x, y, unidad })
 }
 
 const cerrarMenuEdificio = () => {
@@ -205,20 +216,30 @@ onUnmounted(() => {
       @salir="salir"
     />
 
-    <div v-if="edificioMenuAbierto" class="edificio-menu-overlay" @click.self="cerrarMenuEdificio">
-      <div class="edificio-menu">
-        <h3>Construir</h3>
-        <button
-          v-for="ed in EDIFICIOS"
-          :key="ed.tipo"
-          class="btn-secondary"
-          @click="construir(ed.tipo)"
-        >
-          {{ ed.nombre }}
-        </button>
-        <button class="btn-secondary" @click="cerrarMenuEdificio">Cancelar</button>
-      </div>
-    </div>
+    <MapDialogo :abierto="edificioMenuAbierto !== null" titulo="Ciudad" @cerrar="cerrarMenuEdificio">
+      <MapCiudadMenu
+        v-if="edificioMenuAbierto"
+        :vista="vista"
+        :jugador-id="jugadorId"
+        :posicion="edificioMenuAbierto"
+        :constantes="constantes"
+        @construir="construir"
+        @reclutar="reclutar"
+        @cerrar="cerrarMenuEdificio"
+      />
+    </MapDialogo>
+
+    <MapDialogo :abierto="fundarAbierto !== null" titulo="Fundar ciudad" @cerrar="fundarAbierto = null">
+      <input
+        v-model="nombreCiudad"
+        class="entrada-nombre"
+        placeholder="Nombre de la ciudad"
+        @keyup.enter="confirmarFundar"
+      >
+      <button class="btn-primario" :disabled="!nombreCiudad.trim()" @click="confirmarFundar">
+        Fundar
+      </button>
+    </MapDialogo>
   </div>
 </template>
 
@@ -239,36 +260,14 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.edificio-menu-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+.entrada-nombre {
+  background: rgba(0, 0, 0, 0.3); color: #ecf0f1;
+  border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;
+  padding: 0.5rem 0.7rem; font-size: 1rem;
 }
-
-.edificio-menu {
-  background: #2c3e50;
-  border-radius: 12px;
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-width: 220px;
+.btn-primario {
+  background: #3498db; color: #fff; border: 0; border-radius: 6px;
+  padding: 0.5rem 0.9rem; cursor: pointer;
 }
-
-.btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-  padding: 0.5rem 0.8rem;
-  cursor: pointer;
-}
-
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
+.btn-primario:disabled { opacity: 0.45; cursor: not-allowed; }
 </style>
