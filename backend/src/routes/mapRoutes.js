@@ -1,5 +1,11 @@
 import express from 'express';
 import { ReglaError } from '../domain/mapa/errores.js';
+import { EDIFICIOS, UNIDADES } from '../domain/mapa/constantes.js';
+
+// Nombres en espanol para la interfaz. Viven aca y no en el dominio porque
+// son presentacion, no regla de juego.
+const NOMBRE_EDIFICIO = { granary: 'Granero', market: 'Mercado', library: 'Biblioteca', barracks: 'Cuartel' };
+const NOMBRE_UNIDAD = { warrior: 'Guerrero', archer: 'Arquero', spearman: 'Lancero', cavalry: 'Caballería', catapult: 'Catapulta' };
 
 /**
  * Traduce un error del dominio/servicio a una respuesta HTTP.
@@ -32,6 +38,29 @@ function manejarError(err, res) {
  */
 export function crearMapRoutes(servicio) {
   const router = express.Router();
+
+  // GET /api/map/constantes - reglas publicas del juego. Sin token: no exponen
+  // estado de ninguna partida, y el frontend las necesita para no ofrecer
+  // acciones impagables. DEBE ir antes de las rutas con :id.
+  router.get('/constantes', (_req, res) => {
+    res.json({
+      edificios: Object.entries(EDIFICIOS).map(([tipo, datos]) => ({
+        tipo,
+        nombre: NOMBRE_EDIFICIO[tipo] || tipo,
+        costo: datos.costo
+      })),
+      unidades: Object.entries(UNIDADES).map(([tipo, datos]) => ({
+        tipo,
+        nombre: NOMBRE_UNIDAD[tipo] || tipo,
+        ataque: datos.ataque,
+        defensa: datos.defensa,
+        salud: datos.salud,
+        movimiento: datos.movimiento,
+        costo: datos.costo,
+        requiereBarracks: datos.requiereBarracks
+      }))
+    });
+  });
 
   // POST /api/map - crear una partida nueva
   router.post('/', async (req, res) => {

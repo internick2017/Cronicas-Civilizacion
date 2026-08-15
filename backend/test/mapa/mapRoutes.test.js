@@ -171,3 +171,30 @@ describe('mapRoutes', () => {
     expect(res.body).not.toHaveProperty('semilla');
   });
 });
+
+describe('GET /api/map/constantes', () => {
+  it('devuelve edificios y unidades con sus costos', async () => {
+    const { app } = crearServicio();
+    const res = await request(app).get('/api/map/constantes');
+    expect(res.status).toBe(200);
+
+    const granero = res.body.edificios.find(e => e.tipo === 'granary');
+    expect(granero.costo).toEqual({ food: 30, wood: 20 });
+    expect(typeof granero.nombre).toBe('string');
+
+    const caballeria = res.body.unidades.find(u => u.tipo === 'cavalry');
+    expect(caballeria.requiereBarracks).toBe(true);
+    expect(caballeria.ataque).toBe(20);
+    expect(caballeria.costo).toEqual({ food: 25, gold: 40, wood: 5 });
+    expect(caballeria.salud).toBe(120);
+
+    expect(res.body.edificios).toHaveLength(4);
+    expect(res.body.unidades).toHaveLength(5);
+  });
+
+  it('no exige token: son reglas publicas, no estado de partida', async () => {
+    const { app } = crearServicio();
+    const res = await request(app).get('/api/map/constantes');
+    expect(res.status).not.toBe(401);
+  });
+});

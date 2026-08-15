@@ -14,7 +14,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['salir', 'error'])
 
-const { accion, vista: pedirVista } = useMapApi()
+const { accion, vista: pedirVista, obtenerConstantes } = useMapApi()
 const { conectar, desconectar, unirseAPartida, onEstado, onNarrativa } = useMapSocket()
 
 const id = props.partidaInicial.id
@@ -38,6 +38,9 @@ const fusionarNarrativas = (actuales, entrantes) => {
 
 const edificioMenuAbierto = ref(null) // {x, y} | null
 let pollEspera = null
+
+// Reglas del juego (costos, stats). Vienen del backend para no duplicarlas.
+const constantes = ref({ edificios: [], unidades: [] })
 
 const EDIFICIOS = [
   { tipo: 'granary', nombre: 'Granero' },
@@ -134,6 +137,12 @@ const salir = () => {
 
 onMounted(async () => {
   guardarSesion()
+
+  try {
+    constantes.value = await obtenerConstantes()
+  } catch {
+    // Sin constantes el menu de ciudad se muestra vacio; la partida sigue.
+  }
 
   // La vista que llega del lobby puede estar vieja: quien creo la partida la obtuvo
   // ANTES de iniciarla, asi que se pide de nuevo antes de dibujar nada.
