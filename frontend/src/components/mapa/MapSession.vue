@@ -3,7 +3,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useMapApi } from '../../composables/useMapApi.js'
 import { useMapSocket } from '../../composables/useMapSocket.js'
-import MapGrid from './MapGrid.vue'
+import MapCanvas from './MapCanvas.vue'
 import MapPlayerPanel from './MapPlayerPanel.vue'
 import MapActionBar from './MapActionBar.vue'
 import MapRoundLog from './MapRoundLog.vue'
@@ -187,10 +187,10 @@ onUnmounted(() => {
       Esperando a que el anfitrión inicie la partida…
     </div>
 
-    <MapGrid
-      :mapa="vista.mapa"
-      :tamano-mapa="vista.config.tamanoMapa"
+    <MapCanvas
+      :vista="vista"
       :jugador-id="jugadorId"
+      :constantes="constantes"
       @click-tile="onClickTile"
     />
 
