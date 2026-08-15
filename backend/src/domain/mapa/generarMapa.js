@@ -48,7 +48,12 @@ const VECINOS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 // define por el mismo cuantil que decide colinas/montanas (cortes.colina),
 // no por un umbral absoluto: el corte de colina ya es el punto de la
 // distribucion de elevacion que separa "alto" de "bajo" en este mapa.
-function trazarRios(mapa, tamano, elevacion, umbralAlto, rng) {
+// Exportada para poder probar el trazado de rios de forma directa: es una
+// funcion de dominio pura (sin I/O), asi que testearla aislada del ruido y
+// de los cuantiles del mapa completo permite verificar sus propiedades reales
+// (camino contiguo, nacimiento en terreno alto) con mapas y elevaciones
+// sinteticas y controladas.
+export function trazarRios(mapa, tamano, elevacion, umbralAlto, rng) {
   const cantidad = Math.max(1, Math.floor(tamano / 8));
   const largoMax = tamano * 2;
 
@@ -84,15 +89,34 @@ function trazarRios(mapa, tamano, elevacion, umbralAlto, rng) {
 }
 
 // Siembra focos y los hace crecer por casillas contiguas del mismo recurso.
+//
+// El piso de focos es un MINIMO GARANTIZADO, no un numero de intentos: un
+// intento que cae en agua o en un tile ya ocupado se descarta y se reintenta,
+// en vez de perderse. Sin esto, en tamano 10 (100 tiles, 30% agua) el viejo
+// piso de max(2, floor(tamano^2/40))=2 focos podia caer los dos en agua y
+// dejar el mapa entero sin recursos: una partida rota, porque nadie puede
+// producir. El piso de 6 se eligio para que, incluso perdiendo alguno por
+// mala suerte de adyacencia, tamano 10 siga con varios yacimientos jugables;
+// en tamanos grandes el termino tamano^2/40 ya lo supera y manda el.
 function sembrarRecursos(mapa, tamano, rng) {
-  const focos = Math.max(2, Math.floor((tamano * tamano) / 40));
+  const focosObjetivo = Math.max(6, Math.floor((tamano * tamano) / 40));
+  // Tope de intentos generoso para no colgarse si el sorteo tiene mala
+  // suerte reiterada (mapa casi todo agua, semilla desfavorable, etc).
+  const intentosMax = focosObjetivo * 30;
 
-  for (let i = 0; i < focos; i++) {
+  let colocados = 0;
+  let intentos = 0;
+
+  while (colocados < focosObjetivo && intentos < intentosMax) {
+    intentos++;
+
     const x = entero(rng, tamano);
     const y = entero(rng, tamano);
     const semillaTile = mapa[y * tamano + x];
+    if (semillaTile.recurso !== null) continue; // tile ya ocupado: reintentar
+
     const opciones = RECURSO_POR_TERRENO[semillaTile.terreno];
-    if (!opciones || opciones.length === 0) continue;
+    if (!opciones || opciones.length === 0) continue; // agua o sin recurso: reintentar
 
     const recurso = opciones[entero(rng, opciones.length)];
     const tamanoYacimiento = 2 + entero(rng, 4); // 2 a 5 casillas
@@ -112,6 +136,10 @@ function sembrarRecursos(mapa, tamano, rng) {
         if (dentro(nx, ny, tamano)) pendientes.push(mapa[ny * tamano + nx]);
       }
     }
+
+    // La semilla del foco siempre pasa las validaciones de arriba, asi que
+    // puestos >= 1 acá: el foco quedo efectivamente colocado.
+    colocados++;
   }
 }
 

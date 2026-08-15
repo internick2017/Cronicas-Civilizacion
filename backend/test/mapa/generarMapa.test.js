@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generarMapa, posicionesIniciales } from '../../src/domain/mapa/generarMapa.js';
+import { generarMapa, posicionesIniciales, trazarRios } from '../../src/domain/mapa/generarMapa.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
 import { ReglaError } from '../../src/domain/mapa/errores.js';
 
@@ -167,18 +167,76 @@ describe('generarMapa: recursos en yacimientos', () => {
     const b = generarMapa('det', 20).map(t => t.recurso);
     expect(a).toEqual(b);
   });
+
+  // Bug real medido: en tamano 10, focos=max(2, floor(100/40))=2, y si los
+  // dos sorteos caen en agua o en terreno sin recurso valido, el mapa entero
+  // queda sin recursos jugables. Se prueban varios tamanos y semillas porque
+  // el problema es de peor caso, no de promedio.
+  it('siempre hay una cantidad minima de recursos, en cualquier tamano y semilla', () => {
+    const SEMILLAS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const TAMANOS = [10, 20, 30, 60];
+    for (const tamano of TAMANOS) {
+      for (const semilla of SEMILLAS) {
+        const m = generarMapa(`min-${semilla}`, tamano);
+        const conRecurso = m.filter(t => t.recurso !== null).length;
+        expect(conRecurso).toBeGreaterThanOrEqual(5);
+      }
+    }
+  });
 });
 
+// Mapa sintetico de tierra pareja, sin agua previa: aisla el trazado de rios
+// del ruido y los cuantiles del mapa real, para poder verificar sus
+// propiedades geometricas de forma directa y controlada.
+function mapaSintetico(tamano) {
+  const mapa = [];
+  for (let y = 0; y < tamano; y++) {
+    for (let x = 0; x < tamano; x++) {
+      mapa.push({ x, y, terreno: 'plains', recurso: null });
+    }
+  }
+  return mapa;
+}
+
 describe('generarMapa: rios', () => {
-  it('un mapa grande tiene mas agua que el mismo mapa sin rios', () => {
-    // Los rios agregan agua sobre el mar base: si el mapa de 40 tiene mas
-    // casillas de agua que las que dan los umbrales de elevacion solos, es
-    // porque los cauces se dibujaron.
-    const m = generarMapa('rios', 40);
-    const agua = m.filter(t => t.terreno === 'water').length;
-    expect(agua).toBeGreaterThan(0);
-    // Los rios no pueden inundar el mapa.
-    expect(agua / m.length).toBeLessThan(0.45);
+  it('el rio traza un camino de casillas contiguas, no puntos sueltos', () => {
+    const tamano = 12;
+    const mapa = mapaSintetico(tamano);
+    // Elevacion en forma de cono con pico en el centro: garantiza una
+    // pendiente clara y monotonamente descendente hacia afuera, asi el
+    // descenso por gradiente produce un camino largo y determinista.
+    const cx = tamano / 2, cy = tamano / 2;
+    const elevacion = (x, y) => -(Math.abs(x - cx) + Math.abs(y - cy));
+    // Umbral muy bajo: el nacimiento nunca se descarta por altura, asi el
+    // test se enfoca solo en la forma del camino.
+    trazarRios(mapa, tamano, elevacion, -1000, crearRng('camino'));
+
+    const agua = mapa.filter(t => t.terreno === 'water');
+    expect(agua.length).toBeGreaterThan(1);
+    for (const tile of agua) {
+      const tieneVecinoDeAgua = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+        const vecino = mapa.find(t => t.x === tile.x + dx && t.y === tile.y + dy);
+        return vecino && vecino.terreno === 'water';
+      });
+      expect(tieneVecinoDeAgua).toBe(true);
+    }
+  });
+
+  it('el rio solo nace si la casilla de origen supera el umbral de terreno alto', () => {
+    const tamano = 12;
+    // Elevacion pareja: sin pendiente, asi que lo unico que decide si hay
+    // rio o no es la comparacion contra el umbral en el nacimiento.
+    const elevacion = () => 0;
+
+    // Misma semilla de rng en ambas corridas: el punto de origen sorteado
+    // es identico, asi que la unica variable es el umbral.
+    const mapaNace = mapaSintetico(tamano);
+    trazarRios(mapaNace, tamano, elevacion, -1, crearRng('nace'));
+    expect(mapaNace.some(t => t.terreno === 'water')).toBe(true);
+
+    const mapaNoNace = mapaSintetico(tamano);
+    trazarRios(mapaNoNace, tamano, elevacion, 1, crearRng('nace'));
+    expect(mapaNoNace.every(t => t.terreno !== 'water')).toBe(true);
   });
 
   it('los rios no rompen el determinismo', () => {
