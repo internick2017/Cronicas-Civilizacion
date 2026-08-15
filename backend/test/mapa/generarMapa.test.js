@@ -35,13 +35,22 @@ describe('generarMapa', () => {
   });
 
   // El agua tiene que ser suficiente para que se lean costas, pero no tanta
-  // como para ahogar el mapa jugable.
-  it('la proporcion de agua queda entre 15% y 45% en varias semillas', () => {
-    for (const semilla of ['a', 'b', 'c', 'd', 'e']) {
-      const m = generarMapa(semilla, 30);
-      const proporcion = contarTerreno(m, 'water') / m.length;
-      expect(proporcion).toBeGreaterThan(0.15);
-      expect(proporcion).toBeLessThan(0.45);
+  // como para ahogar el mapa jugable. Se prueban varios tamanos (incluidos los
+  // extremos permitidos por la config) porque el bug real era que el ruido en
+  // grillas chicas tiene poca variedad de puntos y un umbral absoluto podia
+  // dejar mapas de 10x10 con hasta 79% de agua: un test que solo miraba un
+  // tamano no lo detectaba.
+  const SEMILLAS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+  const TAMANOS = [10, 20, 30, 60];
+
+  it('la proporcion de agua queda entre 15% y 45% en varios tamanos y semillas', () => {
+    for (const tamano of TAMANOS) {
+      for (const semilla of SEMILLAS) {
+        const m = generarMapa(semilla, tamano);
+        const proporcion = contarTerreno(m, 'water') / m.length;
+        expect(proporcion).toBeGreaterThan(0.15);
+        expect(proporcion).toBeLessThan(0.45);
+      }
     }
   });
 
