@@ -2,8 +2,10 @@
 import { ref, onMounted } from 'vue'
 import StoryLobby from './components/StoryLobby.vue'
 import StorySession from './components/StorySession.vue'
+import ModeSelect from './components/mapa/ModeSelect.vue'
 
 // App state
+const currentMode = ref(null) // null | 'narrativo' | 'mapa'
 const currentView = ref('lobby') // 'lobby' or 'session'
 const currentSession = ref(null)
 const currentPlayer = ref(null)
@@ -30,6 +32,7 @@ const loadSavedSession = async () => {
         if (playerInSession) {
           currentSession.value = result.data // Use updated session data
           currentPlayer.value = player
+          currentMode.value = 'narrativo'
           currentView.value = 'session'
           return
         }
@@ -61,6 +64,10 @@ const clearSavedSession = () => {
 }
 
 // Methods
+const elegirModo = (modo) => {
+  currentMode.value = modo
+}
+
 const handleSessionCreated = (sessionData) => {
   // Session created successfully
   // For now, just show success message
@@ -109,22 +116,34 @@ onMounted(() => {
       <button @click="clearError" class="close-error">✕</button>
     </div>
 
-    <!-- Story Lobby -->
-    <StoryLobby 
-      v-if="currentView === 'lobby'"
-      @session-created="handleSessionCreated"
-      @session-joined="handleSessionJoined"
-      @error="handleError"
+    <!-- Mode selection -->
+    <ModeSelect
+      v-if="currentMode === null"
+      @elegir-modo="elegirModo"
     />
 
-    <!-- Story Session -->
-    <StorySession 
-      v-else-if="currentView === 'session'"
-      :session-id="currentSession?.id"
-      :current-player-id="currentPlayer?.id"
-      @session-ended="handleSessionEnded"
-      @error="handleError"
-    />
+    <!-- Narrative mode -->
+    <template v-else-if="currentMode === 'narrativo'">
+      <StoryLobby
+        v-if="currentView === 'lobby'"
+        @session-created="handleSessionCreated"
+        @session-joined="handleSessionJoined"
+        @error="handleError"
+      />
+
+      <StorySession
+        v-else-if="currentView === 'session'"
+        :session-id="currentSession?.id"
+        :current-player-id="currentPlayer?.id"
+        @session-ended="handleSessionEnded"
+        @error="handleError"
+      />
+    </template>
+
+    <!-- Map mode -->
+    <div v-else-if="currentMode === 'mapa'" class="loading-placeholder">
+      Cargando modo mapa…
+    </div>
   </div>
 </template>
 
@@ -143,6 +162,15 @@ body {
 
 #app {
   min-height: 100vh;
+}
+
+/* Placeholder shown while a mode's real view is not mounted yet */
+.loading-placeholder {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #bdc3c7;
 }
 
 /* Error toast */
