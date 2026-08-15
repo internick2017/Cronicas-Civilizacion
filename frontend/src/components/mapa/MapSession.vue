@@ -192,13 +192,17 @@ const esEnemigo = (tile) =>
 
 const onClickTile = (posicion) => {
   const tile = tileEn(posicion.x, posicion.y)
-  if (!tile || !tile.descubierto) return
+  if (!tile) return
 
   // 1. Con un ejercito seleccionado, un click en casilla alcanzable es una orden.
   if (seleccion.value) {
     const alcanzable = alcanzables.value.some(p => p.x === posicion.x && p.y === posicion.y)
     if (alcanzable) {
       const desde = { ...seleccion.value }
+      // esEnemigo() es false para una casilla en niebla (no trae ejercito ni
+      // ciudad), asi que hacia la niebla SIEMPRE se intenta mover, nunca
+      // atacar. Es lo correcto: el frontend no puede saber si abajo hay un
+      // enemigo, y no debe adivinarlo. Decide el backend.
       if (esEnemigo(tile)) {
         ataqueAbierto.value = { desde, hasta: posicion }
       } else {
@@ -210,6 +214,13 @@ const onClickTile = (posicion) => {
     // Click fuera del alcance: se deselecciona y sigue el flujo normal.
     seleccion.value = null
   }
+
+  // De aca en adelante todos los caminos leen terreno/dueno/ciudad/ejercito,
+  // que una casilla en niebla NO trae ({x, y, descubierto: false}). El unico
+  // camino valido para la niebla es el movimiento de arriba; sin ejercito
+  // seleccionado (o con la casilla fuera de alcance) un click en niebla no
+  // hace nada, que es lo correcto: no hay nada que el jugador conozca ahi.
+  if (!tile.descubierto) return
 
   // 2. Ejercito propio: seleccionar. Un ejercito sin movimiento restante NO
   // se selecciona: no tendria ninguna casilla alcanzable y quedaria marcado
