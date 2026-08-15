@@ -208,12 +208,66 @@ function dibujarOverlay() {
   capaOverlay.addChild(g)
 }
 
+// Hash barato y determinista: mismo (x, y) siempre da el mismo numero en
+// [0, 1). Nada de Math.random() aca, porque la niebla se reconstruye cada
+// vez que cambia el set de casillas descubiertas (ver claveNiebla) y con
+// aleatoriedad real titilaria en cada redibujado.
+function hashCasilla(x, y, semilla) {
+  const n = Math.sin(x * 12.9898 + y * 78.233 + semilla * 37.719) * 43758.5453
+  return n - Math.floor(n)
+}
+
+// Paleta de niebla: tonos pizarra/humo (no negro) para que se lea como
+// "territorio todavia no visto" en vez de "vacio". doble variante de color
+// mas variacion de alpha, ambas derivadas del hash, dan el efecto de nube
+// sin generar mas que un rect+fill por casilla (mismo costo que antes).
+const NIEBLA_COLOR_A = 0x2c333c
+const NIEBLA_COLOR_B = 0x454e59
+const NIEBLA_ALPHA_MIN = 0.82
+const NIEBLA_ALPHA_MAX = 0.95
+// Casillas de niebla pegadas a zona descubierta: mas transparentes, para que
+// el corte entre lo visto y lo oculto sea un degrade y no una pared recta.
+const NIEBLA_ALPHA_BORDE = 0.4
+
+function mezclarColor(colorA, colorB, t) {
+  const ra = (colorA >> 16) & 0xff, ga = (colorA >> 8) & 0xff, ba = colorA & 0xff
+  const rb = (colorB >> 16) & 0xff, gb = (colorB >> 8) & 0xff, bb = colorB & 0xff
+  const r = Math.round(ra + (rb - ra) * t)
+  const g = Math.round(ga + (gb - ga) * t)
+  const b = Math.round(ba + (bb - ba) * t)
+  return (r << 16) | (g << 8) | b
+}
+
 function dibujarNiebla() {
   limpiar(capaNiebla)
   const g = new Graphics()
+
+  // Set de casillas descubiertas, para detectar el borde niebla/descubierto
+  // sin recorrer toda la vista de nuevo por cada casilla oculta.
+  const descubiertas = new Set()
+  for (const tile of props.vista.mapa) {
+    if (tile.descubierto) descubiertas.add(`${tile.x}:${tile.y}`)
+  }
+
   for (const tile of props.vista.mapa) {
     if (tile.descubierto) continue
-    g.rect(tile.x * TILE, tile.y * TILE, TILE, TILE).fill({ color: 0x0a0a0f, alpha: 0.96 })
+
+    let tocaDescubierto = false
+    for (let dx = -1; dx <= 1 && !tocaDescubierto; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue
+        if (descubiertas.has(`${tile.x + dx}:${tile.y + dy}`)) {
+          tocaDescubierto = true
+          break
+        }
+      }
+    }
+
+    const color = mezclarColor(NIEBLA_COLOR_A, NIEBLA_COLOR_B, hashCasilla(tile.x, tile.y, 1))
+    const alphaTextura = NIEBLA_ALPHA_MIN + (NIEBLA_ALPHA_MAX - NIEBLA_ALPHA_MIN) * hashCasilla(tile.x, tile.y, 2)
+    const alpha = tocaDescubierto ? Math.min(alphaTextura, NIEBLA_ALPHA_BORDE) : alphaTextura
+
+    g.rect(tile.x * TILE, tile.y * TILE, TILE, TILE).fill({ color, alpha })
   }
   capaNiebla.addChild(g)
 }
@@ -635,7 +689,11 @@ defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar })
 
 .map-canvas {
   width: 100%;
-  height: 70vh;
+  /* Antes 70vh: con el panel de recursos y la barra de acciones alrededor,
+     dejaba el lienzo muy bajo y ancho (una zona descubierta cuadrada nunca
+     llenaba la pantalla, quedaban franjas negras enormes a los costados).
+     80vh le da bastante mas alto sin tapar esos paneles en un portatil. */
+  height: 80vh;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   overflow: hidden;
