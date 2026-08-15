@@ -6,6 +6,8 @@ import { useMapSocket } from '../../composables/useMapSocket.js'
 import MapGrid from './MapGrid.vue'
 import MapPlayerPanel from './MapPlayerPanel.vue'
 import MapActionBar from './MapActionBar.vue'
+import MapRoundLog from './MapRoundLog.vue'
+import MapVictory from './MapVictory.vue'
 
 const props = defineProps({
   partidaInicial: { type: Object, required: true }
@@ -13,12 +15,16 @@ const props = defineProps({
 const emit = defineEmits(['salir', 'error'])
 
 const { accion, vista: pedirVista } = useMapApi()
-const { conectar, desconectar, unirseAPartida, onEstado } = useMapSocket()
+const { conectar, desconectar, unirseAPartida, onEstado, onNarrativa } = useMapSocket()
 
 const id = props.partidaInicial.id
 const jugadorId = props.partidaInicial.jugadorId
 const token = props.partidaInicial.token
 const vista = ref(props.partidaInicial.vista)
+
+// La narrativa llega por su propio evento porque se genera despues de la
+// accion; el estado que llega por 'estado' todavia no la tiene.
+const narrativas = ref(props.partidaInicial.vista?.narrativas || [])
 
 const edificioMenuAbierto = ref(null) // {x, y} | null
 let pollEspera = null
@@ -46,6 +52,7 @@ const limpiarSesion = () => {
 
 const refrescarVista = async () => {
   vista.value = await pedirVista(id, jugadorId, token)
+  if (vista.value.narrativas) narrativas.value = vista.value.narrativas
   return vista.value
 }
 
@@ -137,6 +144,10 @@ onMounted(async () => {
       vista.value = payload
       detenerVigilancia()
     })
+    onNarrativa((entrada) => {
+      if (narrativas.value.some(n => n.ronda === entrada.ronda)) return
+      narrativas.value = [...narrativas.value, entrada]
+    })
   } catch {
     // El socket es solo para actualizaciones en vivo; si falla la conexion,
     // la partida sigue jugable por REST (ver spec seccion 6).
@@ -165,6 +176,15 @@ onUnmounted(() => {
     />
 
     <MapActionBar :vista="vista" :jugador-id="jugadorId" @terminar-turno="onTerminarTurno" />
+
+    <MapRoundLog :narrativas="narrativas" />
+
+    <MapVictory
+      v-if="vista.estado === 'terminado'"
+      :vista="vista"
+      :jugador-id="jugadorId"
+      @salir="salir"
+    />
 
     <div v-if="edificioMenuAbierto" class="edificio-menu-overlay" @click.self="cerrarMenuEdificio">
       <div class="edificio-menu">

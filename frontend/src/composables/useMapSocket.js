@@ -41,5 +41,9 @@ export function useMapSocket() {
     if (socket.value) socket.value.on('estado', callback)
   }
 
-  return { conectar, desconectar, unirseAPartida, onEstado }
+  const onNarrativa = (callback) => {
+    if (socket.value) socket.value.on('narrativa', callback)
+  }
+
+  return { conectar, desconectar, unirseAPartida, onEstado, onNarrativa }
 }
