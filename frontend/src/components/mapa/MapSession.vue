@@ -16,7 +16,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['salir', 'error'])
 
-const { accion, vista: pedirVista, obtenerConstantes } = useMapApi()
+const { accion, vista: pedirVista, obtenerConstantes, iniciar: iniciarPartidaApi } = useMapApi()
 const { conectar, desconectar, unirseAPartida, onEstado, onNarrativa } = useMapSocket()
 
 const id = props.partidaInicial.id
@@ -44,7 +44,11 @@ const nombreCiudad = ref('')
 let pollEspera = null
 
 // Reglas del juego (costos, stats). Vienen del backend para no duplicarlas.
-const constantes = ref({ edificios: [], unidades: [], costoCiudad: {} })
+// minJugadores tambien viene del backend (ver reglas/partida.js#iniciar): el
+// 2 de aca es solo un valor de arranque para el primer render, antes de que
+// responda /api/map/constantes.
+const constantes = ref({ edificios: [], unidades: [], costoCiudad: {}, minJugadores: 2 })
+const iniciando = ref(false)
 
 const seleccion = ref(null)        // {x, y} del ejercito propio elegido
 const ataqueAbierto = ref(null)    // {desde, hasta} | null
@@ -54,6 +58,19 @@ const tileEn = (x, y) => vista.value.mapa[y * vista.value.config.tamanoMapa + x]
 const esMiTurno = computed(() =>
   vista.value.jugadores[vista.value.indiceJugadorActual]?.id === jugadorId
 )
+
+// El backend no guarda un campo "anfitrion": lo unico estable es que
+// `unirse` va empujando jugadores al arreglo en el orden en que entran
+// (ver aplicar.js#JugadorUnido, que hace push y nunca reordena ni saca del
+// arreglo), y quien crea la partida es siempre el primero en unirse
+// (MapLobby.vue llama crearPartida y de inmediato unirse). Por eso
+// jugadores[0] identifica al anfitrion de forma confiable mientras la
+// partida sigue en 'esperando'.
+const esAnfitrion = computed(() => vista.value.jugadores[0]?.id === jugadorId)
+const jugadoresFaltantes = computed(() =>
+  Math.max(0, constantes.value.minJugadores - vista.value.jugadores.length)
+)
+const puedeIniciar = computed(() => jugadoresFaltantes.value === 0)
 
 // Adyacentes ortogonales (Manhattan 1) que el backend va a aceptar. Replica
 // las validaciones de `reglas/movimiento.js` y `reglas/combate.js` (distancia
@@ -181,6 +198,20 @@ const ejecutarAccion = async (datosAccion) => {
 }
 
 const onTerminarTurno = () => ejecutarAccion({ tipo: 'terminarTurno' })
+
+const onIniciarPartida = async () => {
+  if (!puedeIniciar.value || iniciando.value) return
+  iniciando.value = true
+  try {
+    await iniciarPartidaApi(id)
+    await refrescarVista()
+    detenerVigilancia()
+  } catch (err) {
+    emit('error', err.mensaje || 'No se pudo iniciar la partida.')
+  } finally {
+    iniciando.value = false
+  }
+}
 
 // Mismo criterio que combate.js: hay objetivo enemigo solo si hay un
 // ejercito ajeno o una ciudad ajena en la casilla (no alcanza con que el
@@ -357,8 +388,31 @@ onUnmounted(() => {
   <div class="map-session">
     <MapPlayerPanel :vista="vista" :jugador-id="jugadorId" />
 
-    <div v-if="vista.estado === 'esperando'" class="esperando">
-      Esperando a que el anfitrión inicie la partida…
+    <div v-if="vista.estado === 'esperando'" class="sala-espera">
+      <p class="sala-codigo">
+        Código de la partida: <strong>{{ partidaInicial.codigo }}</strong>
+      </p>
+
+      <p class="sala-titulo">
+        Jugadores unidos ({{ vista.jugadores.length }}/{{ constantes.minJugadores }} mínimo)
+      </p>
+      <ul class="sala-lista">
+        <li v-for="(j, i) in vista.jugadores" :key="j.id">
+          {{ j.nombre }}<span v-if="i === 0" class="sala-etiqueta"> (anfitrión)</span>
+        </li>
+      </ul>
+
+      <template v-if="esAnfitrion">
+        <button class="btn-primario" :disabled="!puedeIniciar || iniciando" @click="onIniciarPartida">
+          Iniciar partida
+        </button>
+        <p v-if="!puedeIniciar" class="sala-motivo">
+          Faltan {{ jugadoresFaltantes }} jugador{{ jugadoresFaltantes === 1 ? '' : 'es' }} para poder iniciar.
+        </p>
+      </template>
+      <p v-else class="sala-motivo">
+        Esperando a que el anfitrión inicie la partida…
+      </p>
     </div>
 
     <MapCanvas
@@ -444,12 +498,52 @@ onUnmounted(() => {
   color: #ecf0f1;
 }
 
-.esperando {
+.sala-espera {
   background: rgba(52, 152, 219, 0.15);
   border-radius: 8px;
-  padding: 0.75rem 1rem;
-  color: #3498db;
+  padding: 1rem 1.25rem;
+  color: #ecf0f1;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sala-codigo {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.sala-codigo strong {
+  color: #3498db;
+  letter-spacing: 0.2rem;
+}
+
+.sala-titulo {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: #bdc3c7;
+}
+
+.sala-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sala-etiqueta {
+  color: #f1c40f;
+  font-size: 0.8rem;
+}
+
+.sala-motivo {
+  margin: 0.25rem 0 0;
+  color: #e67e22;
+  font-size: 0.85rem;
 }
 
 .entrada-nombre {
