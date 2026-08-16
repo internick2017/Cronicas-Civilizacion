@@ -13,7 +13,8 @@ api.interceptors.response.use(
 )
 
 export function useMapApi() {
-  const crearPartida = ({ nombre, contraIA }) => api.post('/', { nombre, contraIA })
+  const crearPartida = ({ nombre, contraIA, dificultadIA }) =>
+    api.post('/', { nombre, contraIA, dificultadIA })
 
   const unirse = (idOCodigo, { id, nombre, civilizacion }) =>
     api.post(`/${idOCodigo}/unirse`, { id, nombre, civilizacion })

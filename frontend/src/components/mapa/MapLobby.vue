@@ -5,7 +5,7 @@ import { useMapApi } from '../../composables/useMapApi.js'
 
 const emit = defineEmits(['partida-unida'])
 
-const { crearPartida, unirse, iniciar, listarPartidas } = useMapApi()
+const { crearPartida, unirse, iniciar, listarPartidas, obtenerConstantes } = useMapApi()
 
 const nombrePartida = ref('')
 const nombreJugador = ref('')
@@ -13,6 +13,13 @@ const codigoUnirse = ref('')
 const partidasActivas = ref([])
 const cargando = ref(false)
 const error = ref('')
+
+// Se leen del backend (no se hardcodean acá) para no duplicar ni las
+// dificultades disponibles ni sus descripciones: si el balance cambia, esta
+// pantalla no queda desactualizada. dificultadIA arranca en null y se fija
+// al default recien cuando llega la respuesta.
+const dificultadesIA = ref([])
+const dificultadIA = ref(null)
 
 // Cuando el jugador CREA una partida no entra directo: queda en esta sala de espera
 // con el codigo a la vista, porque hasta que alguien llame a `iniciar` el mapa esta
@@ -78,7 +85,8 @@ const jugarContraIA = async () => {
   try {
     const { id, codigo } = await crearPartida({
       nombre: nombrePartida.value || 'Partida en solitario',
-      contraIA: true
+      contraIA: true,
+      dificultadIA: dificultadIA.value
     })
     const sesion = await unirseAPartida(id, codigo)
     await iniciar(id)
@@ -119,7 +127,22 @@ const unirseConCodigo = async (codigo) => {
   }
 }
 
-onMounted(cargarPartidas)
+const cargarDificultadesIA = async () => {
+  try {
+    const { dificultadesIA: lista } = await obtenerConstantes()
+    dificultadesIA.value = lista || []
+    dificultadIA.value = lista?.find(d => d.porDefecto)?.tipo ?? lista?.[0]?.tipo ?? null
+  } catch {
+    // Sin la lista, el selector no se muestra: crearPartida ya cae al
+    // default del backend si dificultadIA llega null/invalido.
+    dificultadesIA.value = []
+  }
+}
+
+onMounted(() => {
+  cargarPartidas()
+  cargarDificultadesIA()
+})
 </script>
 
 <template>
@@ -150,6 +173,20 @@ onMounted(cargarPartidas)
       <section class="panel panel-ia">
         <h2>🤖 Jugar solo</h2>
         <p class="ayuda">Sin esperar a nadie: la máquina controla al rival.</p>
+
+        <div v-if="dificultadesIA.length" class="dificultad-lista" role="radiogroup" aria-label="Dificultad">
+          <label
+            v-for="d in dificultadesIA"
+            :key="d.tipo"
+            class="dificultad-opcion"
+            :class="{ elegida: dificultadIA === d.tipo }"
+          >
+            <input type="radio" name="dificultadIA" :value="d.tipo" v-model="dificultadIA" />
+            <span class="dificultad-nombre">{{ d.nombre }}</span>
+            <small>{{ d.descripcion }}</small>
+          </label>
+        </div>
+
         <button class="btn-primary" :disabled="cargando" @click="jugarContraIA">
           Jugar contra la máquina
         </button>
@@ -252,6 +289,34 @@ onMounted(cargarPartidas)
   border-color: rgba(46, 204, 113, 0.35);
   background: rgba(46, 204, 113, 0.08);
 }
+
+.dificultad-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.9rem;
+}
+
+.dificultad-opcion {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.5rem;
+  align-items: baseline;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.dificultad-opcion.elegida {
+  border-color: rgba(46, 204, 113, 0.6);
+  background: rgba(46, 204, 113, 0.12);
+}
+
+.dificultad-nombre { font-weight: 600; }
+.dificultad-opcion small { grid-column: 2; opacity: 0.7; }
 
 .btn-primary {
   background: linear-gradient(45deg, #27ae60, #2ecc71);

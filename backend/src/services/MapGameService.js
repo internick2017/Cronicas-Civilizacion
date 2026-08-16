@@ -9,6 +9,7 @@ import { reclutar } from '../domain/mapa/reglas/militar.js';
 import { adoptarRasgo } from '../domain/mapa/reglas/cultura.js';
 import { abandonar } from '../domain/mapa/reglas/abandono.js';
 import { jugarTurnoIA } from '../domain/mapa/ia.js';
+import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT } from '../domain/mapa/constantes.js';
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
 import { atacar } from '../domain/mapa/reglas/combate.js';
 import { terminarTurno } from '../domain/mapa/reglas/turnos.js';
@@ -140,11 +141,15 @@ export class MapGameService {
     this.cache.set(estado.id, estado);
   }
 
-  async crearPartida({ nombre, semilla, config, contraIA }) {
+  async crearPartida({ nombre, semilla, config, contraIA, dificultadIA }) {
     const codigo = await this._generarCodigoUnico();
+    // dificultadIA se valida ACA (contra la lista blanca) y no en el dominio:
+    // es una preferencia de configuracion, no una regla de juego, y asi
+    // cualquier valor raro que llegue por HTTP nunca pisa el default.
+    const dificultad = DIFICULTADES_IA.includes(dificultadIA) ? dificultadIA : DIFICULTAD_IA_DEFAULT;
     // maxJugadores se fuerza a 2 (creador + bot): una partida "contra la
     // maquina" es de UN humano, no una invitacion a que se sume gente.
-    const cfg = { ...(config ?? {}), ...(contraIA ? { contraIA: true, maxJugadores: 2 } : {}) };
+    const cfg = { ...(config ?? {}), ...(contraIA ? { contraIA: true, dificultadIA: dificultad, maxJugadores: 2 } : {}) };
     const estado = crearEstado({ nombre, semilla: semilla ?? codigo, config: cfg });
     estado.codigo = codigo;
     // El bot NO se agrega aca: si se agregara antes de que exista un humano,
@@ -199,7 +204,10 @@ export class MapGameService {
     // partida y no hay ventana donde un tercero pueda robarle el lugar.
     if (estado.config.contraIA && estado.jugadores.length === 1) {
       const civilizacion = CIVILIZACIONES_BOT[Math.floor(Math.random() * CIVILIZACIONES_BOT.length)];
-      const eventosBot = unirseRegla(estado, { id: ID_BOT, nombre: NOMBRE_BOT, civilizacion, esBot: true });
+      const eventosBot = unirseRegla(estado, {
+        id: ID_BOT, nombre: NOMBRE_BOT, civilizacion, esBot: true,
+        dificultadIA: estado.config.dificultadIA ?? DIFICULTAD_IA_DEFAULT,
+      });
       aplicar(estado, eventosBot);
       eventos.push(...eventosBot);
     }

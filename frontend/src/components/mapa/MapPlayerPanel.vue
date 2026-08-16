@@ -10,6 +10,11 @@ const props = defineProps({
 const jugadorActual = computed(() => props.vista.jugadores[props.vista.indiceJugadorActual])
 const yo = computed(() => props.vista.jugadores.find(j => j.id === props.jugadorId))
 
+// Solo para la etiqueta al lado del bot: los datos de balance de cada
+// dificultad (que hace mejor/peor) viven en el backend (/api/map/constantes),
+// esto es puramente el texto de presentacion.
+const NOMBRE_DIFICULTAD = { facil: 'fácil', normal: 'normal', dificil: 'difícil' }
+
 const NOMBRE_RECURSO = {
   food: 'Comida', gold: 'Oro', wood: 'Madera',
   stone: 'Piedra', science: 'Ciencia', culture: 'Cultura'
@@ -64,7 +69,9 @@ const RECURSOS_ICONOS = {
     <ul class="jugadores-lista">
       <li v-for="j in vista.jugadores" :key="j.id" :class="{ activo: j.id === jugadorActual?.id }">
         <span v-if="j.esBot" title="Jugador controlado por la máquina">🤖</span>
-        {{ j.nombre }} ({{ j.civilizacion }}) <span v-if="!j.activo">— eliminado</span>
+        {{ j.nombre }} ({{ j.civilizacion }})
+        <small v-if="j.esBot" class="dificultad-badge">{{ NOMBRE_DIFICULTAD[j.dificultadIA] || j.dificultadIA }}</small>
+        <span v-if="!j.activo">— eliminado</span>
       </li>
     </ul>
   </div>
@@ -109,6 +116,11 @@ const RECURSOS_ICONOS = {
   margin: 0;
   font-size: 0.85rem;
   color: #bdc3c7;
+}
+
+.dificultad-badge {
+  opacity: 0.6;
+  margin-left: 0.25rem;
 }
 
 .jugadores-lista .activo {
