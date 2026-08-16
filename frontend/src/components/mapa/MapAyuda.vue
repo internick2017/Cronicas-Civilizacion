@@ -32,6 +32,18 @@ const efectoRasgo = (rasgo) => {
   return partes.join(' · ')
 }
 
+const efectoTecnologia = (tec) => {
+  const partes = []
+  if (tec.bonoAtaqueUnidades) partes.push(`+${tec.bonoAtaqueUnidades} de ataque a tus unidades`)
+  if (tec.bonoDefensaUnidades) partes.push(`+${tec.bonoDefensaUnidades} de defensa a tus unidades`)
+  for (const [recurso, fraccion] of Object.entries(tec.produccionPorcentual || {})) {
+    partes.push(`+${Math.round(fraccion * 100)}% de ${NOMBRE_RECURSO[recurso] || recurso}`)
+  }
+  if (tec.desbloqueaUnidad) partes.push('desbloquea una unidad')
+  if (tec.desbloqueaEdificio) partes.push('desbloquea un edificio')
+  return partes.join(' · ')
+}
+
 const terrenosProductivos = computed(() =>
   (props.constantes?.terrenos || []).filter(t => Object.keys(t.produccion || {}).length > 0)
 )
@@ -86,12 +98,17 @@ const porcentajeDominacion = computed(() =>
         </thead>
         <tbody>
           <tr v-for="e in constantes.edificios" :key="e.tipo">
-            <td>{{ e.nombre }}</td>
+            <td>{{ e.nombre }}<small v-if="e.requiereTecnologia"> (necesita tecnología)</small></td>
             <td>{{ costo(e.costo) }}</td>
             <td>{{ produccion(e.produccion) }}</td>
           </tr>
         </tbody>
       </table>
+      <p class="aviso">
+        Además de construir, una ciudad se puede <strong>mejorar de nivel</strong>
+        (con ciencia y oro, cada vez más caro): sube su defensa. Es por ciudad,
+        no una tecnología de toda la civilización.
+      </p>
     </section>
 
     <section v-if="constantes.rasgosCulturales?.length">
@@ -123,12 +140,37 @@ const porcentajeDominacion = computed(() =>
         </thead>
         <tbody>
           <tr v-for="u in constantes.unidades" :key="u.tipo">
-            <td>{{ u.nombre }}<small v-if="u.requiereBarracks"> (necesita cuartel)</small></td>
+            <td>
+              {{ u.nombre }}
+              <small v-if="u.requiereBarracks"> (necesita cuartel)</small>
+              <small v-if="u.requiereTecnologia"> (necesita tecnología)</small>
+            </td>
             <td>{{ u.ataque }}</td>
             <td>{{ u.defensa }}</td>
             <td>{{ u.salud }}</td>
             <td>{{ u.movimiento }}</td>
             <td>{{ costo(u.costo) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section v-if="constantes.tecnologias?.length">
+      <h4>Ciencia</h4>
+      <p>
+        La ciencia se gasta en <strong>tecnologías</strong>: se investigan una
+        sola vez, valen para siempre, y son independientes entre sí (no hace
+        falta una para desbloquear otra).
+      </p>
+      <table>
+        <thead>
+          <tr><th>Tecnología</th><th>Cuesta</th><th>Efecto</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="t in constantes.tecnologias" :key="t.tipo">
+            <td>{{ t.nombre }}</td>
+            <td>{{ t.costo.science }} ciencia</td>
+            <td>{{ efectoTecnologia(t) }}</td>
           </tr>
         </tbody>
       </table>
