@@ -3,7 +3,8 @@ import { ReglaError } from '../domain/mapa/errores.js';
 import {
   EDIFICIOS, UNIDADES, COSTO_CIUDAD, MIN_JUGADORES,
   PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, BONO_TERRENO_DEFENSA,
-  BONO_DEFENSA_CIUDAD, PORCENTAJE_VICTORIA_DOMINACION, RASGOS_CULTURALES
+  BONO_DEFENSA_CIUDAD, PORCENTAJE_VICTORIA_DOMINACION, RASGOS_CULTURALES,
+  DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT
 } from '../domain/mapa/constantes.js';
 
 // Nombres en espanol para la interfaz. Viven aca y no en el dominio porque
@@ -16,6 +17,11 @@ const NOMBRE_UNIDAD = { warrior: 'Guerrero', archer: 'Arquero', spearman: 'Lance
 const NOMBRE_TERRENO = {
   plains: 'Llanura', forest: 'Bosque', mountains: 'Montaña',
   hills: 'Colinas', desert: 'Desierto', water: 'Agua'
+};
+const DIFICULTAD_IA_INFO = {
+  facil: { nombre: 'Fácil', descripcion: 'Ataca sin calcular y a veces se distrae; buena para aprender el juego.' },
+  normal: { nombre: 'Normal', descripcion: 'Evita los combates que va a perder y construye con criterio.' },
+  dificil: { nombre: 'Difícil', descripcion: 'Solo pelea cuando tiene ventaja clara y prioriza unidades fuertes.' },
 };
 
 /**
@@ -92,6 +98,12 @@ export function crearMapRoutes(servicio) {
         visionExtra: datos.visionExtra ?? 0,
         bonoDefensaCiudad: datos.bonoDefensaCiudad ?? 0
       })),
+      dificultadesIA: DIFICULTADES_IA.map((tipo) => ({
+        tipo,
+        nombre: DIFICULTAD_IA_INFO[tipo]?.nombre || tipo,
+        descripcion: DIFICULTAD_IA_INFO[tipo]?.descripcion || '',
+        porDefecto: tipo === DIFICULTAD_IA_DEFAULT,
+      })),
       bonoDefensaCiudad: BONO_DEFENSA_CIUDAD,
       porcentajeVictoriaDominacion: PORCENTAJE_VICTORIA_DOMINACION
     });
@@ -100,8 +112,10 @@ export function crearMapRoutes(servicio) {
   // POST /api/map - crear una partida nueva
   router.post('/', async (req, res) => {
     try {
-      const { nombre, semilla, config, contraIA } = req.body ?? {};
-      const resultado = await servicio.crearPartida({ nombre, semilla, config, contraIA: Boolean(contraIA) });
+      const { nombre, semilla, config, contraIA, dificultadIA } = req.body ?? {};
+      const resultado = await servicio.crearPartida({
+        nombre, semilla, config, contraIA: Boolean(contraIA), dificultadIA,
+      });
       res.status(201).json(resultado);
     } catch (err) {
       manejarError(err, res);
