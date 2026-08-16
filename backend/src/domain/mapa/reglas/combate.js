@@ -7,6 +7,7 @@ import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
 import { validarTurno, evento } from './comun.js';
 import { bonoDefensaPorRasgos } from './cultura.js';
+import { bonoAtaquePorTecnologias, bonoDefensaUnidadPorTecnologias } from './tecnologia.js';
 
 export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   validarTurno(estado, jugadorId);
@@ -38,13 +39,22 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   const base = ejercitoEnemigo ? UNIDADES[ejercitoEnemigo.tipo].defensa : defensaCiudad(ciudadEnemiga.nivel);
   const ciudadPropia = Boolean(tileHasta.ciudad);
 
+  // Metalurgia y fortificacion (tecnologia) son bonos PLANOS a unidades, no
+  // multiplicadores: se suman antes de aplicar los multiplicadores de
+  // terreno/ciudad, que siguen siendo exclusivos de la defensa.
+  const propio = estado.jugadores.find(j => j.id === jugadorId);
+  const ataqueBase = atacante.ataque + bonoAtaquePorTecnologias(propio);
+
   // El rasgo cultural del arte solo cuenta si se defiende una ciudad, y es la
-  // del DUEÑO de esa casilla, no la del atacante.
+  // del DUEÑO de esa casilla, no la del atacante. Fortificacion, al reves,
+  // solo cuenta si se defiende con un EJERCITO: una ciudad no es "una
+  // unidad", asi que su formula de defensa (defensaCiudad(nivel)) no la usa.
   const defensor = estado.jugadores.find(j => j.id === tileHasta.dueno);
   const bonoCiudad = ciudadPropia ? BONO_DEFENSA_CIUDAD * bonoDefensaPorRasgos(defensor) : 1;
+  const defensaBase = base + (ejercitoEnemigo ? bonoDefensaUnidadPorTecnologias(defensor) : 0);
 
-  const poderAtaque = atacante.ataque * tirada(rng);
-  const poderDefensa = base * tirada(rng) * bonoDefensa(tileHasta.terreno) * bonoCiudad;
+  const poderAtaque = ataqueBase * tirada(rng);
+  const poderDefensa = defensaBase * tirada(rng) * bonoDefensa(tileHasta.terreno) * bonoCiudad;
 
   const ganador = poderAtaque > poderDefensa ? 'atacante' : 'defensor';
 

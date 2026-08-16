@@ -8,7 +8,8 @@ const NOMBRE_EDIFICIO = {
   library: 'una biblioteca',
   barracks: 'un cuartel',
   sawmill: 'un aserradero',
-  quarry: 'una cantera'
+  quarry: 'una cantera',
+  university: 'una universidad'
 };
 
 const NOMBRE_RASGO = {
@@ -18,11 +19,21 @@ const NOMBRE_RASGO = {
   arte: 'el arte'
 };
 
+const NOMBRE_TECNOLOGIA = {
+  metalurgia: 'la metalurgia',
+  fortificacion: 'la fortificación',
+  irrigacion: 'la irrigación',
+  mineria: 'la minería',
+  formacionMilitar: 'una nueva formación militar',
+  filosofia: 'la filosofía'
+};
+
 const NOMBRE_UNIDAD = {
   warrior: 'guerreros',
   archer: 'arqueros',
   spearman: 'lanceros',
   cavalry: 'caballeria',
+  legionary: 'legionarios',
   catapult: 'una catapulta'
 };
 
@@ -94,6 +105,17 @@ export function narrarRonda(eventos, jugadores = []) {
       case 'RasgoAdoptado': {
         const rasgo = NOMBRE_RASGO[datos.rasgo] ?? textoSeguro(datos.rasgo) ?? 'una nueva costumbre';
         frases.push(`${quien} hizo florecer ${rasgo} entre su gente.`);
+        break;
+      }
+
+      case 'TecnologiaInvestigada': {
+        const tecnologia = NOMBRE_TECNOLOGIA[datos.tecnologia] ?? textoSeguro(datos.tecnologia) ?? 'un nuevo saber';
+        frases.push(`${quien} dominó ${tecnologia}.`);
+        break;
+      }
+
+      case 'CiudadMejorada': {
+        frases.push(`${quien} amplió una de sus ciudades.`);
         break;
       }
 

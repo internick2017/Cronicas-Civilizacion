@@ -1,6 +1,7 @@
 import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_VICTORIA_DOMINACION } from '../constantes.js';
 import { validarTurno, evento } from './comun.js';
 import { produccionPorRasgos } from './cultura.js';
+import { aplicarBonosPorcentuales } from './tecnologia.js';
 
 export function siguienteIndiceActivo(estado, excluirIds = null) {
   const n = estado.jugadores.length;
@@ -38,7 +39,10 @@ export function producirParaJugador(estado, jugadorId) {
       for (const [recurso, cantidad] of Object.entries(produccionEdificio)) acumular(recurso, cantidad);
     }
   }
-  return produccion;
+  // Los bonos porcentuales de tecnologia (irrigacion, mineria) se aplican AL
+  // FINAL, sobre el total ya sumado: un 20% de "toda tu comida" tiene que
+  // contar el terreno, los edificios Y los rasgos, no solo la base.
+  return aplicarBonosPorcentuales(produccion, estado.jugadores.find(j => j.id === jugadorId));
 }
 
 // Exportada para que abandonar() use la MISMA evaluacion: si el que se va deja
