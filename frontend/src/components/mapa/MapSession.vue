@@ -41,6 +41,24 @@ const fusionarNarrativas = (actuales, entrantes) => {
 const edificioMenuAbierto = ref(null) // {x, y} | null
 const fundarAbierto = ref(null) // {x, y} | null
 const nombreCiudad = ref('')
+
+// El mapa ocupa toda la pantalla, asi que la cronica y la lista de ciudades
+// van encima como paneles que se pueden cerrar en vez de apilados debajo
+// (donde quedaban fuera de la vista y habia que scrollear para encontrarlos).
+const canvasRef = ref(null)
+const cronicaAbierta = ref(true)
+const ciudadesAbierto = ref(false)
+
+const misCiudades = computed(() =>
+  vista.value.mapa
+    .filter(t => t.ciudad && t.dueno === jugadorId)
+    .map(t => ({ x: t.x, y: t.y, nombre: t.ciudad.nombre, nivel: t.ciudad.nivel }))
+)
+
+const irACiudad = (ciudad) => {
+  canvasRef.value?.irA(ciudad.x, ciudad.y)
+  ciudadesAbierto.value = false
+}
 let pollEspera = null
 
 // Reglas del juego (costos, stats). Vienen del backend para no duplicarlas.
@@ -340,6 +358,13 @@ const onTecla = (e) => {
 
 onMounted(async () => {
   window.addEventListener('keydown', onTecla)
+  // La partida es a pantalla fija, pero el #app global mide 100vh MAS su
+  // padding, asi que la pagina de atras seguia teniendo unos pixeles de
+  // scroll y el gesto de arrastrar el mapa en tactil movia la pagina entera.
+  // Va en <html> ademas de <body>: con overflow hidden solo en body, el
+  // elemento que scrollea sigue siendo <html> y la pagina se mueve igual.
+  document.documentElement.style.overflow = 'hidden'
+  document.body.style.overflow = 'hidden'
   guardarSesion()
 
   try {
@@ -379,6 +404,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onTecla)
+  document.documentElement.style.overflow = ''
+  document.body.style.overflow = ''
   detenerVigilancia()
   desconectar()
 })
@@ -415,18 +442,46 @@ onUnmounted(() => {
       </p>
     </div>
 
-    <MapCanvas
-      :vista="vista"
-      :jugador-id="jugadorId"
-      :seleccion="seleccion"
-      :alcanzables="alcanzables"
-      :constantes="constantes"
-      @click-tile="onClickTile"
-    />
+    <div class="zona-mapa">
+      <MapCanvas
+        ref="canvasRef"
+        :vista="vista"
+        :jugador-id="jugadorId"
+        :seleccion="seleccion"
+        :alcanzables="alcanzables"
+        :constantes="constantes"
+        @click-tile="onClickTile"
+      />
+
+      <div class="botonera-paneles">
+        <button class="btn-panel" @click="ciudadesAbierto = !ciudadesAbierto">
+          🏙️ Ciudades ({{ misCiudades.length }})
+        </button>
+        <button class="btn-panel" @click="cronicaAbierta = !cronicaAbierta">
+          📖 Crónica
+        </button>
+      </div>
+
+      <aside v-if="ciudadesAbierto" class="panel-flotante panel-ciudades">
+        <h3>Mis ciudades</h3>
+        <p v-if="misCiudades.length === 0" class="panel-vacio">
+          Todavía no tenés ciudades.
+        </p>
+        <button
+          v-for="ciudad in misCiudades"
+          :key="`${ciudad.x},${ciudad.y}`"
+          class="item-ciudad"
+          @click="irACiudad(ciudad)"
+        >
+          <span>{{ ciudad.nombre }}</span>
+          <small>nivel {{ ciudad.nivel }}</small>
+        </button>
+      </aside>
+
+      <MapRoundLog v-if="cronicaAbierta" class="panel-flotante panel-cronica" :narrativas="narrativas" />
+    </div>
 
     <MapActionBar :vista="vista" :jugador-id="jugadorId" @terminar-turno="onTerminarTurno" />
-
-    <MapRoundLog :narrativas="narrativas" />
 
     <MapVictory
       v-if="vista.estado === 'terminado'"
@@ -493,12 +548,130 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* La partida ocupa exactamente una pantalla y no scrollea: antes el mapa media
+   80vh fijos y el encabezado lo empujaba, asi que habia que bajar para ver el
+   tablero y mas abajo todavia para encontrar la cronica. dvh en vez de vh
+   porque en celulares y tablets la barra del navegador se muestra y se
+   esconde, y con vh el layout salta. */
 .map-session {
+  /* Fija a la ventana a proposito: el #app global tiene max-width 1280px y
+     padding, asi que dentro de esa caja la partida nunca podria ocupar la
+     pantalla (de ahi las franjas negras a los costados en monitores anchos).
+     z-index bajo para que el toast de errores, que esta en 1001, siga arriba. */
+  position: fixed;
+  inset: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 0.6rem;
+  padding: 0.6rem;
   color: #ecf0f1;
+  background: #1a2332;
+  overflow: hidden;
+}
+
+/* Contenedor del mapa: se come todo el alto sobrante. min-height 0 es lo que
+   permite que un hijo flexible pueda ACHICARSE (sin esto un flex item nunca
+   baja de su contenido y vuelve a aparecer el scroll). */
+.zona-mapa {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.botonera-paneles {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  gap: 0.4rem;
+  z-index: 2;
+}
+
+.btn-panel {
+  background: rgba(15, 20, 25, 0.85);
+  color: #ecf0f1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btn-panel:hover { background: rgba(52, 152, 219, 0.35); }
+
+.panel-flotante {
+  position: absolute;
+  z-index: 2;
+  background: rgba(15, 20, 25, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+}
+
+.panel-ciudades {
+  top: 3.2rem;
+  left: 0.75rem;
+  width: 15rem;
+  max-height: 60%;
+  overflow-y: auto;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.panel-ciudades h3 { margin: 0 0 0.3rem; font-size: 0.9rem; color: #f1c40f; }
+.panel-vacio { opacity: 0.6; font-style: italic; margin: 0; font-size: 0.85rem; }
+
+.item-ciudad {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ecf0f1;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.item-ciudad:hover { background: rgba(52, 152, 219, 0.35); }
+.item-ciudad small { opacity: 0.6; font-size: 0.75rem; }
+
+/* La cronica es el corazon narrativo del juego: va a la vista, no enterrada
+   al pie de la pagina. Ancho acotado para no tapar el mapa. El alto lo sigue
+   poniendo el propio MapRoundLog (30vh), para no tener dos reglas peleando
+   por el mismo max-height. */
+.panel-cronica {
+  top: 0.75rem;
+  right: 0.75rem;
+  width: min(24rem, 38%);
+}
+
+/* En telefonos no hay lugar para paneles al costado: el 38% del ancho deja una
+   columna de texto ilegible y encima se monta sobre los botones. Pasan a ocupar
+   el ancho completo, la cronica abajo (como una hoja) y las ciudades arriba. */
+@media (max-width: 640px) {
+  .panel-cronica {
+    top: auto;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    width: auto;
+  }
+
+  .panel-ciudades {
+    left: 0.5rem;
+    right: 0.5rem;
+    width: auto;
+    max-height: 45%;
+  }
+
+  .btn-panel { font-size: 0.8rem; padding: 0.35rem 0.55rem; }
 }
 
 .sala-espera {
