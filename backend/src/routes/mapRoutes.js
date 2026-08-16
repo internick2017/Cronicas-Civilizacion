@@ -100,8 +100,8 @@ export function crearMapRoutes(servicio) {
   // POST /api/map - crear una partida nueva
   router.post('/', async (req, res) => {
     try {
-      const { nombre, semilla, config } = req.body ?? {};
-      const resultado = await servicio.crearPartida({ nombre, semilla, config });
+      const { nombre, semilla, config, contraIA } = req.body ?? {};
+      const resultado = await servicio.crearPartida({ nombre, semilla, config, contraIA: Boolean(contraIA) });
       res.status(201).json(resultado);
     } catch (err) {
       manejarError(err, res);
