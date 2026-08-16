@@ -1,5 +1,5 @@
 import { tileEn, jugadorPorId, puedePagar } from '../MapGame.js';
-import { UNIDADES } from '../constantes.js';
+import { UNIDADES, CUARTEL } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento } from './comun.js';
 import { tieneTecnologiaRequerida } from './tecnologia.js';
@@ -33,12 +33,24 @@ export function reclutar(estado, jugadorId, { x, y, unidad }) {
   if (!tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) {
     throw new ReglaError('REQUIERE_TECNOLOGIA', `Esa unidad requiere la tecnología: ${definicion.requiereTecnologia}`);
   }
-  if (!puedePagar(jugador, definicion.costo)) {
+
+  // Un cuartel entrena mejor: lo reclutado ahi sale mas barato y con mas
+  // movimiento. No es solo la llave para caballeria/catapulta.
+  const tieneCuartel = tile.ciudad.edificios.includes('barracks');
+  const costo = tieneCuartel
+    ? Object.fromEntries(Object.entries(definicion.costo).map(
+      ([recurso, monto]) => [recurso, Math.round(monto * (1 - CUARTEL.descuentoReclutar))]))
+    : definicion.costo;
+
+  if (!puedePagar(jugador, costo)) {
     throw new ReglaError('RECURSOS_INSUFICIENTES', 'Recursos insuficientes');
   }
 
   return [
-    evento('RecursosGastados', estado, jugadorId, { costo: definicion.costo }),
-    evento('UnidadReclutada', estado, jugadorId, { x, y, tipo: unidad }),
+    evento('RecursosGastados', estado, jugadorId, { costo }),
+    evento('UnidadReclutada', estado, jugadorId, {
+      x, y, tipo: unidad,
+      bonoMovimiento: tieneCuartel ? CUARTEL.bonoMovimiento : 0,
+    }),
   ];
 }

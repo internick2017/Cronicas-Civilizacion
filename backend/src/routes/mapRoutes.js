@@ -4,7 +4,7 @@ import {
   EDIFICIOS, UNIDADES, COSTO_CIUDAD, MIN_JUGADORES,
   PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, BONO_TERRENO_DEFENSA,
   BONO_DEFENSA_CIUDAD, PORCENTAJE_VICTORIA_DOMINACION, RASGOS_CULTURALES,
-  DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, TECNOLOGIAS, COSTO_MEJORA_CIUDAD
+  DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, TECNOLOGIAS, COSTO_MEJORA_CIUDAD, CUARTEL
 } from '../domain/mapa/constantes.js';
 
 // Nombres en espanol para la interfaz. Viven aca y no en el dominio porque
@@ -99,6 +99,9 @@ export function crearMapRoutes(servicio) {
         desbloqueaEdificio: datos.desbloqueaEdificio ?? null
       })),
       costoMejoraCiudadPorNivel: COSTO_MEJORA_CIUDAD(1),
+      // Efectos del cuartel (ver el comentario junto a EDIFICIOS.barracks en
+      // el dominio): no son "produccion" de un recurso, por eso van aparte.
+      cuartel: CUARTEL,
       // Reglas de economia y combate, para que el panel de ayuda las explique
       // leyendolas de aca en vez de copiarlas (y quedar desactualizado al
       // primer cambio de balance).

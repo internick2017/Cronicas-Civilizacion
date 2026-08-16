@@ -45,13 +45,27 @@ const motivoEdificio = (ed) => {
   return null
 }
 
+// El cuartel abarata y potencia lo reclutado EN esa ciudad (ver el
+// comentario en constantes.js#CUARTEL): sin esto el boton mostraria el
+// precio y el movimiento de lista aunque el backend vaya a cobrar/dar otra
+// cosa, y "sin recursos" podria estar mal si el precio real (con descuento)
+// si te alcanza.
+const cuartel = computed(() => props.constantes.cuartel || null)
+const costoReal = (costoBase) => {
+  if (!tieneBarracks.value || !cuartel.value) return costoBase
+  return Object.fromEntries(Object.entries(costoBase).map(
+    ([r, m]) => [r, Math.round(m * (1 - cuartel.value.descuentoReclutar))]))
+}
+const movimientoReal = (u) =>
+  u.movimiento + (tieneBarracks.value && cuartel.value ? cuartel.value.bonoMovimiento : 0)
+
 const motivoUnidad = (u) => {
   if (tile.value?.ejercito) return 'casilla ocupada'
   if (u.requiereBarracks && !tieneBarracks.value) return 'requiere cuartel'
   if (u.requiereTecnologia && !misTecnologias.value.includes(u.requiereTecnologia)) {
     return `requiere ${nombreTecnologia(u.requiereTecnologia)}`
   }
-  if (!puedePagar(u.costo)) return 'sin recursos'
+  if (!puedePagar(costoReal(u.costo))) return 'sin recursos'
   return null
 }
 
@@ -108,8 +122,9 @@ const motivoMejora = computed(() => (puedePagar(costoMejora.value) ? null : 'sin
         @click="$emit('reclutar', u.tipo)"
       >
         <strong>{{ u.nombre }}</strong>
-        <small>ATQ {{ u.ataque }} · DEF {{ u.defensa }} · MOV {{ u.movimiento }}</small>
-        <small>{{ textoCosto(u.costo) }}</small>
+        <small>ATQ {{ u.ataque }} · DEF {{ u.defensa }} · MOV {{ movimientoReal(u) }}</small>
+        <small>{{ textoCosto(costoReal(u.costo)) }}</small>
+        <em v-if="tieneBarracks && cuartel" class="bono-cuartel">🏛️ cuartel: -{{ Math.round(cuartel.descuentoReclutar * 100) }}%, +{{ cuartel.bonoMovimiento }} mov</em>
         <em v-if="motivoUnidad(u)">{{ motivoUnidad(u) }}</em>
       </button>
     </section>
@@ -130,4 +145,5 @@ section { display: flex; flex-direction: column; gap: 0.35rem; }
 .btn-secundario:disabled { opacity: 0.45; cursor: not-allowed; }
 small { opacity: 0.7; font-size: 0.75rem; }
 em { color: #e67e22; font-size: 0.72rem; font-style: normal; }
+.bono-cuartel { color: #2ecc71; }
 </style>

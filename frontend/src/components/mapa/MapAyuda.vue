@@ -109,6 +109,14 @@ const porcentajeDominacion = computed(() =>
         (con ciencia y oro, cada vez más caro): sube su defensa. Es por ciudad,
         no una tecnología de toda la civilización.
       </p>
+      <p v-if="constantes.cuartel">
+        El <strong>cuartel</strong> no solo desbloquea caballería y catapulta:
+        la ciudad donde está sube +{{ constantes.cuartel.bonoDefensaCiudad }} de
+        defensa, cura +{{ constantes.cuartel.curacionPorRonda }} de vida por
+        turno a la tropa parada ahí, y lo que reclutes ahí sale
+        {{ Math.round(constantes.cuartel.descuentoReclutar * 100) }}% más barato
+        y con +{{ constantes.cuartel.bonoMovimiento }} de movimiento.
+      </p>
     </section>
 
     <section v-if="constantes.rasgosCulturales?.length">
