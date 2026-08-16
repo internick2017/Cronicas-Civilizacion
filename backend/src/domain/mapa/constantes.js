@@ -31,8 +31,12 @@ export const EDIFICIOS = {
     costo: { gold: 50, wood: 30 },
     produccion: { gold: 5 }
   },
+  // La biblioteca costaba 20 de ciencia, pero la ciencia empieza en 0 y su UNICA
+  // fuente es la propia biblioteca: era imposible de construir en toda partida.
+  // Ahora cuesta solo materiales, asi que la ciencia pasa a ser algo que se
+  // genera y nunca un requisito previo para generarla.
   library: {
-    costo: { science: 20, stone: 40 },
+    costo: { wood: 20, stone: 40 },
     produccion: { science: 3 }
   },
   barracks: {
