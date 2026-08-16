@@ -114,9 +114,15 @@ const porcentajeDominacion = computed(() =>
         por ×{{ constantes.bonoDefensaCiudad }} si está dentro de una ciudad.
       </p>
       <p>
-        Gana el número más alto y <strong>solo el perdedor recibe daño</strong>:
-        cuanto más desparejo el resultado, más daño. Atacar de frente a una
-        unidad defensiva parada en altura suele salir mal.
+        Gana el número más alto, pero <strong>los dos lados reciben daño</strong>:
+        cada uno pega según su peso en el combate y el golpe del perdedor vale
+        la mitad. Cuanto más parejo el combate, más se desgasta también el que
+        gana, así que encadenar peleas sin recuperarse se paga caro.
+      </p>
+      <p class="aviso">
+        Atacar de frente a una unidad defensiva parada en altura o dentro de
+        una ciudad suele salir mal. Un atacante muy debilitado puede caer por
+        la réplica aunque gane, y en ese caso la ciudad no se captura.
       </p>
     </section>
   </div>

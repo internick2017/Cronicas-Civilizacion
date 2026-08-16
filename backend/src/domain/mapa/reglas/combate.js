@@ -1,5 +1,8 @@
 import { tileEn } from '../MapGame.js';
-import { UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD } from '../constantes.js';
+import {
+  UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD,
+  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA
+} from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
 import { validarTurno, evento } from './comun.js';
@@ -38,11 +41,18 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   const poderDefensa = base * tirada(rng) * bonoDefensa(tileHasta.terreno) * (ciudadPropia ? BONO_DEFENSA_CIUDAD : 1);
 
   const ganador = poderAtaque > poderDefensa ? 'atacante' : 'defensor';
-  const damageMultiplier = Math.abs(poderAtaque - poderDefensa) / Math.max(poderAtaque, poderDefensa);
-  const dano = Math.max(10, Math.round(50 * damageMultiplier));
 
-  const danoAtacante = ganador === 'defensor' ? dano : 0;
-  const danoDefensor = ganador === 'atacante' ? dano : 0;
+  // Cada lado pega segun su peso relativo en el combate, no segun quien gano:
+  // el que domina hace mas dano, pero el otro igual araña algo. El golpe del
+  // perdedor va a la mitad (FACTOR_REPLICA) para que atacar siga conviniendo.
+  const poderTotal = poderAtaque + poderDefensa;
+  const golpe = (poder, esDelGanador) => {
+    const bruto = DANO_COMBATE * (poder / poderTotal) * (esDelGanador ? 1 : FACTOR_REPLICA);
+    return Math.max(esDelGanador ? DANO_MINIMO : REPLICA_MINIMA, Math.round(bruto));
+  };
+
+  const danoDefensor = golpe(poderAtaque, ganador === 'atacante');
+  const danoAtacante = golpe(poderDefensa, ganador === 'defensor');
 
   const eventos = [
     evento('CombateResuelto', estado, jugadorId, {
@@ -54,14 +64,21 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
     }),
   ];
 
-  if (ganador === 'atacante') {
-    if (ejercitoEnemigo) {
-      if (ejercitoEnemigo.salud - danoDefensor <= 0) {
-        eventos.push(evento('UnidadDestruida', estado, jugadorId, { x: hasta.x, y: hasta.y }));
-      }
-    } else {
-      eventos.push(evento('CiudadCapturada', estado, jugadorId, { x: hasta.x, y: hasta.y }));
-    }
+  // Con dano mutuo cualquiera de los dos puede caer, incluso el que gano: la
+  // muerte depende de la salud que tenia, no de quien se llevo el combate.
+  const atacanteCae = tileDesde.ejercito.salud - danoAtacante <= 0;
+  const defensorCae = Boolean(ejercitoEnemigo) && ejercitoEnemigo.salud - danoDefensor <= 0;
+
+  if (defensorCae) {
+    eventos.push(evento('UnidadDestruida', estado, jugadorId, { x: hasta.x, y: hasta.y }));
+  }
+  if (atacanteCae) {
+    eventos.push(evento('UnidadDestruida', estado, jugadorId, { x: desde.x, y: desde.y }));
+  }
+
+  // Solo se toma la ciudad si queda alguien en pie para tomarla.
+  if (ganador === 'atacante' && !ejercitoEnemigo && !atacanteCae) {
+    eventos.push(evento('CiudadCapturada', estado, jugadorId, { x: hasta.x, y: hasta.y }));
   }
 
   return eventos;
