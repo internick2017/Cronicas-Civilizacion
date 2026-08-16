@@ -12,6 +12,7 @@ export function aplicar(estado, eventos) {
           nombre: datos.nombre,
           civilizacion: datos.civilizacion,
           recursos: { ...RECURSOS_INICIALES },
+          rasgos: [],
           activo: true,
         });
         break;
@@ -32,6 +33,15 @@ export function aplicar(estado, eventos) {
       case 'EdificioConstruido': {
         const t = tileEn(estado, datos.x, datos.y);
         t.ciudad.edificios.push(datos.edificio);
+        break;
+      }
+
+      case 'RasgoAdoptado': {
+        const j = jugadorPorId(estado, jugadorId);
+        // Las partidas creadas antes de que existieran los rasgos no traen el
+        // campo: se crea al vuelo en vez de romper.
+        if (!j.rasgos) j.rasgos = [];
+        j.rasgos.push(datos.rasgo);
         break;
       }
 

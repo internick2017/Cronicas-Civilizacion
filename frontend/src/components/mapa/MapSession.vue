@@ -11,6 +11,7 @@ import MapVictory from './MapVictory.vue'
 import MapDialogo from './MapDialogo.vue'
 import MapCiudadMenu from './MapCiudadMenu.vue'
 import MapAyuda from './MapAyuda.vue'
+import MapCultura from './MapCultura.vue'
 
 const props = defineProps({
   partidaInicial: { type: Object, required: true }
@@ -64,6 +65,17 @@ const misCiudades = computed(() =>
     .filter(t => t.ciudad && t.dueno === jugadorId)
     .map(t => ({ x: t.x, y: t.y, nombre: t.ciudad.nombre, nivel: t.ciudad.nivel }))
 )
+
+const culturaAbierta = ref(false)
+
+const misRasgos = computed(() =>
+  vista.value.jugadores.find(j => j.id === jugadorId)?.rasgos || []
+)
+
+const adoptarRasgo = (rasgo) => {
+  culturaAbierta.value = false
+  ejecutarAccion({ tipo: 'adoptarRasgo', rasgo })
+}
 
 const irACiudad = (ciudad) => {
   canvasRef.value?.irA(ciudad.x, ciudad.y)
@@ -461,6 +473,9 @@ onUnmounted(() => {
         <button class="btn-panel" @click="cronicaAbierta = !cronicaAbierta">
           {{ cronicaAbierta ? '📖 Ocultar crónica' : '📖 Ver crónica' }}
         </button>
+        <button class="btn-panel" title="Rasgos culturales" @click="culturaAbierta = true">
+          🎭 Cultura
+        </button>
         <button class="btn-panel" title="Reglas del juego" @click="ayudaAbierta = true">
           ℹ️ Reglas
         </button>
@@ -496,6 +511,16 @@ onUnmounted(() => {
       :jugador-id="jugadorId"
       @salir="salir"
     />
+
+    <MapDialogo :abierto="culturaAbierta" titulo="Rasgos culturales" @cerrar="culturaAbierta = false">
+      <MapCultura
+        :constantes="constantes"
+        :recursos="recursosPropios"
+        :rasgos="misRasgos"
+        :es-tu-turno="esMiTurno"
+        @adoptar="adoptarRasgo"
+      />
+    </MapDialogo>
 
     <MapDialogo :abierto="ayudaAbierta" titulo="Reglas del juego" @cerrar="ayudaAbierta = false">
       <MapAyuda :constantes="constantes" />

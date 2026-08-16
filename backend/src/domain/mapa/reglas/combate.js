@@ -6,6 +6,7 @@ import {
 import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
 import { validarTurno, evento } from './comun.js';
+import { bonoDefensaPorRasgos } from './cultura.js';
 
 export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   validarTurno(estado, jugadorId);
@@ -37,8 +38,13 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   const base = ejercitoEnemigo ? UNIDADES[ejercitoEnemigo.tipo].defensa : defensaCiudad(ciudadEnemiga.nivel);
   const ciudadPropia = Boolean(tileHasta.ciudad);
 
+  // El rasgo cultural del arte solo cuenta si se defiende una ciudad, y es la
+  // del DUEÑO de esa casilla, no la del atacante.
+  const defensor = estado.jugadores.find(j => j.id === tileHasta.dueno);
+  const bonoCiudad = ciudadPropia ? BONO_DEFENSA_CIUDAD * bonoDefensaPorRasgos(defensor) : 1;
+
   const poderAtaque = atacante.ataque * tirada(rng);
-  const poderDefensa = base * tirada(rng) * bonoDefensa(tileHasta.terreno) * (ciudadPropia ? BONO_DEFENSA_CIUDAD : 1);
+  const poderDefensa = base * tirada(rng) * bonoDefensa(tileHasta.terreno) * bonoCiudad;
 
   const ganador = poderAtaque > poderDefensa ? 'atacante' : 'defensor';
 

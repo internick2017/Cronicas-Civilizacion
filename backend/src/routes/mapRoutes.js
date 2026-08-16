@@ -3,7 +3,7 @@ import { ReglaError } from '../domain/mapa/errores.js';
 import {
   EDIFICIOS, UNIDADES, COSTO_CIUDAD, MIN_JUGADORES,
   PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, BONO_TERRENO_DEFENSA,
-  BONO_DEFENSA_CIUDAD, PORCENTAJE_VICTORIA_DOMINACION
+  BONO_DEFENSA_CIUDAD, PORCENTAJE_VICTORIA_DOMINACION, RASGOS_CULTURALES
 } from '../domain/mapa/constantes.js';
 
 // Nombres en espanol para la interfaz. Viven aca y no en el dominio porque
@@ -82,6 +82,15 @@ export function crearMapRoutes(servicio) {
         nombre: NOMBRE_TERRENO[tipo] || tipo,
         produccion,
         bonoDefensa: BONO_TERRENO_DEFENSA[tipo] ?? 1
+      })),
+      rasgosCulturales: Object.entries(RASGOS_CULTURALES).map(([tipo, datos]) => ({
+        tipo,
+        nombre: datos.nombre,
+        descripcion: datos.descripcion,
+        costo: { culture: datos.costo },
+        produccionCiudad: datos.produccionCiudad ?? {},
+        visionExtra: datos.visionExtra ?? 0,
+        bonoDefensaCiudad: datos.bonoDefensaCiudad ?? 0
       })),
       bonoDefensaCiudad: BONO_DEFENSA_CIUDAD,
       porcentajeVictoriaDominacion: PORCENTAJE_VICTORIA_DOMINACION
