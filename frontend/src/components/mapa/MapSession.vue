@@ -370,6 +370,25 @@ const salir = () => {
   emit('salir')
 }
 
+const salidaAbierta = ref(false)
+
+// Irse no es solo cerrar la pantalla: si el jugador desaparece y era su turno,
+// los demas quedan esperando para siempre a alguien que no vuelve. Por eso se
+// avisa al backend (accion 'abandonar') antes de volver al lobby.
+// Si la partida todavia no arranco no hay turno que destrabar, y el backend
+// rechaza la accion: en ese caso se sale igual, sin molestar al jugador.
+const confirmarSalida = async () => {
+  salidaAbierta.value = false
+  if (vista.value.estado === 'jugando') {
+    try {
+      await accion(id, jugadorId, token, { tipo: 'abandonar' })
+    } catch {
+      // Que falle el aviso no puede dejar al jugador atrapado en la partida.
+    }
+  }
+  salir()
+}
+
 const onTecla = (e) => {
   if (e.key !== 'Escape') return
   seleccion.value = null
@@ -479,6 +498,9 @@ onUnmounted(() => {
         <button class="btn-panel" title="Reglas del juego" @click="ayudaAbierta = true">
           ℹ️ Reglas
         </button>
+        <button class="btn-panel btn-salir" title="Salir de la partida" @click="salidaAbierta = true">
+          🚪 Salir
+        </button>
       </div>
 
       <aside v-if="ciudadesAbierto" class="panel-flotante panel-ciudades">
@@ -511,6 +533,16 @@ onUnmounted(() => {
       :jugador-id="jugadorId"
       @salir="salir"
     />
+
+    <MapDialogo :abierto="salidaAbierta" titulo="¿Salir de la partida?" @cerrar="salidaAbierta = false">
+      <p class="salida-aviso">
+        Vas a volver al menú para crear o unirte a otra partida.
+      </p>
+      <p class="salida-aviso salida-fuerte">
+        No hay vuelta atrás: abandonás esta partida y los demás siguen jugando sin vos.
+      </p>
+      <button class="btn-primario btn-peligro" @click="confirmarSalida">Sí, salir</button>
+    </MapDialogo>
 
     <MapDialogo :abierto="culturaAbierta" titulo="Rasgos culturales" @cerrar="culturaAbierta = false">
       <MapCultura
@@ -642,6 +674,15 @@ onUnmounted(() => {
 }
 
 .btn-panel:hover { background: rgba(52, 152, 219, 0.35); }
+
+/* Salir es la unica accion de la botonera que no se puede deshacer: se separa
+   del resto y se tiñe para que nadie la toque de paso. */
+.btn-salir { margin-left: 0.6rem; border-color: rgba(231, 76, 60, 0.5); }
+.btn-salir:hover { background: rgba(231, 76, 60, 0.35); }
+
+.salida-aviso { margin: 0; line-height: 1.45; }
+.salida-fuerte { color: #e67e22; }
+.btn-peligro { background: #c0392b; margin-top: 0.4rem; }
 
 .panel-flotante {
   position: absolute;
