@@ -16,7 +16,10 @@ function ciudadesDe(estado, jugadorId) {
   return estado.mapa.filter(t => t.ciudad && t.dueno === jugadorId);
 }
 
-function producirParaJugador(estado, jugadorId) {
+// Exportada para que la vista pueda MOSTRAR el rendimiento por turno sin
+// duplicar la formula: el numero que ve el jugador sale del mismo calculo que
+// despues le suma los recursos (ver visibilidad.js#vistaJugadorPublica).
+export function producirParaJugador(estado, jugadorId) {
   const produccion = {};
   const acumular = (recurso, cantidad) => {
     produccion[recurso] = (produccion[recurso] ?? 0) + cantidad;

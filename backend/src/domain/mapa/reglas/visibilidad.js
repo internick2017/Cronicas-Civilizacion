@@ -1,5 +1,6 @@
 import { jugadorPorId } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
+import { producirParaJugador } from './turnos.js';
 
 function vistaTile(tile, jugadorId) {
   if (!tile.descubiertoPor.includes(jugadorId)) {
@@ -9,10 +10,18 @@ function vistaTile(tile, jugadorId) {
   return { ...resto, descubierto: true };
 }
 
-function vistaJugadorPublica(jugador, jugadorId) {
+function vistaJugadorPublica(jugador, jugadorId, estado) {
   const { id, nombre, civilizacion, activo } = jugador;
   if (jugador.id === jugadorId) {
-    return { id, nombre, civilizacion, activo, recursos: { ...jugador.recursos } };
+    return {
+      id, nombre, civilizacion, activo,
+      recursos: { ...jugador.recursos },
+      // Cuanto va a rendir cada recurso al cerrar el turno. Sin esto el
+      // jugador no puede planificar: no hay forma de saber si juntar para una
+      // ciudad le lleva dos turnos o quince. Es informacion privada, va junto
+      // a los recursos y por el mismo motivo.
+      produccion: producirParaJugador(estado, jugador.id),
+    };
   }
   return { id, nombre, civilizacion, activo };
 }
@@ -30,7 +39,7 @@ export function vistaJugador(estado, jugadorId) {
     indiceJugadorActual: estado.indiceJugadorActual,
     config: structuredClone(estado.config),
     ganador: estado.ganador,
-    jugadores: estado.jugadores.map(j => vistaJugadorPublica(j, jugadorId)),
+    jugadores: estado.jugadores.map(j => vistaJugadorPublica(j, jugadorId, estado)),
     mapa: estado.mapa.map(t => vistaTile(t, jugadorId)),
   };
 }
