@@ -13,9 +13,14 @@ const backendPort = process.env.BACKEND_PORT || 3000
 // Necesario para que el micrófono (Web Speech API) funcione por la IP de la red
 // desde celulares SIN advertencias.
 // Generar:  cd frontend/.certs && mkcert -cert-file cert.pem -key-file key.pem 192.168.3.6 localhost 127.0.0.1
-const https = existsSync(certKeyPath) && existsSync(certPath)
-  ? { key: readFileSync(certKeyPath), cert: readFileSync(certPath) }
-  : undefined
+// SIN_HTTPS=1 sirve por HTTP plano: util para dispositivos de la red que no
+// confian en la CA local de mkcert (tablets, celulares). Costo: el navegador ya
+// no esta en contexto seguro, asi que el microfono (modo voz) no funciona ahi.
+const https = process.env.SIN_HTTPS
+  ? undefined
+  : existsSync(certKeyPath) && existsSync(certPath)
+    ? { key: readFileSync(certKeyPath), cert: readFileSync(certPath) }
+    : undefined
 
 // https://vite.dev/config/
 export default defineConfig({
