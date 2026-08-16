@@ -28,8 +28,16 @@ const cargarPartidas = async () => {
   }
 }
 
+// `crypto.randomUUID` SOLO existe en contexto seguro (HTTPS o localhost). Al abrir el
+// juego por HTTP desde la IP de la red (tablets, celulares) es `undefined` y reventaba
+// antes de llamar a `unirse`, con el mensaje enganosos "No se pudo crear la partida".
+// El respaldo no necesita ser criptografico: es un id de jugador, no un secreto.
+const nuevoId = () =>
+  window.crypto?.randomUUID?.() ??
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`
+
 const unirseAPartida = async (idOCodigo, codigoConocido = null) => {
-  const jugadorId = window.crypto.randomUUID()
+  const jugadorId = nuevoId()
   const { vista, token } = await unirse(idOCodigo, {
     id: jugadorId,
     nombre: nombreJugador.value,
