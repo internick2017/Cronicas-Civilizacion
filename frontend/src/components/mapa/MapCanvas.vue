@@ -67,6 +67,14 @@ const animacionesActivas = new Set()
 // Vigila el tamano del contenedor para redimensionar el lienzo (ver onMounted).
 let observadorTamano = null
 
+// Pellizco (zoom tactil). El zoom vivia solo en el evento 'wheel', que en una
+// tablet o un telefono no existe: no habia NINGUNA forma de acercar el mapa.
+// Se lleva a mano el registro de dedos apoyados porque hace falta la distancia
+// entre dos de ellos, dato que un solo evento de puntero no da.
+const dedos = new Map() // pointerId -> {x, y} en coordenadas del lienzo
+let distanciaAnterior = null
+let pellizcando = false
+
 // Set de claves "x:y" de las casillas que ya tienen sprite de terreno creado.
 // El terreno es aditivo (ver comentario en actualizarTerreno): una vez que una
 // casilla se descubre nunca vuelve a ocultarse, asi que no hace falta volver a
@@ -394,18 +402,70 @@ function limitarCamara() {
   mundo.y = ajustar(mundo.y, app.screen.height)
 }
 
-function aplicarZoom(delta, centro) {
+// Multiplica el zoom por un factor, anclado a un punto del lienzo. Es la base
+// tanto de la rueda (factor fijo) como del pellizco (factor continuo, segun
+// cuanto se separaron los dedos).
+function aplicarZoomFactor(factor, centro) {
   const anterior = mundo.scale.x
   const piso = Math.max(ZOOM_MIN, zoomMinimo())
-  const nuevo = Math.min(ZOOM_MAX, Math.max(piso, anterior * (delta > 0 ? 0.9 : 1.1)))
+  const nuevo = Math.min(ZOOM_MAX, Math.max(piso, anterior * factor))
   if (nuevo === anterior) return
   // Se hace zoom hacia el puntero, no hacia el origen: si no, el mapa se
   // escapa de la pantalla apenas te acercas.
-  const factor = nuevo / anterior
-  mundo.x = centro.x - (centro.x - mundo.x) * factor
-  mundo.y = centro.y - (centro.y - mundo.y) * factor
+  const real = nuevo / anterior
+  mundo.x = centro.x - (centro.x - mundo.x) * real
+  mundo.y = centro.y - (centro.y - mundo.y) * real
   mundo.scale.set(nuevo)
   limitarCamara()
+}
+
+function aplicarZoom(delta, centro) {
+  aplicarZoomFactor(delta > 0 ? 0.9 : 1.1, centro)
+}
+
+function posicionEnLienzo(evento) {
+  const caja = app.canvas.getBoundingClientRect()
+  return { x: evento.clientX - caja.left, y: evento.clientY - caja.top }
+}
+
+function dosDedos() {
+  const [a, b] = [...dedos.values()]
+  return {
+    distancia: Math.hypot(a.x - b.x, a.y - b.y),
+    medio: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+  }
+}
+
+function onDedoBaja(evento) {
+  if (evento.pointerType === 'mouse') return
+  dedos.set(evento.pointerId, posicionEnLienzo(evento))
+  if (dedos.size === 2) {
+    pellizcando = true
+    // Cancela el paneo en curso: con dos dedos apoyados, el movimiento es un
+    // pellizco y no un arrastre, y si no el mapa se va corriendo mientras
+    // hacemos zoom.
+    arrastrando = false
+    distanciaAnterior = dosDedos().distancia
+  }
+}
+
+function onDedoMueve(evento) {
+  if (!dedos.has(evento.pointerId)) return
+  dedos.set(evento.pointerId, posicionEnLienzo(evento))
+  if (dedos.size !== 2) return
+  const { distancia, medio } = dosDedos()
+  if (distanciaAnterior && distancia > 0) {
+    aplicarZoomFactor(distancia / distanciaAnterior, medio)
+  }
+  distanciaAnterior = distancia
+}
+
+function onDedoSube(evento) {
+  dedos.delete(evento.pointerId)
+  if (dedos.size < 2) distanciaAnterior = null
+  // Se mantiene en true hasta soltar TODOS los dedos: si no, al levantar uno
+  // el otro queda apoyado y se interpreta como un click en la casilla.
+  if (dedos.size === 0) pellizcando = false
 }
 
 function centrarEn(x, y, zoom) {
@@ -600,7 +660,7 @@ function onPointerDown(evento) {
 }
 
 function onPointerMove(evento) {
-  if (!arrastrando) return
+  if (pellizcando || !arrastrando) return
   if (Math.abs(evento.global.x - puntoDown.x) > 3 || Math.abs(evento.global.y - puntoDown.y) > 3) {
     huboArrastre = true
   }
@@ -611,6 +671,7 @@ function onPointerMove(evento) {
 
 function onPointerUp(evento) {
   arrastrando = false
+  if (pellizcando) return // se estaba haciendo zoom, no eligiendo una casilla
   if (huboArrastre) return // fue un paneo, no un click en la casilla
   const local = mundo.toLocal(evento.global)
   const x = Math.floor(local.x / TILE)
@@ -680,6 +741,15 @@ onMounted(async () => {
     e.preventDefault()
     aplicarZoom(e.deltaY, { x: e.offsetX, y: e.offsetY })
   }, { passive: false })
+
+  // Pellizco para hacer zoom en tactil. Va con listeners nativos y no por los
+  // eventos de Pixi porque hacen falta VARIOS punteros a la vez, y Pixi los
+  // entrega de a uno sin conservar el conjunto de dedos apoyados.
+  app.canvas.addEventListener('pointerdown', onDedoBaja)
+  app.canvas.addEventListener('pointermove', onDedoMueve)
+  app.canvas.addEventListener('pointerup', onDedoSube)
+  app.canvas.addEventListener('pointercancel', onDedoSube)
+  app.canvas.addEventListener('pointerleave', onDedoSube)
 
   // Primer dibujado: fuerza las 4 capas (las claves "anterior" arrancan en
   // null, asi que actualizarDesdeVista() las redibuja todas la primera vez).
@@ -758,6 +828,13 @@ defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar, irA })
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   overflow: hidden;
+  touch-action: none;
+}
+
+/* touch-action NO se hereda: sin esto, el navegador se queda con el gesto
+   sobre el propio lienzo (desplazar la pagina, zoom del navegador) y el
+   pellizco del mapa nunca llega a nuestros manejadores. */
+.map-canvas canvas {
   touch-action: none;
 }
 
