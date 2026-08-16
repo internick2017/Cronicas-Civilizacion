@@ -1,5 +1,6 @@
 import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_VICTORIA_DOMINACION } from '../constantes.js';
 import { validarTurno, evento } from './comun.js';
+import { produccionPorRasgos } from './cultura.js';
 
 function siguienteIndiceActivo(estado, excluirIds = null) {
   const n = estado.jugadores.length;
@@ -24,8 +25,12 @@ export function producirParaJugador(estado, jugadorId) {
   const acumular = (recurso, cantidad) => {
     produccion[recurso] = (produccion[recurso] ?? 0) + cantidad;
   };
+  // Los rasgos culturales rinden POR ciudad, igual que el terreno y los
+  // edificios: valen para las ciudades que ya tenias y para las que fundes.
+  const porRasgos = produccionPorRasgos(estado.jugadores.find(j => j.id === jugadorId));
   for (const tile of ciudadesDe(estado, jugadorId)) {
     for (const [recurso, cantidad] of Object.entries(PRODUCCION_BASE_CIUDAD)) acumular(recurso, cantidad);
+    for (const [recurso, cantidad] of Object.entries(porRasgos)) acumular(recurso, cantidad);
     const bono = BONO_TERRENO_PRODUCCION[tile.terreno] ?? {};
     for (const [recurso, cantidad] of Object.entries(bono)) acumular(recurso, cantidad);
     for (const edificio of tile.ciudad.edificios) {

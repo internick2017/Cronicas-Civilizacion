@@ -9,8 +9,14 @@ export function validarTurno(estado, jugadorId) {
 export const evento = (tipo, estado, jugadorId, datos = {}) =>
   ({ tipo, turno: estado.turno, jugadorId, datos });
 
-export function radio1(x, y) {
+// radio = 1 descubre el cuadrado de 3x3 alrededor. El rasgo cultural del
+// idioma lo agranda (ver reglas/cultura.js#radioVision).
+export function radioAlrededor(x, y, radio = 1) {
   const tiles = [];
-  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) tiles.push({ x: x + dx, y: y + dy });
+  for (let dx = -radio; dx <= radio; dx++) {
+    for (let dy = -radio; dy <= radio; dy++) tiles.push({ x: x + dx, y: y + dy });
+  }
   return tiles;
 }
+
+export const radio1 = (x, y) => radioAlrededor(x, y, 1);

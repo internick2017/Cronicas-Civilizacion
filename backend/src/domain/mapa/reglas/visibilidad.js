@@ -16,6 +16,7 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
     return {
       id, nombre, civilizacion, activo,
       recursos: { ...jugador.recursos },
+      rasgos: [...(jugador.rasgos ?? [])],
       // Cuanto va a rendir cada recurso al cerrar el turno. Sin esto el
       // jugador no puede planificar: no hay forma de saber si juntar para una
       // ciudad le lleva dos turnos o quince. Es informacion privada, va junto

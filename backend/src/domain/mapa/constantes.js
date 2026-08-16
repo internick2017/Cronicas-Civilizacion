@@ -111,6 +111,40 @@ export const BONO_TERRENO_PRODUCCION = {
   water: {}
 };
 
+// --- Rasgos culturales ---------------------------------------------------
+// La cultura se producia (+2 por ciudad) y no se gastaba en NADA: era un
+// contador decorativo. Ahora se cambia por rasgos que la civilizacion adopta
+// una sola vez y conserva para siempre. Son acumulativos: se pueden tener
+// todos, y el costo creciente marca el orden en que conviene tomarlos.
+// Cada rasgo le da ademas material propio al narrador, que es donde este
+// juego se diferencia de un juego de estrategia cualquiera.
+export const RASGOS_CULTURALES = {
+  gastronomia: {
+    nombre: 'Gastronomía',
+    costo: 30,
+    descripcion: 'Vuestra cocina alimenta mejor a cada ciudad.',
+    produccionCiudad: { food: 2 }
+  },
+  idioma: {
+    nombre: 'Idioma propio',
+    costo: 40,
+    descripcion: 'Vuestras palabras viajan lejos: se explora mas terreno de una vez.',
+    visionExtra: 1
+  },
+  teatro: {
+    nombre: 'Teatro',
+    costo: 50,
+    descripcion: 'Las plazas se llenan y la cultura alimenta mas cultura.',
+    produccionCiudad: { culture: 1 }
+  },
+  arte: {
+    nombre: 'Arte',
+    costo: 60,
+    descripcion: 'Una ciudad que se ama a si misma se defiende mejor.',
+    bonoDefensaCiudad: 0.25
+  }
+};
+
 export const BONO_TERRENO_DEFENSA = {
   mountains: 1.25,
   hills: 1.25,

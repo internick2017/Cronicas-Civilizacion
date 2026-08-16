@@ -24,6 +24,14 @@ const costo = (obj) => listaRecursos(obj) || 'gratis'
 const produccion = (obj) =>
   Object.keys(obj || {}).length ? `+${listaRecursos(obj).replace(/, /g, ', +')}` : 'nada'
 
+const efectoRasgo = (rasgo) => {
+  const partes = Object.entries(rasgo.produccionCiudad || {})
+    .map(([recurso, cantidad]) => `+${cantidad} ${NOMBRE_RECURSO[recurso] || recurso} por ciudad`)
+  if (rasgo.visionExtra) partes.push(`+${rasgo.visionExtra} de alcance al explorar`)
+  if (rasgo.bonoDefensaCiudad) partes.push(`+${Math.round(rasgo.bonoDefensaCiudad * 100)}% de defensa en tus ciudades`)
+  return partes.join(' · ')
+}
+
 const terrenosProductivos = computed(() =>
   (props.constantes?.terrenos || []).filter(t => Object.keys(t.produccion || {}).length > 0)
 )
@@ -81,6 +89,27 @@ const porcentajeDominacion = computed(() =>
             <td>{{ e.nombre }}</td>
             <td>{{ costo(e.costo) }}</td>
             <td>{{ produccion(e.produccion) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section v-if="constantes.rasgosCulturales?.length">
+      <h4>Cultura</h4>
+      <p>
+        La cultura se gasta en <strong>rasgos</strong> que tu civilización adopta
+        una sola vez y conserva para siempre. Son acumulativos: podés tenerlos
+        todos si juntás la cultura.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Rasgo</th><th>Cuesta</th><th>Efecto</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in constantes.rasgosCulturales" :key="r.tipo">
+            <td>{{ r.nombre }}</td>
+            <td>{{ r.costo.culture }} cultura</td>
+            <td>{{ efectoRasgo(r) }}</td>
           </tr>
         </tbody>
       </table>

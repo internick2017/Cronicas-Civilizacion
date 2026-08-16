@@ -6,6 +6,7 @@ import { ReglaError } from '../domain/mapa/errores.js';
 import { unirse as unirseRegla, iniciar as iniciarRegla } from '../domain/mapa/reglas/partida.js';
 import { fundarCiudad, construir } from '../domain/mapa/reglas/ciudades.js';
 import { reclutar } from '../domain/mapa/reglas/militar.js';
+import { adoptarRasgo } from '../domain/mapa/reglas/cultura.js';
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
 import { atacar } from '../domain/mapa/reglas/combate.js';
 import { terminarTurno } from '../domain/mapa/reglas/turnos.js';
@@ -26,6 +27,7 @@ const REGLAS_POR_TIPO = {
   construir: (estado, jugadorId, accion) => construir(estado, jugadorId, accion),
   reclutar: (estado, jugadorId, accion) => reclutar(estado, jugadorId, accion),
   moverEjercito: (estado, jugadorId, accion) => moverEjercito(estado, jugadorId, accion),
+  adoptarRasgo: (estado, jugadorId, accion) => adoptarRasgo(estado, jugadorId, accion),
   terminarTurno: (estado, jugadorId) => terminarTurno(estado, jugadorId),
 };
 

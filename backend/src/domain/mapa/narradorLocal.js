@@ -11,6 +11,13 @@ const NOMBRE_EDIFICIO = {
   quarry: 'una cantera'
 };
 
+const NOMBRE_RASGO = {
+  gastronomia: 'una cocina propia',
+  idioma: 'una lengua propia',
+  teatro: 'el teatro',
+  arte: 'el arte'
+};
+
 const NOMBRE_UNIDAD = {
   warrior: 'guerreros',
   archer: 'arqueros',
@@ -81,6 +88,12 @@ export function narrarRonda(eventos, jugadores = []) {
       case 'EdificioConstruido': {
         const edificio = NOMBRE_EDIFICIO[datos.edificio] ?? textoSeguro(datos.edificio) ?? 'una construccion';
         frases.push(`${quien} construyo ${edificio}.`);
+        break;
+      }
+
+      case 'RasgoAdoptado': {
+        const rasgo = NOMBRE_RASGO[datos.rasgo] ?? textoSeguro(datos.rasgo) ?? 'una nueva costumbre';
+        frases.push(`${quien} hizo florecer ${rasgo} entre su gente.`);
         break;
       }
 
