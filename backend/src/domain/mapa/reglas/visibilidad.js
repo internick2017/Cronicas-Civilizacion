@@ -11,10 +11,10 @@ function vistaTile(tile, jugadorId) {
 }
 
 function vistaJugadorPublica(jugador, jugadorId, estado) {
-  const { id, nombre, civilizacion, activo } = jugador;
+  const { id, nombre, civilizacion, activo, esBot } = jugador;
   if (jugador.id === jugadorId) {
     return {
-      id, nombre, civilizacion, activo,
+      id, nombre, civilizacion, activo, esBot: Boolean(esBot),
       recursos: { ...jugador.recursos },
       rasgos: [...(jugador.rasgos ?? [])],
       // Cuanto va a rendir cada recurso al cerrar el turno. Sin esto el
@@ -24,7 +24,9 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       produccion: producirParaJugador(estado, jugador.id),
     };
   }
-  return { id, nombre, civilizacion, activo };
+  // esBot no es informacion sensible (a diferencia de recursos/rasgos): se
+  // muestra siempre para que el frontend pueda marcar "🤖" al rival.
+  return { id, nombre, civilizacion, activo, esBot: Boolean(esBot) };
 }
 
 export function vistaJugador(estado, jugadorId) {
