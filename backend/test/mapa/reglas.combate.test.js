@@ -55,8 +55,11 @@ describe('atacar', () => {
     // rng 'combate-1': tirada 1 (ataque) = 1.014382811728865, tirada 2 (defensa) = 0.8075878992676735
     // poderAtaque = 25 * 1.014382811728865 = 25.359570293221623
     // poderDefensa = 5 * 0.8075878992676735 * bonoDefensa('plains'=1.0) * (sin ciudad => 1) = 4.0379394963383675
-    // damageMultiplier = |pA-pD| / max(pA,pD) = 0.840772558460201
-    // dano = max(10, round(50 * 0.840772558460201)) = 42
+    // Cada lado pega segun su peso en el combate (ver constantes DANO_COMBATE
+    // y FACTOR_REPLICA); el golpe del perdedor va a la mitad.
+    // poderTotal = 25.359570293221623 + 4.0379394963383675 = 29.39750978955999
+    // danoDefensor = max(10, round(50 * 25.3595.../29.3975...))       = 43
+    // danoAtacante = max(3,  round(50 * 4.0379.../29.3975... * 0.5))  = 3
     const evs = atacar(e, 'p1', { desde: { x: 19, y: 1 }, hasta: { x: 18, y: 1 } }, crearRng('combate-1'));
 
     expect(evs).toHaveLength(1);
@@ -65,12 +68,13 @@ describe('atacar', () => {
       desde: { x: 19, y: 1 },
       hasta: { x: 18, y: 1 },
       ganador: 'atacante',
-      danoAtacante: 0,
-      danoDefensor: 42,
+      danoAtacante: 3,
+      danoDefensor: 43,
     });
 
     aplicar(e, evs);
-    expect(tileEn(e, 18, 1).ejercito.salud).toBe(80 - 42);
+    expect(tileEn(e, 18, 1).ejercito.salud).toBe(80 - 43);
+    expect(tileEn(e, 19, 1).ejercito.salud).toBe(60 - 3);
     expect(tileEn(e, 19, 1).ejercito.movimientoRestante).toBe(0);
   });
 
@@ -80,11 +84,13 @@ describe('atacar', () => {
     tileEn(e, 18, 1).terreno = 'mountains';
 
     // poderDefensa = 5 * 0.8075878992676735 * 1.25 = 5.047424370422959 (vs 4.0379... en llanura)
-    // dano = max(10, round(50 * 0.8009656980752513)) = 40 (vs 42 en llanura)
+    // El terreno no solo le baja el daño recibido (43 -> 42): tambien le sube
+    // el que devuelve (3 -> 4), porque pesa mas en el combate.
     const evs = atacar(e, 'p1', { desde: { x: 19, y: 1 }, hasta: { x: 18, y: 1 } }, crearRng('combate-1'));
 
     expect(evs[0].datos.ganador).toBe('atacante');
-    expect(evs[0].datos.danoDefensor).toBe(40);
+    expect(evs[0].datos.danoDefensor).toBe(42);
+    expect(evs[0].datos.danoAtacante).toBe(4);
   });
 
   it('atacar una ciudad enemiga sin ejército y ganar: emite CiudadCapturada y el tile cambia de dueño al aplicar', () => {

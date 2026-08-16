@@ -39,6 +39,20 @@ export const EDIFICIOS = {
     costo: { wood: 20, stone: 40 },
     produccion: { science: 3 }
   },
+  // Aserradero y cantera son la salida al callejon sin salida de la economia:
+  // hasta ahora madera y piedra SOLO entraban si habias fundado sobre bosque o
+  // montaña, y si no, tu ingreso era cero para siempre y no podias expandirte.
+  // Ninguno de los dos cuesta el recurso que produce, y los dos se pagan sobre
+  // todo con oro, que toda ciudad genera: asi no se repite el candado de la
+  // biblioteca, donde hacia falta el recurso para poder producirlo.
+  sawmill: {
+    costo: { food: 20, gold: 40 },
+    produccion: { wood: 3 }
+  },
+  quarry: {
+    costo: { food: 20, gold: 50 },
+    produccion: { stone: 2 }
+  },
   barracks: {
     costo: { gold: 40, stone: 30 },
     produccion: {}
@@ -118,6 +132,18 @@ export const PORCENTAJE_VICTORIA_DOMINACION = 0.6;
 export const MIN_JUGADORES = 2;
 
 export const BONO_DEFENSA_CIUDAD = 1.5;
+
+// --- Combate -------------------------------------------------------------
+// Antes el ganador salia INTACTO y el perdedor se llevaba todo el dano. Eso
+// convertia cada ataque en una moneda al aire y borraba el desgaste, que es
+// justamente lo que hace interesante decidir CUANDO pelear: una unidad fuerte
+// podia encadenar peleas sin consecuencia.
+// Ahora los dos se hacen dano segun su peso en el combate, y el golpe del
+// perdedor vale la mitad, para que atacar siga valiendo la pena.
+export const DANO_COMBATE = 50;
+export const FACTOR_REPLICA = 0.5;
+export const DANO_MINIMO = 10;   // piso del golpe del ganador
+export const REPLICA_MINIMA = 3; // hasta la derrota mas aplastante araña algo
 
 // Helper functions for terrain and city defense bonuses
 export const bonoDefensa = (terreno) => BONO_TERRENO_DEFENSA[terreno] ?? 1.0;
