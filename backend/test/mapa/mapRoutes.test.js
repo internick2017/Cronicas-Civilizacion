@@ -5,6 +5,7 @@ import Database from 'better-sqlite3';
 import { MapGameRepo } from '../../src/db/MapGameRepo.js';
 import { MapGameService } from '../../src/services/MapGameService.js';
 import { crearMapRoutes } from '../../src/routes/mapRoutes.js';
+import { EDIFICIOS, UNIDADES } from '../../src/domain/mapa/constantes.js';
 
 function crearApp(servicio) {
   const app = express();
@@ -211,8 +212,11 @@ describe('GET /api/map/constantes', () => {
     expect(caballeria.costo).toEqual({ food: 25, gold: 40, wood: 5 });
     expect(caballeria.salud).toBe(120);
 
-    expect(res.body.edificios).toHaveLength(4);
-    expect(res.body.unidades).toHaveLength(5);
+    // Se compara contra el dominio en vez de contra un numero fijo: la lista
+    // de edificios crece con el balance y un literal obliga a tocar el test
+    // cada vez sin aportar nada.
+    expect(res.body.edificios.map(e => e.tipo).sort()).toEqual(Object.keys(EDIFICIOS).sort());
+    expect(res.body.unidades.map(u => u.tipo).sort()).toEqual(Object.keys(UNIDADES).sort());
   });
 
   it('incluye el costo de fundar ciudad', async () => {

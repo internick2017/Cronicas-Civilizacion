@@ -6,7 +6,9 @@ const NOMBRE_EDIFICIO = {
   granary: 'un granero',
   market: 'un mercado',
   library: 'una biblioteca',
-  barracks: 'un cuartel'
+  barracks: 'un cuartel',
+  sawmill: 'un aserradero',
+  quarry: 'una cantera'
 };
 
 const NOMBRE_UNIDAD = {

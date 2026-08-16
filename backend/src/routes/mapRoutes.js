@@ -8,7 +8,10 @@ import {
 
 // Nombres en espanol para la interfaz. Viven aca y no en el dominio porque
 // son presentacion, no regla de juego.
-const NOMBRE_EDIFICIO = { granary: 'Granero', market: 'Mercado', library: 'Biblioteca', barracks: 'Cuartel' };
+const NOMBRE_EDIFICIO = {
+  granary: 'Granero', market: 'Mercado', library: 'Biblioteca',
+  barracks: 'Cuartel', sawmill: 'Aserradero', quarry: 'Cantera'
+};
 const NOMBRE_UNIDAD = { warrior: 'Guerrero', archer: 'Arquero', spearman: 'Lancero', cavalry: 'Caballería', catapult: 'Catapulta' };
 const NOMBRE_TERRENO = {
   plains: 'Llanura', forest: 'Bosque', mountains: 'Montaña',
