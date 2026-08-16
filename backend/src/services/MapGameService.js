@@ -4,9 +4,10 @@ import { aplicar } from '../domain/mapa/aplicar.js';
 import { crearRng } from '../domain/mapa/rng.js';
 import { ReglaError } from '../domain/mapa/errores.js';
 import { unirse as unirseRegla, iniciar as iniciarRegla } from '../domain/mapa/reglas/partida.js';
-import { fundarCiudad, construir } from '../domain/mapa/reglas/ciudades.js';
+import { fundarCiudad, construir, mejorarCiudad } from '../domain/mapa/reglas/ciudades.js';
 import { reclutar } from '../domain/mapa/reglas/militar.js';
 import { adoptarRasgo } from '../domain/mapa/reglas/cultura.js';
+import { investigar } from '../domain/mapa/reglas/tecnologia.js';
 import { abandonar } from '../domain/mapa/reglas/abandono.js';
 import { jugarTurnoIA } from '../domain/mapa/ia.js';
 import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT } from '../domain/mapa/constantes.js';
@@ -45,6 +46,8 @@ const REGLAS_POR_TIPO = {
   reclutar: (estado, jugadorId, accion) => reclutar(estado, jugadorId, accion),
   moverEjercito: (estado, jugadorId, accion) => moverEjercito(estado, jugadorId, accion),
   adoptarRasgo: (estado, jugadorId, accion) => adoptarRasgo(estado, jugadorId, accion),
+  investigar: (estado, jugadorId, accion) => investigar(estado, jugadorId, accion),
+  mejorarCiudad: (estado, jugadorId, accion) => mejorarCiudad(estado, jugadorId, accion),
   abandonar: (estado, jugadorId) => abandonar(estado, jugadorId),
   terminarTurno: (estado, jugadorId) => terminarTurno(estado, jugadorId),
 };

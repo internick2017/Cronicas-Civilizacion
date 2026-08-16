@@ -6,9 +6,9 @@ const props = defineProps({
   vista: { type: Object, required: true },
   jugadorId: { type: String, required: true },
   posicion: { type: Object, required: true },
-  constantes: { type: Object, required: true } // {edificios: [...], unidades: [...]}
+  constantes: { type: Object, required: true } // {edificios: [...], unidades: [...], tecnologias: [...]}
 })
-defineEmits(['construir', 'reclutar', 'cerrar'])
+defineEmits(['construir', 'reclutar', 'mejorar', 'cerrar'])
 
 // Los costos NO se copian del backend: llegan por prop desde MapSession, que
 // los pide a GET /api/map/constantes. Una sola fuente de verdad.
@@ -24,6 +24,11 @@ const recursos = computed(() =>
 )
 const tieneBarracks = computed(() => (tile.value?.ciudad?.edificios || []).includes('barracks'))
 const yaConstruido = (edificio) => (tile.value?.ciudad?.edificios || []).includes(edificio)
+const misTecnologias = computed(() =>
+  props.vista.jugadores.find(j => j.id === props.jugadorId)?.tecnologias || []
+)
+const nombreTecnologia = (tipo) =>
+  (props.constantes.tecnologias || []).find(t => t.tipo === tipo)?.nombre || tipo
 
 const puedePagar = (costo) =>
   Object.entries(costo).every(([recurso, monto]) => (recursos.value[recurso] || 0) >= monto)
@@ -33,6 +38,9 @@ const textoCosto = (costo) =>
 
 const motivoEdificio = (ed) => {
   if (yaConstruido(ed.tipo)) return 'ya construido'
+  if (ed.requiereTecnologia && !misTecnologias.value.includes(ed.requiereTecnologia)) {
+    return `requiere ${nombreTecnologia(ed.requiereTecnologia)}`
+  }
   if (!puedePagar(ed.costo)) return 'sin recursos'
   return null
 }
@@ -40,13 +48,41 @@ const motivoEdificio = (ed) => {
 const motivoUnidad = (u) => {
   if (tile.value?.ejercito) return 'casilla ocupada'
   if (u.requiereBarracks && !tieneBarracks.value) return 'requiere cuartel'
+  if (u.requiereTecnologia && !misTecnologias.value.includes(u.requiereTecnologia)) {
+    return `requiere ${nombreTecnologia(u.requiereTecnologia)}`
+  }
   if (!puedePagar(u.costo)) return 'sin recursos'
   return null
 }
+
+// Mejorar el nivel es repetible (a diferencia de construir un edificio): el
+// costo crece con el nivel actual, calculado del mismo modo que el backend
+// (COSTO_MEJORA_CIUDAD(nivel) = base * nivel), asi el numero mostrado nunca
+// se desincroniza de lo que realmente va a cobrar el servidor.
+const nivelActual = computed(() => tile.value?.ciudad?.nivel ?? 1)
+const costoMejora = computed(() => {
+  const base = props.constantes.costoMejoraCiudadPorNivel || {}
+  return Object.fromEntries(Object.entries(base).map(([r, m]) => [r, m * nivelActual.value]))
+})
+const motivoMejora = computed(() => (puedePagar(costoMejora.value) ? null : 'sin recursos'))
 </script>
 
 <template>
   <div class="ciudad-menu">
+    <section>
+      <h4>Nivel de la ciudad</h4>
+      <button
+        class="btn-secundario"
+        :disabled="motivoMejora !== null"
+        @click="$emit('mejorar')"
+      >
+        <strong>Mejorar (nivel {{ nivelActual }} → {{ nivelActual + 1 }})</strong>
+        <small>{{ textoCosto(costoMejora) }}</small>
+        <small>Más defensa contra ataques.</small>
+        <em v-if="motivoMejora">{{ motivoMejora }}</em>
+      </button>
+    </section>
+
     <section>
       <h4>Construir</h4>
       <button

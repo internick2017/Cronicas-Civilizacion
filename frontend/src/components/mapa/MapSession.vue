@@ -12,6 +12,7 @@ import MapDialogo from './MapDialogo.vue'
 import MapCiudadMenu from './MapCiudadMenu.vue'
 import MapAyuda from './MapAyuda.vue'
 import MapCultura from './MapCultura.vue'
+import MapCiencia from './MapCiencia.vue'
 
 const props = defineProps({
   partidaInicial: { type: Object, required: true }
@@ -71,6 +72,17 @@ const culturaAbierta = ref(false)
 const misRasgos = computed(() =>
   vista.value.jugadores.find(j => j.id === jugadorId)?.rasgos || []
 )
+
+const cienciaAbierta = ref(false)
+
+const misTecnologias = computed(() =>
+  vista.value.jugadores.find(j => j.id === jugadorId)?.tecnologias || []
+)
+
+const investigar = (tecnologia) => {
+  cienciaAbierta.value = false
+  ejecutarAccion({ tipo: 'investigar', tecnologia })
+}
 
 const adoptarRasgo = (rasgo) => {
   culturaAbierta.value = false
@@ -373,6 +385,13 @@ const reclutar = (unidad) => {
   ejecutarAccion({ tipo: 'reclutar', x, y, unidad })
 }
 
+const mejorarCiudad = () => {
+  if (!edificioMenuAbierto.value) return
+  const { x, y } = edificioMenuAbierto.value
+  edificioMenuAbierto.value = null
+  ejecutarAccion({ tipo: 'mejorarCiudad', x, y })
+}
+
 const cerrarMenuEdificio = () => {
   edificioMenuAbierto.value = null
 }
@@ -507,6 +526,9 @@ onUnmounted(() => {
         <button class="btn-panel" title="Rasgos culturales" @click="culturaAbierta = true">
           🎭 Cultura
         </button>
+        <button class="btn-panel" title="Tecnologías" @click="cienciaAbierta = true">
+          🔬 Ciencia
+        </button>
         <button class="btn-panel" title="Reglas del juego" @click="ayudaAbierta = true">
           ℹ️ Reglas
         </button>
@@ -566,6 +588,16 @@ onUnmounted(() => {
       />
     </MapDialogo>
 
+    <MapDialogo :abierto="cienciaAbierta" titulo="Tecnologías" @cerrar="cienciaAbierta = false">
+      <MapCiencia
+        :constantes="constantes"
+        :recursos="recursosPropios"
+        :tecnologias="misTecnologias"
+        :es-tu-turno="esMiTurno"
+        @investigar="investigar"
+      />
+    </MapDialogo>
+
     <MapDialogo :abierto="ayudaAbierta" titulo="Reglas del juego" @cerrar="ayudaAbierta = false">
       <MapAyuda :constantes="constantes" />
     </MapDialogo>
@@ -579,6 +611,7 @@ onUnmounted(() => {
         :constantes="constantes"
         @construir="construir"
         @reclutar="reclutar"
+        @mejorar="mejorarCiudad"
         @cerrar="cerrarMenuEdificio"
       />
     </MapDialogo>

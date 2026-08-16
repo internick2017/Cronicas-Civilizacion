@@ -4,16 +4,19 @@ import {
   EDIFICIOS, UNIDADES, COSTO_CIUDAD, MIN_JUGADORES,
   PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, BONO_TERRENO_DEFENSA,
   BONO_DEFENSA_CIUDAD, PORCENTAJE_VICTORIA_DOMINACION, RASGOS_CULTURALES,
-  DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT
+  DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, TECNOLOGIAS, COSTO_MEJORA_CIUDAD
 } from '../domain/mapa/constantes.js';
 
 // Nombres en espanol para la interfaz. Viven aca y no en el dominio porque
 // son presentacion, no regla de juego.
 const NOMBRE_EDIFICIO = {
   granary: 'Granero', market: 'Mercado', library: 'Biblioteca',
-  barracks: 'Cuartel', sawmill: 'Aserradero', quarry: 'Cantera'
+  barracks: 'Cuartel', sawmill: 'Aserradero', quarry: 'Cantera', university: 'Universidad'
 };
-const NOMBRE_UNIDAD = { warrior: 'Guerrero', archer: 'Arquero', spearman: 'Lancero', cavalry: 'Caballería', catapult: 'Catapulta' };
+const NOMBRE_UNIDAD = {
+  warrior: 'Guerrero', archer: 'Arquero', spearman: 'Lancero', cavalry: 'Caballería',
+  catapult: 'Catapulta', legionary: 'Legionario'
+};
 const NOMBRE_TERRENO = {
   plains: 'Llanura', forest: 'Bosque', mountains: 'Montaña',
   hills: 'Colinas', desert: 'Desierto', water: 'Agua'
@@ -67,7 +70,8 @@ export function crearMapRoutes(servicio) {
         tipo,
         nombre: NOMBRE_EDIFICIO[tipo] || tipo,
         costo: datos.costo,
-        produccion: datos.produccion
+        produccion: datos.produccion,
+        requiereTecnologia: datos.requiereTecnologia ?? null
       })),
       unidades: Object.entries(UNIDADES).map(([tipo, datos]) => ({
         tipo,
@@ -77,8 +81,24 @@ export function crearMapRoutes(servicio) {
         salud: datos.salud,
         movimiento: datos.movimiento,
         costo: datos.costo,
-        requiereBarracks: datos.requiereBarracks
+        requiereBarracks: datos.requiereBarracks,
+        requiereTecnologia: datos.requiereTecnologia ?? null
       })),
+      // Tecnologias (que se pagan con ciencia) y el costo de subir el nivel de
+      // una ciudad, que no es una tecnologia (es repetible, por ciudad): se
+      // exponen por separado para que el frontend no los confunda.
+      tecnologias: Object.entries(TECNOLOGIAS).map(([tipo, datos]) => ({
+        tipo,
+        nombre: datos.nombre,
+        descripcion: datos.descripcion,
+        costo: datos.costo,
+        bonoAtaqueUnidades: datos.bonoAtaqueUnidades ?? 0,
+        bonoDefensaUnidades: datos.bonoDefensaUnidades ?? 0,
+        produccionPorcentual: datos.produccionPorcentual ?? {},
+        desbloqueaUnidad: datos.desbloqueaUnidad ?? null,
+        desbloqueaEdificio: datos.desbloqueaEdificio ?? null
+      })),
+      costoMejoraCiudadPorNivel: COSTO_MEJORA_CIUDAD(1),
       // Reglas de economia y combate, para que el panel de ayuda las explique
       // leyendolas de aca en vez de copiarlas (y quedar desactualizado al
       // primer cambio de balance).
