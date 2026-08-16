@@ -311,8 +311,20 @@ const onClickTile = (posicion) => {
     return
   }
 
-  // 4. Casilla libre: fundar.
-  if (!tile.ciudad && (tile.dueno === jugadorId || tile.dueno === null)) {
+  // 4. Territorio propio SIN ciudad (lo reclamaste caminando un ejercito
+  // encima): no hay nada para hacer ahi. fundarCiudad (backend) rechaza
+  // CUALQUIER casilla con dueño, incluso el propio, asi que ofrecer fundar
+  // aca abria el dialogo para terminar rechazado con "la casilla ya esta
+  // ocupada" pese a no haber ninguna tropa ni ciudad a la vista: justo el
+  // reporte del usuario jugando. Se avisa el motivo real en vez de fallar en
+  // silencio contra el backend.
+  if (!tile.ciudad && tile.dueno === jugadorId) {
+    emit('error', 'Ya es tuyo, pero no se puede fundar sobre territorio ya reclamado: solo en tierra sin dueño.')
+    return
+  }
+
+  // 5. Casilla libre (sin dueño): fundar.
+  if (!tile.ciudad && tile.dueno === null) {
     nombreCiudad.value = ''
     fundarAbierto.value = posicion
   }
