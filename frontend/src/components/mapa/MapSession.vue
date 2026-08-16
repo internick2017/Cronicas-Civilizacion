@@ -358,13 +358,6 @@ const onTecla = (e) => {
 
 onMounted(async () => {
   window.addEventListener('keydown', onTecla)
-  // La partida es a pantalla fija, pero el #app global mide 100vh MAS su
-  // padding, asi que la pagina de atras seguia teniendo unos pixeles de
-  // scroll y el gesto de arrastrar el mapa en tactil movia la pagina entera.
-  // Va en <html> ademas de <body>: con overflow hidden solo en body, el
-  // elemento que scrollea sigue siendo <html> y la pagina se mueve igual.
-  document.documentElement.style.overflow = 'hidden'
-  document.body.style.overflow = 'hidden'
   guardarSesion()
 
   try {
@@ -404,8 +397,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onTecla)
-  document.documentElement.style.overflow = ''
-  document.body.style.overflow = ''
   detenerVigilancia()
   desconectar()
 })
@@ -578,6 +569,12 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   display: flex;
+  /* Contiene el gesto tactil DENTRO del mapa en vez de bloquear el scroll de
+     toda la pagina: bloquearlo con overflow hidden en <html> desactivaba de
+     paso el "tirar para recargar" de Android, que en tablet es la unica forma
+     comoda de refrescar. El lienzo ya tiene touch-action: none, asi que
+     arrastrar el mapa no mueve nada; fuera del mapa el gesto sigue vivo. */
+  overscroll-behavior: contain;
 }
 
 .botonera-paneles {
