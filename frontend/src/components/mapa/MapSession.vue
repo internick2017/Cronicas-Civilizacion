@@ -10,6 +10,7 @@ import MapRoundLog from './MapRoundLog.vue'
 import MapVictory from './MapVictory.vue'
 import MapDialogo from './MapDialogo.vue'
 import MapCiudadMenu from './MapCiudadMenu.vue'
+import MapAyuda from './MapAyuda.vue'
 
 const props = defineProps({
   partidaInicial: { type: Object, required: true }
@@ -46,8 +47,17 @@ const nombreCiudad = ref('')
 // van encima como paneles que se pueden cerrar en vez de apilados debajo
 // (donde quedaban fuera de la vista y habia que scrollear para encontrarlos).
 const canvasRef = ref(null)
-const cronicaAbierta = ref(true)
 const ciudadesAbierto = ref(false)
+const ayudaAbierta = ref(false)
+
+// La cronica se puede ocultar y la eleccion se recuerda: a quien no le interesa
+// la narrativa no tiene que cerrarla en cada partida, y a quien si le interesa
+// no se le esconde nunca.
+const PREF_CRONICA = 'mapa.cronicaAbierta'
+const cronicaAbierta = ref(localStorage.getItem(PREF_CRONICA) !== 'no')
+watch(cronicaAbierta, (abierta) => {
+  localStorage.setItem(PREF_CRONICA, abierta ? 'si' : 'no')
+})
 
 const misCiudades = computed(() =>
   vista.value.mapa
@@ -449,7 +459,10 @@ onUnmounted(() => {
           🏙️ Ciudades ({{ misCiudades.length }})
         </button>
         <button class="btn-panel" @click="cronicaAbierta = !cronicaAbierta">
-          📖 Crónica
+          {{ cronicaAbierta ? '📖 Ocultar crónica' : '📖 Ver crónica' }}
+        </button>
+        <button class="btn-panel" title="Reglas del juego" @click="ayudaAbierta = true">
+          ℹ️ Reglas
         </button>
       </div>
 
@@ -469,7 +482,10 @@ onUnmounted(() => {
         </button>
       </aside>
 
-      <MapRoundLog v-if="cronicaAbierta" class="panel-flotante panel-cronica" :narrativas="narrativas" />
+      <div v-if="cronicaAbierta" class="panel-flotante panel-cronica">
+        <button class="cerrar-cronica" title="Ocultar la crónica" @click="cronicaAbierta = false">✕</button>
+        <MapRoundLog :narrativas="narrativas" />
+      </div>
     </div>
 
     <MapActionBar :vista="vista" :jugador-id="jugadorId" @terminar-turno="onTerminarTurno" />
@@ -480,6 +496,10 @@ onUnmounted(() => {
       :jugador-id="jugadorId"
       @salir="salir"
     />
+
+    <MapDialogo :abierto="ayudaAbierta" titulo="Reglas del juego" @cerrar="ayudaAbierta = false">
+      <MapAyuda :constantes="constantes" />
+    </MapDialogo>
 
     <MapDialogo :abierto="edificioMenuAbierto !== null" titulo="Ciudad" @cerrar="cerrarMenuEdificio">
       <MapCiudadMenu
@@ -647,6 +667,28 @@ onUnmounted(() => {
   top: 0.75rem;
   right: 0.75rem;
   width: min(24rem, 38%);
+}
+
+.cerrar-cronica {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
+  z-index: 1;
+  background: transparent;
+  color: #bdc3c7;
+  border: 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.15rem 0.3rem;
+}
+
+.cerrar-cronica:hover { color: #fff; }
+
+/* La cronica ahora vive dentro de un panel que ya pone fondo y borde: sin
+   esto se veria un recuadro dentro de otro. */
+.panel-cronica :deep(.round-log) {
+  background: transparent;
+  border: 0;
 }
 
 /* En telefonos no hay lugar para paneles al costado: el 38% del ancho deja una

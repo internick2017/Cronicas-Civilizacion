@@ -10,6 +10,24 @@ const props = defineProps({
 const jugadorActual = computed(() => props.vista.jugadores[props.vista.indiceJugadorActual])
 const yo = computed(() => props.vista.jugadores.find(j => j.id === props.jugadorId))
 
+const NOMBRE_RECURSO = {
+  food: 'Comida', gold: 'Oro', wood: 'Madera',
+  stone: 'Piedra', science: 'Ciencia', culture: 'Cultura'
+}
+
+// Lo que rinde cada recurso al cerrar el turno. Lo calcula el backend con la
+// MISMA funcion que despues suma los recursos (ver reglas/turnos.js), para que
+// lo prometido y lo entregado no puedan separarse.
+const rinde = (recurso) => yo.value?.produccion?.[recurso] ?? 0
+
+const tituloRecurso = (recurso) => {
+  const nombre = NOMBRE_RECURSO[recurso] || recurso
+  const porTurno = rinde(recurso)
+  return porTurno
+    ? `${nombre}: +${porTurno} por turno`
+    : `${nombre}: no estás produciendo (solo rinde con ciudades y edificios que lo generen)`
+}
+
 // Emoji viejos a proposito: 🪵 (madera) y 🪨 (piedra) son de Emoji 13 (2020) y la
 // fuente de Windows 10 no los trae, asi que salian como el cuadradito de glifo
 // faltante. Los de aca son de Emoji 6.0 o anteriores, presentes en todos lados.
@@ -26,8 +44,20 @@ const RECURSOS_ICONOS = {
     </div>
 
     <div v-if="yo?.recursos" class="recursos">
-      <span v-for="(cantidad, recurso) in yo.recursos" :key="recurso" class="recurso">
+      <span
+        v-for="(cantidad, recurso) in yo.recursos"
+        :key="recurso"
+        class="recurso"
+        :title="tituloRecurso(recurso)"
+      >
         {{ RECURSOS_ICONOS[recurso] || recurso }} {{ cantidad }}
+        <!-- El rendimiento por turno importa tanto como el stock: sin el no se
+             puede saber si juntar para una ciudad lleva dos turnos o quince.
+             El cero se marca distinto porque suele ser un problema (madera y
+             piedra solo rinden si fundaste sobre bosque o montana). -->
+        <small :class="['rinde', { nada: !rinde(recurso) }]">
+          {{ rinde(recurso) ? `+${rinde(recurso)}` : '+0' }}
+        </small>
       </span>
     </div>
 
@@ -61,6 +91,16 @@ const RECURSOS_ICONOS = {
   flex-wrap: wrap;
   font-size: 0.9rem;
 }
+
+.rinde {
+  color: #2ecc71;
+  font-size: 0.75rem;
+  margin-left: 0.15rem;
+}
+
+/* Un +0 en verde se lee como "todo bien"; en gris apagado se lee como lo que
+   es: ese recurso no esta entrando. */
+.rinde.nada { color: #7f8c8d; }
 
 .jugadores-lista {
   list-style: none;
