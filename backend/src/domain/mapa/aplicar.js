@@ -14,6 +14,7 @@ export function aplicar(estado, eventos) {
           recursos: { ...RECURSOS_INICIALES },
           rasgos: [],
           activo: true,
+          esBot: Boolean(datos.esBot),
         });
         break;
 
