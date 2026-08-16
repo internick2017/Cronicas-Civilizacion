@@ -1,11 +1,19 @@
 import express from 'express';
 import { ReglaError } from '../domain/mapa/errores.js';
-import { EDIFICIOS, UNIDADES, COSTO_CIUDAD, MIN_JUGADORES } from '../domain/mapa/constantes.js';
+import {
+  EDIFICIOS, UNIDADES, COSTO_CIUDAD, MIN_JUGADORES,
+  PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, BONO_TERRENO_DEFENSA,
+  BONO_DEFENSA_CIUDAD, PORCENTAJE_VICTORIA_DOMINACION
+} from '../domain/mapa/constantes.js';
 
 // Nombres en espanol para la interfaz. Viven aca y no en el dominio porque
 // son presentacion, no regla de juego.
 const NOMBRE_EDIFICIO = { granary: 'Granero', market: 'Mercado', library: 'Biblioteca', barracks: 'Cuartel' };
 const NOMBRE_UNIDAD = { warrior: 'Guerrero', archer: 'Arquero', spearman: 'Lancero', cavalry: 'Caballería', catapult: 'Catapulta' };
+const NOMBRE_TERRENO = {
+  plains: 'Llanura', forest: 'Bosque', mountains: 'Montaña',
+  hills: 'Colinas', desert: 'Desierto', water: 'Agua'
+};
 
 /**
  * Traduce un error del dominio/servicio a una respuesta HTTP.
@@ -49,7 +57,8 @@ export function crearMapRoutes(servicio) {
       edificios: Object.entries(EDIFICIOS).map(([tipo, datos]) => ({
         tipo,
         nombre: NOMBRE_EDIFICIO[tipo] || tipo,
-        costo: datos.costo
+        costo: datos.costo,
+        produccion: datos.produccion
       })),
       unidades: Object.entries(UNIDADES).map(([tipo, datos]) => ({
         tipo,
@@ -60,7 +69,19 @@ export function crearMapRoutes(servicio) {
         movimiento: datos.movimiento,
         costo: datos.costo,
         requiereBarracks: datos.requiereBarracks
-      }))
+      })),
+      // Reglas de economia y combate, para que el panel de ayuda las explique
+      // leyendolas de aca en vez de copiarlas (y quedar desactualizado al
+      // primer cambio de balance).
+      produccionBaseCiudad: PRODUCCION_BASE_CIUDAD,
+      terrenos: Object.entries(BONO_TERRENO_PRODUCCION).map(([tipo, produccion]) => ({
+        tipo,
+        nombre: NOMBRE_TERRENO[tipo] || tipo,
+        produccion,
+        bonoDefensa: BONO_TERRENO_DEFENSA[tipo] ?? 1
+      })),
+      bonoDefensaCiudad: BONO_DEFENSA_CIUDAD,
+      porcentajeVictoriaDominacion: PORCENTAJE_VICTORIA_DOMINACION
     });
   });
 
