@@ -14,6 +14,8 @@ const props = defineProps({
 const emit = defineEmits(['click-tile'])
 
 const TILE = 48 // pixeles por casilla en zoom 1
+// Piso absoluto, por si el lienzo todavia no tiene tamano real. El piso que
+// manda en la practica es zoomMinimo(), que se calcula contra la pantalla.
 const ZOOM_MIN = 0.35
 // Tope alto a proposito: al empezar solo hay 3x3 casillas descubiertas y con
 // un tope bajo el encuadre no puede acercarse lo suficiente como para que
@@ -61,6 +63,9 @@ let huboArrastre = false
 // jugador sale de la partida sigue corriendo y termina tocando sprites ya
 // destruidos por app.destroy().
 const animacionesActivas = new Set()
+
+// Vigila el tamano del contenedor para redimensionar el lienzo (ver onMounted).
+let observadorTamano = null
 
 // Set de claves "x:y" de las casillas que ya tienen sprite de terreno creado.
 // El terreno es aditivo (ver comentario en actualizarTerreno): una vez que una
@@ -363,9 +368,36 @@ function destellar(x, y, color) {
 
 // --- Camara: zoom y paneo ------------------------------------------------
 
+// Zoom por debajo del cual el mundo dejaria de cubrir el lienzo y apareceria
+// el vacio de afuera del mapa (negro, indistinguible de la niebla). Se calcula
+// contra el lado MAS EXIGENTE de la pantalla, asi ningun eje queda corto.
+function zoomMinimo() {
+  if (!app) return ZOOM_MIN
+  const mundoCasillas = tamano() * TILE
+  if (!mundoCasillas) return ZOOM_MIN
+  return Math.max(app.screen.width / mundoCasillas, app.screen.height / mundoCasillas)
+}
+
+// Empuja la camara de vuelta adentro si quedo mostrando fuera del mapa. Se
+// llama despues de CADA movimiento (zoom, paneo, centrado): es mas simple y
+// mas confiable que tratar de prevenirlo en cada gesto por separado.
+function limitarCamara() {
+  if (!app || !mundo) return
+  const mundoPx = tamano() * TILE * mundo.scale.x
+  const ajustar = (pos, pantalla) =>
+    // Si el mundo entra entero en la pantalla no hay nada que recortar: se
+    // centra. Si no, se lo mantiene tapando el lienzo de borde a borde.
+    mundoPx <= pantalla
+      ? (pantalla - mundoPx) / 2
+      : Math.min(0, Math.max(pantalla - mundoPx, pos))
+  mundo.x = ajustar(mundo.x, app.screen.width)
+  mundo.y = ajustar(mundo.y, app.screen.height)
+}
+
 function aplicarZoom(delta, centro) {
   const anterior = mundo.scale.x
-  const nuevo = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, anterior * (delta > 0 ? 0.9 : 1.1)))
+  const piso = Math.max(ZOOM_MIN, zoomMinimo())
+  const nuevo = Math.min(ZOOM_MAX, Math.max(piso, anterior * (delta > 0 ? 0.9 : 1.1)))
   if (nuevo === anterior) return
   // Se hace zoom hacia el puntero, no hacia el origen: si no, el mapa se
   // escapa de la pantalla apenas te acercas.
@@ -373,12 +405,15 @@ function aplicarZoom(delta, centro) {
   mundo.x = centro.x - (centro.x - mundo.x) * factor
   mundo.y = centro.y - (centro.y - mundo.y) * factor
   mundo.scale.set(nuevo)
+  limitarCamara()
 }
 
 function centrarEn(x, y, zoom) {
-  if (zoom != null) mundo.scale.set(zoom)
+  if (zoom != null) mundo.scale.set(Math.max(zoom, zoomMinimo()))
   mundo.x = app.screen.width / 2 - x * TILE * mundo.scale.x
   mundo.y = app.screen.height / 2 - y * TILE * mundo.scale.y
+  // Centrar en algo pegado al borde del mapa dejaria medio lienzo afuera.
+  limitarCamara()
 }
 
 // Calcula el rectangulo (en casillas) que contiene todas las casillas
@@ -410,7 +445,7 @@ function calcularEncuadre() {
 
   const zoomAncho = app.screen.width / (anchoCasillas * TILE)
   const zoomAlto = app.screen.height / (altoCasillas * TILE)
-  const zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.min(zoomAncho, zoomAlto)))
+  const zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoomMinimo(), Math.min(zoomAncho, zoomAlto)))
 
   return { x: centroX, y: centroY, zoom }
 }
@@ -571,6 +606,7 @@ function onPointerMove(evento) {
   }
   mundo.x = evento.global.x - arrastreInicio.x
   mundo.y = evento.global.y - arrastreInicio.y
+  limitarCamara()
 }
 
 function onPointerUp(evento) {
@@ -628,6 +664,18 @@ onMounted(async () => {
   app.stage.on('pointermove', onPointerMove)
   app.stage.on('pointerup', onPointerUp)
   app.stage.on('pointerupoutside', () => { arrastrando = false })
+  // resizeTo solo reacciona al resize de la VENTANA. Ahora que el alto del
+  // mapa lo reparte el layout, el contenedor puede cambiar de tamano sin que
+  // la ventana cambie, y el lienzo quedaria con el tamano viejo (recortado).
+  // El observador cubre los dos casos. Al cambiar el tamano tambien cambia el
+  // zoom minimo, de ahi el limitarCamara().
+  observadorTamano = new ResizeObserver(() => {
+    if (!app || !contenedor.value) return
+    app.renderer.resize(contenedor.value.clientWidth, contenedor.value.clientHeight)
+    limitarCamara()
+  })
+  observadorTamano.observe(contenedor.value)
+
   app.canvas.addEventListener('wheel', (e) => {
     e.preventDefault()
     aplicarZoom(e.deltaY, { x: e.offsetX, y: e.offsetY })
@@ -658,6 +706,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   desmontado = true
+  observadorTamano?.disconnect()
+  observadorTamano = null
   animacionesActivas.forEach(id => cancelAnimationFrame(id))
   animacionesActivas.clear()
   if (app) {
@@ -670,7 +720,15 @@ watch(() => props.vista, actualizarDesdeVista, { deep: true })
 watch(() => [props.seleccion, props.alcanzables], dibujarOverlay, { deep: true })
 watch(() => props.constantes, dibujarPiezas, { deep: true })
 
-defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar })
+// Lleva la camara a una casilla concreta SIN tocar el zoom: lo usa la lista de
+// ciudades para saltar de una a otra manteniendo el nivel de acercamiento que
+// el jugador venia usando.
+function irA(x, y) {
+  if (!app) return
+  centrarEn(x + 0.5, y + 0.5)
+}
+
+defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar, irA })
 </script>
 
 <template>
@@ -685,15 +743,18 @@ defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar })
 <style scoped>
 .map-canvas-wrap {
   position: relative;
+  /* El alto ya no lo decide el mapa: lo reparte el layout de la partida
+     (MapSession), que le da todo el espacio que sobra despues del encabezado
+     y la barra de acciones. Antes eran 80vh fijos, que sumados al resto
+     siempre pasaban de una pantalla y obligaban a scrollear. */
+  flex: 1;
+  min-height: 0;
+  display: flex;
 }
 
 .map-canvas {
   width: 100%;
-  /* Antes 70vh: con el panel de recursos y la barra de acciones alrededor,
-     dejaba el lienzo muy bajo y ancho (una zona descubierta cuadrada nunca
-     llenaba la pantalla, quedaban franjas negras enormes a los costados).
-     80vh le da bastante mas alto sin tapar esos paneles en un portatil. */
-  height: 80vh;
+  height: 100%;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   overflow: hidden;
