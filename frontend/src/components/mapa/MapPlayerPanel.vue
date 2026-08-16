@@ -10,8 +10,11 @@ const props = defineProps({
 const jugadorActual = computed(() => props.vista.jugadores[props.vista.indiceJugadorActual])
 const yo = computed(() => props.vista.jugadores.find(j => j.id === props.jugadorId))
 
+// Emoji viejos a proposito: 🪵 (madera) y 🪨 (piedra) son de Emoji 13 (2020) y la
+// fuente de Windows 10 no los trae, asi que salian como el cuadradito de glifo
+// faltante. Los de aca son de Emoji 6.0 o anteriores, presentes en todos lados.
 const RECURSOS_ICONOS = {
-  food: '🌾', gold: '💰', wood: '🪵', stone: '🪨', science: '🔬', culture: '🎭'
+  food: '🌾', gold: '💰', wood: '🌲', stone: '⛰️', science: '🔬', culture: '🎭'
 }
 </script>
 
