@@ -1,6 +1,7 @@
 import { jugadorPorId } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
 import { producirParaJugador } from './turnos.js';
+import { DIFICULTAD_IA_DEFAULT } from '../constantes.js';
 
 function vistaTile(tile, jugadorId) {
   if (!tile.descubiertoPor.includes(jugadorId)) {
@@ -24,9 +25,13 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       produccion: producirParaJugador(estado, jugador.id),
     };
   }
-  // esBot no es informacion sensible (a diferencia de recursos/rasgos): se
-  // muestra siempre para que el frontend pueda marcar "🤖" al rival.
-  return { id, nombre, civilizacion, activo, esBot: Boolean(esBot) };
+  // esBot y dificultadIA no son informacion sensible (a diferencia de
+  // recursos/rasgos): se muestran siempre para que el frontend pueda marcar
+  // "🤖" al rival y con que dificultad esta jugando.
+  return {
+    id, nombre, civilizacion, activo, esBot: Boolean(esBot),
+    ...(esBot ? { dificultadIA: jugador.dificultadIA ?? DIFICULTAD_IA_DEFAULT } : {}),
+  };
 }
 
 export function vistaJugador(estado, jugadorId) {

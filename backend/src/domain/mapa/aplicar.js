@@ -15,6 +15,7 @@ export function aplicar(estado, eventos) {
           rasgos: [],
           activo: true,
           esBot: Boolean(datos.esBot),
+          dificultadIA: datos.dificultadIA ?? null,
         });
         break;
 

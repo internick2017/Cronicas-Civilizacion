@@ -165,6 +165,13 @@ export const PORCENTAJE_VICTORIA_DOMINACION = 0.6;
 // en vez de tener que adivinarla o copiarla a mano.
 export const MIN_JUGADORES = 2;
 
+// Niveles del jugador-bot (ver domain/mapa/ia.js). Viven aca, junto al resto
+// de las constantes publicas, porque tanto la vista (que informa que
+// dificultad tiene el rival) como el propio modulo de IA los necesitan, y
+// esto evita que uno dependa del otro.
+export const DIFICULTADES_IA = ['facil', 'normal', 'dificil'];
+export const DIFICULTAD_IA_DEFAULT = 'normal';
+
 export const BONO_DEFENSA_CIUDAD = 1.5;
 
 // --- Combate -------------------------------------------------------------
