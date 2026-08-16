@@ -63,6 +63,7 @@ const RECURSOS_ICONOS = {
 
     <ul class="jugadores-lista">
       <li v-for="j in vista.jugadores" :key="j.id" :class="{ activo: j.id === jugadorActual?.id }">
+        <span v-if="j.esBot" title="Jugador controlado por la máquina">🤖</span>
         {{ j.nombre }} ({{ j.civilizacion }}) <span v-if="!j.activo">— eliminado</span>
       </li>
     </ul>

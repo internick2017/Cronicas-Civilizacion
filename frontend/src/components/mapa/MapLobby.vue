@@ -64,6 +64,32 @@ const crear = async () => {
   }
 }
 
+// Jugar contra la maquina no necesita sala de espera: el bot se agrega solo
+// al unirse (ver MapGameService#_unirse), asi que apenas el humano entra ya
+// hay 2 jugadores y se puede arrancar directo, sin un codigo que mostrarle a
+// nadie ni un boton "iniciar" esperando a alguien que nunca va a llegar.
+const jugarContraIA = async () => {
+  if (!nombreJugador.value) {
+    error.value = 'Ingresá tu nombre antes de jugar.'
+    return
+  }
+  error.value = ''
+  cargando.value = true
+  try {
+    const { id, codigo } = await crearPartida({
+      nombre: nombrePartida.value || 'Partida en solitario',
+      contraIA: true
+    })
+    const sesion = await unirseAPartida(id, codigo)
+    await iniciar(id)
+    emit('partida-unida', sesion)
+  } catch (err) {
+    error.value = err.mensaje || 'No se pudo iniciar la partida contra la máquina.'
+  } finally {
+    cargando.value = false
+  }
+}
+
 const iniciarPartida = async () => {
   error.value = ''
   cargando.value = true
@@ -120,6 +146,14 @@ onMounted(cargarPartidas)
         Tu nombre / civilización
         <input v-model="nombreJugador" type="text" placeholder="Incas" />
       </label>
+
+      <section class="panel panel-ia">
+        <h2>🤖 Jugar solo</h2>
+        <p class="ayuda">Sin esperar a nadie: la máquina controla al rival.</p>
+        <button class="btn-primary" :disabled="cargando" @click="jugarContraIA">
+          Jugar contra la máquina
+        </button>
+      </section>
 
       <section class="panel">
         <h2>Crear partida nueva</h2>
@@ -209,6 +243,14 @@ onMounted(cargarPartidas)
   color: #bdc3c7;
   font-size: 0.85rem;
   margin: 0.25rem 0;
+}
+
+/* Se separa visualmente del resto: es el camino mas rapido (un solo click,
+   sin nombre de partida ni codigo que compartir), asi que conviene que se
+   note distinto en vez de mezclarse con "crear" y "unirse". */
+.panel-ia {
+  border-color: rgba(46, 204, 113, 0.35);
+  background: rgba(46, 204, 113, 0.08);
 }
 
 .btn-primary {
