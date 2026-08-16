@@ -2,7 +2,7 @@ import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_
 import { validarTurno, evento } from './comun.js';
 import { produccionPorRasgos } from './cultura.js';
 
-function siguienteIndiceActivo(estado, excluirIds = null) {
+export function siguienteIndiceActivo(estado, excluirIds = null) {
   const n = estado.jugadores.length;
   let idx = estado.indiceJugadorActual;
   for (let i = 0; i < n; i++) {
@@ -41,7 +41,10 @@ export function producirParaJugador(estado, jugadorId) {
   return produccion;
 }
 
-function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turnoCierre) {
+// Exportada para que abandonar() use la MISMA evaluacion: si el que se va deja
+// a un solo jugador en pie, la partida tiene que terminar igual que si lo
+// hubieran eliminado peleando.
+export function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turnoCierre) {
   if (activosPostEliminacion.length === 0) {
     return evento('PartidaTerminada', estado, jugadorId, {
       ganador: null,
