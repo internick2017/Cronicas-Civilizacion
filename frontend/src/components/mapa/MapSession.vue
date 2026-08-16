@@ -456,7 +456,10 @@ onUnmounted(() => {
         @keyup.enter="confirmarFundar"
       >
       <small class="costo-fundar">Costo: {{ textoCostoCiudad }}</small>
+      <!-- El boton se deshabilita por dos motivos distintos y antes solo se explicaba
+           uno: sin el aviso del nombre vacio, el jugador cree que le faltan recursos. -->
       <em v-if="!puedeFundar" class="motivo-fundar">sin recursos</em>
+      <em v-else-if="!nombreCiudad.trim()" class="motivo-fundar">poné un nombre para la ciudad</em>
       <button class="btn-primario" :disabled="!nombreCiudad.trim() || !puedeFundar" @click="confirmarFundar">
         Fundar
       </button>
