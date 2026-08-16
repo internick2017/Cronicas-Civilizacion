@@ -53,6 +53,12 @@ export const EDIFICIOS = {
     costo: { food: 20, gold: 50 },
     produccion: { stone: 2 }
   },
+  // Antes el cuartel SOLO desbloqueaba reclutar caballeria/catapulta: era el
+  // unico edificio sin ningun efecto propio (produccion: {}). Ahora, ademas
+  // de eso, la ciudad donde esta construido cura a la tropa que para ahi,
+  // se defiende mejor, y lo que reclutes ahi sale mas barato y con mas
+  // movimiento (ver CUARTEL mas abajo, junto a EDIFICIOS a proposito: son
+  // valores del MISMO edificio, no una regla de combate/reclutamiento aparte).
   barracks: {
     costo: { gold: 40, stone: 30 },
     produccion: {}
@@ -118,6 +124,15 @@ export const UNIDADES = {
     requiereBarracks: false,
     requiereTecnologia: 'formacionMilitar'
   }
+};
+
+// Efectos propios del cuartel (ver el comentario junto a EDIFICIOS.barracks):
+// hasta ahora era el unico edificio sin ninguno.
+export const CUARTEL = {
+  curacionPorRonda: 15,   // vida que recupera una tropa parada ahi, al cerrar la ronda
+  bonoDefensaCiudad: 3,   // suma PLANA a defensaCiudad(nivel) al defenderse
+  descuentoReclutar: 0.15, // 15% menos en el costo de lo reclutado ahi
+  bonoMovimiento: 1       // punto de movimiento extra para lo reclutado ahi
 };
 
 export const BONO_TERRENO_PRODUCCION = {

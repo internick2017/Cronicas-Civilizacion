@@ -1,6 +1,6 @@
 import { tileEn } from '../MapGame.js';
 import {
-  UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD,
+  UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, CUARTEL,
   DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA
 } from '../constantes.js';
 import { ReglaError } from '../errores.js';
@@ -36,7 +36,15 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   }
 
   const atacante = UNIDADES[tileDesde.ejercito.tipo];
-  const base = ejercitoEnemigo ? UNIDADES[ejercitoEnemigo.tipo].defensa : defensaCiudad(ciudadEnemiga.nivel);
+  // El cuartel suma defensa PLANA a la ciudad donde esta construido (no a
+  // los ejercitos: eso es fortificacion, la tecnologia). Se resuelve aca, no
+  // en defensaCiudad(nivel), porque esa formula es pura y solo conoce el
+  // nivel; el cuartel es un dato de ESE tile puntual, no de la ciudad en si.
+  const bonoCuartel = ciudadEnemiga && tileHasta.ciudad.edificios.includes('barracks')
+    ? CUARTEL.bonoDefensaCiudad : 0;
+  const base = ejercitoEnemigo
+    ? UNIDADES[ejercitoEnemigo.tipo].defensa
+    : defensaCiudad(ciudadEnemiga.nivel) + bonoCuartel;
   const ciudadPropia = Boolean(tileHasta.ciudad);
 
   // Metalurgia y fortificacion (tecnologia) son bonos PLANOS a unidades, no
