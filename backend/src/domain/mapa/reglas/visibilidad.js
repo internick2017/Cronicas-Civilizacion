@@ -18,6 +18,7 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       id, nombre, civilizacion, activo, esBot: Boolean(esBot),
       recursos: { ...jugador.recursos },
       rasgos: [...(jugador.rasgos ?? [])],
+      tecnologias: [...(jugador.tecnologias ?? [])],
       // Cuanto va a rendir cada recurso al cerrar el turno. Sin esto el
       // jugador no puede planificar: no hay forma de saber si juntar para una
       // ciudad le lleva dos turnos o quince. Es informacion privada, va junto

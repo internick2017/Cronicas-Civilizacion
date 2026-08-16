@@ -2,6 +2,7 @@ import { tileEn, jugadorPorId, puedePagar } from '../MapGame.js';
 import { UNIDADES } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento } from './comun.js';
+import { tieneTecnologiaRequerida } from './tecnologia.js';
 
 // El objeto `accion` que llega desde MapGameService trae `tipo` como campo de
 // ENRUTAMIENTO ('reclutar', 'construir', ...) y se pasa completo, sin
@@ -29,6 +30,9 @@ export function reclutar(estado, jugadorId, { x, y, unidad }) {
   }
 
   const jugador = jugadorPorId(estado, jugadorId);
+  if (!tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) {
+    throw new ReglaError('REQUIERE_TECNOLOGIA', `Esa unidad requiere la tecnología: ${definicion.requiereTecnologia}`);
+  }
   if (!puedePagar(jugador, definicion.costo)) {
     throw new ReglaError('RECURSOS_INSUFICIENTES', 'Recursos insuficientes');
   }

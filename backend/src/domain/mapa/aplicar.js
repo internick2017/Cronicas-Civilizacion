@@ -13,6 +13,7 @@ export function aplicar(estado, eventos) {
           civilizacion: datos.civilizacion,
           recursos: { ...RECURSOS_INICIALES },
           rasgos: [],
+          tecnologias: [],
           activo: true,
           esBot: Boolean(datos.esBot),
           dificultadIA: datos.dificultadIA ?? null,
@@ -44,6 +45,20 @@ export function aplicar(estado, eventos) {
         // campo: se crea al vuelo en vez de romper.
         if (!j.rasgos) j.rasgos = [];
         j.rasgos.push(datos.rasgo);
+        break;
+      }
+
+      case 'TecnologiaInvestigada': {
+        const j = jugadorPorId(estado, jugadorId);
+        if (!j.tecnologias) j.tecnologias = [];
+        j.tecnologias.push(datos.tecnologia);
+        break;
+      }
+
+      case 'CiudadMejorada': {
+        const t = tileEn(estado, datos.x, datos.y);
+        t.ciudad.nivel += 1;
+        t.ciudad.poblacion += 250;
         break;
       }
 

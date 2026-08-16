@@ -56,6 +56,13 @@ export const EDIFICIOS = {
   barracks: {
     costo: { gold: 40, stone: 30 },
     produccion: {}
+  },
+  // Desbloqueada por la tecnologia 'filosofia' (ver TECNOLOGIAS): la ciencia
+  // pasa a alimentarse sola, igual que el teatro hace con la cultura.
+  university: {
+    costo: { gold: 70, stone: 40 },
+    produccion: { science: 4 },
+    requiereTecnologia: 'filosofia'
   }
 };
 
@@ -99,6 +106,17 @@ export const UNIDADES = {
     movimiento: 1,
     costo: { food: 10, gold: 50, wood: 30, stone: 20 },
     requiereBarracks: true
+  },
+  // Desbloqueada por la tecnologia 'formacionMilitar' (ver TECNOLOGIAS), no
+  // por un cuartel: infanteria pesada, entre el guerrero y la caballeria.
+  legionary: {
+    ataque: 16,
+    defensa: 18,
+    salud: 110,
+    movimiento: 2,
+    costo: { food: 22, gold: 35, wood: 15 },
+    requiereBarracks: false,
+    requiereTecnologia: 'formacionMilitar'
   }
 };
 
@@ -142,6 +160,53 @@ export const RASGOS_CULTURALES = {
     costo: 60,
     descripcion: 'Una ciudad que se ama a si misma se defiende mejor.',
     bonoDefensaCiudad: 0.25
+  }
+};
+
+// --- Tecnologias -----------------------------------------------------------
+// La ciencia tenia el mismo problema que tenia la cultura antes de los
+// rasgos: se producia (biblioteca, +3/turno) y no se gastaba en NADA. Mismo
+// patron que RASGOS_CULTURALES: independientes (sin arbolito de requisitos
+// entre ellas), se compran una sola vez y valen para siempre, acumulables.
+// Ademas de estas, la ciencia habilita subir el NIVEL de una ciudad (ver
+// COSTO_MEJORA_CIUDAD mas abajo): eso es una accion repetible por ciudad,
+// no una tecnologia global, asi que vive aparte.
+export const TECNOLOGIAS = {
+  metalurgia: {
+    nombre: 'Metalurgia',
+    costo: { science: 40 },
+    descripcion: 'Mejores armas: +2 de ataque para todas tus unidades.',
+    bonoAtaqueUnidades: 2
+  },
+  fortificacion: {
+    nombre: 'Fortificación',
+    costo: { science: 40 },
+    descripcion: 'Mejores corazas: +2 de defensa para todas tus unidades.',
+    bonoDefensaUnidades: 2
+  },
+  irrigacion: {
+    nombre: 'Irrigación',
+    costo: { science: 35 },
+    descripcion: '+20% de producción de comida en todas tus ciudades.',
+    produccionPorcentual: { food: 0.2 }
+  },
+  mineria: {
+    nombre: 'Minería',
+    costo: { science: 35 },
+    descripcion: '+20% de producción de oro en todas tus ciudades.',
+    produccionPorcentual: { gold: 0.2 }
+  },
+  formacionMilitar: {
+    nombre: 'Formación militar',
+    costo: { science: 45 },
+    descripcion: 'Desbloquea al legionario: infantería pesada, sin necesitar cuartel.',
+    desbloqueaUnidad: 'legionary'
+  },
+  filosofia: {
+    nombre: 'Filosofía',
+    costo: { science: 60 },
+    descripcion: 'Desbloquea la universidad: la ciencia empieza a alimentarse sola.',
+    desbloqueaEdificio: 'university'
   }
 };
 
@@ -190,3 +255,9 @@ export const REPLICA_MINIMA = 3; // hasta la derrota mas aplastante araña algo
 export const bonoDefensa = (terreno) => BONO_TERRENO_DEFENSA[terreno] ?? 1.0;
 
 export const defensaCiudad = (nivel) => 8 + 2 * nivel;
+
+// Mejorar el nivel de una ciudad es repetible (a diferencia de una
+// tecnologia): cada nivel cuesta mas que el anterior, y el beneficio ya
+// existia de antes sin usarse — defensaCiudad(nivel) escala con esto desde
+// el principio, solo que nada permitia subir `nivel` mas alla de 1.
+export const COSTO_MEJORA_CIUDAD = (nivel) => ({ science: 15 * nivel, gold: 10 * nivel });
