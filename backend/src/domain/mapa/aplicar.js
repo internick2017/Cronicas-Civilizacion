@@ -159,6 +159,19 @@ export function aplicar(estado, eventos) {
       case 'JugadorEliminado': {
         const j = jugadorPorId(estado, datos.jugadorId);
         j.activo = false;
+        // Su territorio SUELTO vuelve a ser tierra de nadie. Si no, queda a
+        // nombre de alguien que ya no juega y se convierte en un muro
+        // permanente: moverEjercito lo rechaza por ajeno, fundarCiudad por
+        // ocupado, y atacar necesita un ejercito o una ciudad enemiga, que ahi
+        // ya no hay. Nadie podria volver a pisarlo nunca, y esas casillas
+        // siguen contando en el denominador de la victoria por dominacion, asi
+        // que un jugador muerto podia dejar el 60% fuera de alcance para todos.
+        // Las ciudades NO se liberan: como ciudad enemiga si se pueden atacar y
+        // capturar (no son un muro), y dejarlas sin dueño obligaria a inventar
+        // que significa una ciudad de nadie.
+        for (const t of estado.mapa) {
+          if (t.dueno === datos.jugadorId && !t.ciudad) t.dueno = null;
+        }
         break;
       }
 
