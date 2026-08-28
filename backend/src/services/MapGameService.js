@@ -4,15 +4,35 @@ import { aplicar } from '../domain/mapa/aplicar.js';
 import { crearRng } from '../domain/mapa/rng.js';
 import { ReglaError } from '../domain/mapa/errores.js';
 import { unirse as unirseRegla, iniciar as iniciarRegla } from '../domain/mapa/reglas/partida.js';
-import { fundarCiudad, construir } from '../domain/mapa/reglas/ciudades.js';
+import { fundarCiudad, construir, mejorarCiudad } from '../domain/mapa/reglas/ciudades.js';
 import { reclutar } from '../domain/mapa/reglas/militar.js';
+import { adoptarRasgo } from '../domain/mapa/reglas/cultura.js';
+import { investigar } from '../domain/mapa/reglas/tecnologia.js';
+import { abandonar } from '../domain/mapa/reglas/abandono.js';
+import { jugarTurnoIA } from '../domain/mapa/ia.js';
+import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT } from '../domain/mapa/constantes.js';
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
 import { atacar } from '../domain/mapa/reglas/combate.js';
 import { terminarTurno } from '../domain/mapa/reglas/turnos.js';
 import { vistaJugador } from '../domain/mapa/reglas/visibilidad.js';
+import logger from '../utils/logger.js';
 
 // Sin caracteres ambiguos necesarios: codigo corto, solo mayusculas y digitos.
 const ALFABETO_CODIGO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+// Id fijo: en una partida "contra la maquina" solo hay un bot, se agrega una
+// sola vez al crear la partida, y nunca choca con un id de jugador humano
+// (esos los genera el frontend con crypto.randomUUID()/un fallback propio).
+const ID_BOT = 'bot-ia';
+const NOMBRE_BOT = 'La Máquina';
+const CIVILIZACIONES_BOT = ['Autómatas', 'El Enjambre', 'La Colmena', 'Los Engranajes'];
+
+// Tope de rondas de IA resueltas EN CADENA dentro de una misma llamada (p.ej.
+// un humano abandona y deja solo bots, o hay varios bots seguidos en el orden
+// de turno). Muy por encima de lo que 1 bot + humanos necesita en la
+// practica: es un backstop contra un bug que deje el turno sin avanzar nunca
+// hacia un jugador NO bot, que colgaria el request para siempre.
+const VUELTAS_IA_MAXIMAS = 10;
 
 function generarCodigo() {
   let codigo = '';
@@ -25,6 +45,10 @@ const REGLAS_POR_TIPO = {
   construir: (estado, jugadorId, accion) => construir(estado, jugadorId, accion),
   reclutar: (estado, jugadorId, accion) => reclutar(estado, jugadorId, accion),
   moverEjercito: (estado, jugadorId, accion) => moverEjercito(estado, jugadorId, accion),
+  adoptarRasgo: (estado, jugadorId, accion) => adoptarRasgo(estado, jugadorId, accion),
+  investigar: (estado, jugadorId, accion) => investigar(estado, jugadorId, accion),
+  mejorarCiudad: (estado, jugadorId, accion) => mejorarCiudad(estado, jugadorId, accion),
+  abandonar: (estado, jugadorId) => abandonar(estado, jugadorId),
   terminarTurno: (estado, jugadorId) => terminarTurno(estado, jugadorId),
 };
 
@@ -120,12 +144,48 @@ export class MapGameService {
     this.cache.set(estado.id, estado);
   }
 
-  async crearPartida({ nombre, semilla, config }) {
+  async crearPartida({ nombre, semilla, config, contraIA, dificultadIA }) {
     const codigo = await this._generarCodigoUnico();
-    const estado = crearEstado({ nombre, semilla: semilla ?? codigo, config });
+    // dificultadIA se valida ACA (contra la lista blanca) y no en el dominio:
+    // es una preferencia de configuracion, no una regla de juego, y asi
+    // cualquier valor raro que llegue por HTTP nunca pisa el default.
+    const dificultad = DIFICULTADES_IA.includes(dificultadIA) ? dificultadIA : DIFICULTAD_IA_DEFAULT;
+    // maxJugadores se fuerza a 2 (creador + bot): una partida "contra la
+    // maquina" es de UN humano, no una invitacion a que se sume gente.
+    const cfg = { ...(config ?? {}), ...(contraIA ? { contraIA: true, dificultadIA: dificultad, maxJugadores: 2 } : {}) };
+    const estado = crearEstado({ nombre, semilla: semilla ?? codigo, config: cfg });
     estado.codigo = codigo;
+    // El bot NO se agrega aca: si se agregara antes de que exista un humano,
+    // cualquiera que vea el codigo en el lobby publico podria unirse primero
+    // y quedarse con el lugar que le corresponde al creador. Se agrega recien
+    // en `_unirse`, en la MISMA operacion que el primer humano se une.
     await this._persistir(estado);
-    return { id: estado.id, codigo };
+    return { id: estado.id, codigo, contraIA: Boolean(contraIA) };
+  }
+
+  /**
+   * Resuelve, EN CADENA, los turnos de todos los bots que le toquen jugar a
+   * partir del estado actual (muta `estado`, aplicando cada evento igual que
+   * una accion humana). Se llama despues de cualquier operacion que pueda
+   * dejar el turno en manos de un bot: iniciar la partida, o cualquier accion
+   * humana que cierre su turno (incluido abandonar).
+   *
+   * Sin esto la partida se trabaria esperando una accion HTTP que nunca va a
+   * llegar, porque nadie controla al bot desde afuera.
+   */
+  _resolverTurnosIA(estado) {
+    const eventos = [];
+    for (let vuelta = 0; vuelta < VUELTAS_IA_MAXIMAS; vuelta++) {
+      if (estado.estado !== 'jugando') break;
+      const actual = estado.jugadores[estado.indiceJugadorActual];
+      if (!actual?.esBot) break;
+
+      // Semilla determinista: misma partida + mismo turno + misma vuelta =
+      // mismas decisiones, igual que el resto del dominio (combate, mapa).
+      const rng = crearRng(`ia:${estado.semilla}:${estado.turno}:${actual.id}:${vuelta}`);
+      eventos.push(...jugarTurnoIA(estado, actual.id, rng));
+    }
+    return eventos;
   }
 
   async unirse(idOCodigo, jugador) {
@@ -141,6 +201,20 @@ export class MapGameService {
     const estado = structuredClone(original);
     const eventos = unirseRegla(estado, { id, nombre, civilizacion });
     aplicar(estado, eventos);
+
+    // El bot se suma en la MISMA operacion que el primer humano se une (ver
+    // el comentario en crearPartida): asi es atomico bajo el candado de esta
+    // partida y no hay ventana donde un tercero pueda robarle el lugar.
+    if (estado.config.contraIA && estado.jugadores.length === 1) {
+      const civilizacion = CIVILIZACIONES_BOT[Math.floor(Math.random() * CIVILIZACIONES_BOT.length)];
+      const eventosBot = unirseRegla(estado, {
+        id: ID_BOT, nombre: NOMBRE_BOT, civilizacion, esBot: true,
+        dificultadIA: estado.config.dificultadIA ?? DIFICULTAD_IA_DEFAULT,
+      });
+      aplicar(estado, eventosBot);
+      eventos.push(...eventosBot);
+    }
+
     await this._persistir(estado, eventos);
 
     const token = crypto.randomBytes(32).toString('hex');
@@ -161,10 +235,22 @@ export class MapGameService {
     const estado = structuredClone(original);
     const eventos = iniciarRegla(estado);
     aplicar(estado, eventos);
+    // Si el primer jugador en el orden de turno es el bot (partidas "contra
+    // la maquina": se agrega al crear, antes que el humano), su apertura se
+    // resuelve aca mismo: para cuando el humano pide el estado, ya es su
+    // turno. No se narra aca (igual que el resto de _iniciar): se narra
+    // junto con el resto de la ronda 1 cuando esta cierra en _accion.
+    eventos.push(...this._resolverTurnosIA(estado));
     await this._persistir(estado, eventos);
 
-    const jugadorActual = estado.jugadores[estado.indiceJugadorActual];
-    return vistaJugador(estado, jugadorActual.id);
+    // OJO: nunca devolver vistaJugador(estado, X) aca. Este endpoint no exige
+    // token (arrancar la partida es una accion de "sala de espera", no de un
+    // jugador puntual) y devolver la vista privada de un jugador (aunque sea
+    // solo la del jugador de turno) filtraria mapa descubierto y recursos
+    // ajenos a quien sea que llame a /iniciar, sin credenciales. El frontend
+    // vuelve a pedir el estado via GET /:id (con token) despues de iniciar,
+    // asi que alcanza con una confirmacion minima sin datos de juego.
+    return { iniciada: true, turno: estado.turno };
   }
 
   async accion(id, jugadorId, accion, token) {
@@ -194,14 +280,45 @@ export class MapGameService {
     // Si la regla tiro ReglaError, nunca llegamos aca: nada se aplico ni se persistio,
     // y el clon descartado no dejo rastro (el cache sigue apuntando al `original`).
     aplicar(estado, eventos);
+    // Si esta accion humana deja el turno en manos de un bot (terminarTurno,
+    // o abandonar si le tocaba a el), se resuelve aca mismo, ANTES de
+    // persistir: asi el propio jugador que actuo ya ve, en la respuesta de
+    // esta misma llamada, que volvio a ser su turno (o el resultado de la
+    // partida si el bot gano/perdio en el camino).
+    eventos.push(...this._resolverTurnosIA(estado));
     await this._persistir(estado, eventos);
 
     const cerroRonda = eventos.some(e => e.tipo === 'RondaCompletada');
     if (cerroRonda && this.narrador) {
       const turnoRonda = eventos.find(e => e.tipo === 'RondaCompletada').turno;
-      Promise.resolve(this.narrador(eventos))
-        .then(narrativa => this.repo.guardarNarrativa(estado.id, turnoRonda, narrativa))
-        .catch(() => null); // la narracion nunca puede romper la partida
+      // Se narra la RONDA completa, no solo la ultima accion: esta ultima siempre
+      // es terminarTurno (eventos de contabilidad, que el narrador no narra), y
+      // todo lo interesante (fundaciones, construcciones, combates) ocurrio en
+      // acciones anteriores de la misma ronda. Esa lectura a la DB queda DENTRO
+      // de esta cadena protegida por el .catch de abajo: si falla, se cae al
+      // mismo lugar que un fallo de narracion y nunca rompe la partida.
+      Promise.resolve(this.repo.eventosDeRonda(estado.id, turnoRonda))
+        .then(eventosRonda => this.narrador(eventosRonda, estado.jugadores))
+        .then(async (narrativa) => {
+          if (!narrativa) return;
+          await this.repo.guardarNarrativa(estado.id, turnoRonda, narrativa);
+          // La narracion tarda (puede pegarle a la IA), asi que llega despues
+          // de la emision del estado. Se avisa por su propio evento para que
+          // el jugador la vea en esta ronda y no en la siguiente.
+          if (this.emitir) {
+            for (const jugador of estado.jugadores) {
+              this.emitir(id, jugador.id, 'narrativa', { ronda: turnoRonda, texto: narrativa });
+            }
+          }
+        })
+        .catch((error) => {
+          // Se loguea antes de tragar el error: la narracion nunca puede
+          // romper la partida, pero un fallo silencioso es invisible en
+          // produccion. El invariante (nunca romper) se mantiene: seguimos
+          // devolviendo null / sin propagar la excepcion.
+          logger.error('Fallo al narrar/guardar la narrativa de la ronda de mapa:', error);
+          return null;
+        });
     }
 
     // Una emision POR JUGADOR, con SOLO su vista. Antes se mandaba un unico
@@ -209,19 +326,28 @@ export class MapGameService {
     // socket de la sala recibia la niebla, ciudades y recursos de todos los
     // demas, reintroduciendo por socket la fuga que el dominio ya evitaba.
     // Invariante: un socket del jugador X nunca recibe la vista de Y.
+    // Se adjuntan las narrativas tambien aca para que la vista emitida por
+    // socket sea consistente con la que devuelve `vista()` (misma forma).
+    // UNA sola lectura de narrativas por accion, reutilizada para TODOS los
+    // jugadores (loop de abajo) y para el `return` de mas abajo: no se hace
+    // una lectura extra por jugador emitido (N jugadores => 1 lectura, no N).
+    const narrativas = await this.repo.narrativasDe(estado.id);
     if (this.emitir) {
       for (const jugador of estado.jugadores) {
-        this.emitir(id, jugador.id, 'estado', vistaJugador(estado, jugador.id));
+        this.emitir(id, jugador.id, 'estado', { ...vistaJugador(estado, jugador.id), narrativas });
       }
     }
 
-    return { vista: vistaJugador(estado, jugadorId), eventos };
+    return { vista: { ...vistaJugador(estado, jugadorId), narrativas }, eventos };
   }
 
   async vista(id, jugadorId, token) {
     const estado = await this._resolver(id);
     if (!estado) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
     await this.verificarToken(estado.id, jugadorId, token);
-    return vistaJugador(estado, jugadorId);
+    // Las narrativas se adjuntan aca y no en `vistaJugador`: esa funcion es
+    // dominio puro y no tiene acceso al repo.
+    const narrativas = await this.repo.narrativasDe(estado.id);
+    return { ...vistaJugador(estado, jugadorId), narrativas };
   }
 }

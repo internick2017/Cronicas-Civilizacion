@@ -1,6 +1,7 @@
 import { tileEn } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
-import { validarTurno, evento, radio1 } from './comun.js';
+import { validarTurno, evento, radioAlrededor } from './comun.js';
+import { radioVision } from './cultura.js';
 
 export function moverEjercito(estado, jugadorId, { desde, hasta }) {
   validarTurno(estado, jugadorId);
@@ -36,7 +37,9 @@ export function moverEjercito(estado, jugadorId, { desde, hasta }) {
 
   const eventos = [
     evento('EjercitoMovido', estado, jugadorId, { desde: { x: desde.x, y: desde.y }, hasta: { x: hasta.x, y: hasta.y } }),
-    evento('TerritorioDescubierto', estado, jugadorId, { tiles: radio1(hasta.x, hasta.y) }),
+    evento('TerritorioDescubierto', estado, jugadorId, {
+      tiles: radioAlrededor(hasta.x, hasta.y, radioVision(estado.jugadores.find(j => j.id === jugadorId)))
+    }),
   ];
 
   if (!tileHasta.dueno) {

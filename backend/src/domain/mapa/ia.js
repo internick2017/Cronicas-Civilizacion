@@ -1,0 +1,298 @@
+// Jugador controlado por la maquina, para partidas de un jugador humano.
+//
+// No es una IA con modelo de lenguaje: son reglas heuristicas simples, del
+// mismo tipo que el narrador local (ver narradorLocal.js). No hace falta mas
+// para que la partida sea jugable sola: la IA no tiene que jugar OPTIMO, solo
+// tiene que jugar RAZONABLE (o deliberadamente PEOR, en facil) y nunca trabar
+// el turno.
+//
+// Diseño: en cada paso se elige UNA accion con el estado actual (los
+// recursos y el mapa cambian entre pasos, igual que si un humano jugara
+// click a click), se ejecuta reusando las MISMAS reglas de dominio que usa
+// un jugador humano (nunca se inventa un camino paralelo que pueda violar
+// una regla del juego), y se repite hasta que no hay mas nada razonable que
+// hacer o se llega al tope de pasos. Al final siempre se termina el turno:
+// la IA nunca puede dejar la partida esperando a que ella actue.
+import { tileEn, jugadorPorId, puedePagar } from './MapGame.js';
+import {
+  EDIFICIOS, UNIDADES, COSTO_CIUDAD, BONO_TERRENO_PRODUCCION,
+  bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD,
+  DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT
+} from './constantes.js';
+import { aplicar } from './aplicar.js';
+import { fundarCiudad, construir } from './reglas/ciudades.js';
+import { reclutar } from './reglas/militar.js';
+import { moverEjercito } from './reglas/movimiento.js';
+import { atacar } from './reglas/combate.js';
+import { terminarTurno } from './reglas/turnos.js';
+import { bonoDefensaPorRasgos } from './reglas/cultura.js';
+import { ReglaError } from './errores.js';
+
+// Backstop duro: protege contra un bug futuro que deje a decidirAccion
+// devolviendo algo valido para siempre (p.ej. una regla nueva que la IA
+// nunca deja de poder pagar). Muy por encima de lo que un turno real usa.
+const PASOS_MAXIMOS = 60;
+// Si una decision falla por una ReglaError 5 veces seguidas, algo quedo mal
+// modelado (p.ej. dos "candidatos" que se invalidan mutuamente) y seguir
+// probando no va a arreglarlo: mejor cerrar el turno que quedar reintentando.
+const FALLOS_SEGUIDOS_MAXIMOS = 5;
+
+// Orden que prioriza aserradero/cantera primero: evita el error de balance
+// que encontramos jugando (madera o piedra en cero para siempre si la
+// capital no cayo en el terreno correcto). Lo usan normal y dificil.
+const ORDEN_EDIFICIOS_BUENO = ['sawmill', 'quarry', 'granary', 'market', 'library', 'barracks'];
+// Orden "de fabrica" de EDIFICIOS (sin ese criterio): lo que construiria
+// alguien sin pensarlo. Es lo que separa a facil del resto.
+const ORDEN_EDIFICIOS_NATURAL = Object.keys(EDIFICIOS);
+
+export { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT };
+
+// Un solo lugar donde vive QUE tan bien juega cada nivel. Ajustar la
+// dificultad es tocar numeros aca, no reescribir logica.
+const PERFILES_DIFICULTAD = {
+  facil: {
+    // 3 de cada 10 pasos, la maquina directamente no hace nada ese paso
+    // (como si dudara o se distrajera): juega mas lento y menos a fondo.
+    probabilidadSaltear: 0.3,
+    // 0 = ataca a cualquier vecino enemigo sin calcular si conviene, igual
+    // que la version original. Es justo el tipo de error (arquero contra
+    // lancero en altura) que un jugador nuevo tambien cometeria.
+    margenAtaque: 0,
+    unidadesPrioridad: ['warrior'],
+    topeEjercitosExtra: 0,
+    ordenEdificios: ORDEN_EDIFICIOS_NATURAL,
+    elegirMejorFundacion: false,
+  },
+  normal: {
+    probabilidadSaltear: 0,
+    // Ataca solo si su ataque base alcanza al menos el 90% del poder
+    // defensivo estimado del objetivo: filtra los enfrentamientos obviamente
+    // perdidos (el caso real que motivo el cambio de combate a dano mutuo),
+    // sin llegar a jugar perfecto.
+    margenAtaque: 0.9,
+    unidadesPrioridad: ['warrior', 'spearman', 'archer'],
+    topeEjercitosExtra: 1,
+    ordenEdificios: ORDEN_EDIFICIOS_BUENO,
+    elegirMejorFundacion: false,
+  },
+  dificil: {
+    probabilidadSaltear: 0,
+    // Solo pelea cuando esta claramente arriba (10% de margen mas que
+    // "parejo"): prefiere reposicionarse antes que un intercambio parejo.
+    margenAtaque: 1.15,
+    // Prioriza unidades de cuartel (mas fuertes) en cuanto estan disponibles.
+    unidadesPrioridad: ['cavalry', 'catapult', 'spearman', 'archer', 'warrior'],
+    topeEjercitosExtra: 2,
+    ordenEdificios: ORDEN_EDIFICIOS_BUENO,
+    elegirMejorFundacion: true,
+  },
+};
+
+function perfilDe(estado, jugadorId) {
+  const jugador = jugadorPorId(estado, jugadorId);
+  const dificultad = DIFICULTADES_IA.includes(jugador?.dificultadIA)
+    ? jugador.dificultadIA
+    : DIFICULTAD_IA_DEFAULT;
+  return PERFILES_DIFICULTAD[dificultad];
+}
+
+const VECINOS_ORTOGONALES = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+
+function ciudadesDe(estado, jugadorId) {
+  return estado.mapa.filter((t) => t.ciudad && t.dueno === jugadorId);
+}
+
+function ejercitosDe(estado, jugadorId) {
+  return estado.mapa.filter((t) => t.ejercito && t.ejercito.dueno === jugadorId);
+}
+
+function vecinosOrtogonales(estado, x, y) {
+  return VECINOS_ORTOGONALES
+    .map(([dx, dy]) => tileEn(estado, x + dx, y + dy))
+    .filter(Boolean);
+}
+
+function elegir(rng, opciones) {
+  return opciones[Math.floor(rng() * opciones.length)];
+}
+
+// Estimacion del poder defensivo de un tile enemigo, con la MISMA formula que
+// reglas/combate.js pero SIN el dado (tirada() es aleatorio en el momento del
+// combate real; la IA decide ANTES de tirar, asi que solo puede trabajar con
+// lo que ya se sabe). No es exacta: es una guia para no atacar a ciegas.
+function poderDefensivoEstimado(estado, objetivo) {
+  const base = objetivo.ejercito
+    ? UNIDADES[objetivo.ejercito.tipo].defensa
+    : defensaCiudad(objetivo.ciudad.nivel);
+  const ciudadPropia = Boolean(objetivo.ciudad);
+  const defensor = estado.jugadores.find((j) => j.id === objetivo.dueno);
+  const bonoCiudad = ciudadPropia ? BONO_DEFENSA_CIUDAD * bonoDefensaPorRasgos(defensor) : 1;
+  return base * bonoDefensa(objetivo.terreno) * bonoCiudad;
+}
+
+// --- Decisiones, una por dominio de juego ---------------------------------
+
+function decidirConstruccion(estado, jugadorId, perfil) {
+  const jugador = jugadorPorId(estado, jugadorId);
+  for (const tile of ciudadesDe(estado, jugadorId)) {
+    const faltantes = perfil.ordenEdificios.filter((tipo) => !tile.ciudad.edificios.includes(tipo));
+    for (const tipo of faltantes) {
+      if (puedePagar(jugador, EDIFICIOS[tipo].costo)) {
+        return { tipo: 'construir', x: tile.x, y: tile.y, edificio: tipo };
+      }
+    }
+  }
+  return null;
+}
+
+// El tope de ejercitos (ciudades + un extra segun dificultad) evita que la IA
+// gaste TODO en soldados y nunca construya ni funde.
+function decidirReclutamiento(estado, jugadorId, perfil) {
+  const jugador = jugadorPorId(estado, jugadorId);
+  const ciudades = ciudadesDe(estado, jugadorId);
+  if (ejercitosDe(estado, jugadorId).length >= ciudades.length + perfil.topeEjercitosExtra) return null;
+
+  const libre = ciudades.find((tile) => !tile.ejercito);
+  if (!libre) return null;
+
+  for (const tipo of perfil.unidadesPrioridad) {
+    const definicion = UNIDADES[tipo];
+    if (definicion.requiereBarracks && !libre.ciudad.edificios.includes('barracks')) continue;
+    if (puedePagar(jugador, definicion.costo)) {
+      return { tipo: 'reclutar', x: libre.x, y: libre.y, unidad: tipo };
+    }
+  }
+  return null;
+}
+
+function decidirMilitar(estado, jugadorId, rng, perfil) {
+  for (const origen of ejercitosDe(estado, jugadorId)) {
+    if (origen.ejercito.movimientoRestante <= 0) continue;
+    const vecinos = vecinosOrtogonales(estado, origen.x, origen.y);
+
+    const objetivo = vecinos.find((t) =>
+      (t.ejercito && t.ejercito.dueno !== jugadorId) || (t.ciudad && t.dueno !== jugadorId));
+    if (objetivo) {
+      const ataquePropio = UNIDADES[origen.ejercito.tipo].ataque;
+      // margenAtaque=0 (facil) hace que esto siempre de verdadero: cualquier
+      // poder defensivo es >= 0 * cualquier cosa, asi que ataca sin pensar.
+      const conviene = ataquePropio >= perfil.margenAtaque * poderDefensivoEstimado(estado, objetivo);
+      if (conviene) {
+        return { tipo: 'atacar', desde: { x: origen.x, y: origen.y }, hasta: { x: objetivo.x, y: objetivo.y } };
+      }
+      // Si no conviene, NO ataca: cae al movimiento normal de abajo (se
+      // reposiciona/explora en vez de tirarse a un combate que va a perder).
+    }
+
+    const transitables = vecinos.filter((t) =>
+      t.terreno !== 'water' &&
+      !(t.dueno && t.dueno !== jugadorId) &&
+      !(t.ejercito && t.ejercito.dueno === jugadorId));
+    if (transitables.length === 0) continue;
+
+    // Prioriza explorar (moverse hacia lo que todavia no descubrio) sobre
+    // deambular por territorio ya conocido: una IA que solo pisa lo que ya
+    // ve nunca encuentra al rival ni agranda su propio mapa.
+    const sinExplorar = transitables.filter((t) => !t.descubiertoPor.includes(jugadorId));
+    const destino = elegir(rng, sinExplorar.length ? sinExplorar : transitables);
+    return { tipo: 'moverEjercito', desde: { x: origen.x, y: origen.y }, hasta: { x: destino.x, y: destino.y } };
+  }
+  return null;
+}
+
+// Suma los numeros de BONO_TERRENO_PRODUCCION de un terreno, sin importar el
+// recurso: sirve solo para COMPARAR candidatas entre si (agua/desierto dan
+// menos que bosque/colinas), no como un valor con significado propio.
+function puntajeTerreno(tile) {
+  return Object.values(BONO_TERRENO_PRODUCCION[tile.terreno] ?? {}).reduce((a, b) => a + b, 0);
+}
+
+function decidirFundacion(estado, jugadorId, rng, perfil) {
+  const jugador = jugadorPorId(estado, jugadorId);
+  if (!puedePagar(jugador, COSTO_CIUDAD)) return null;
+
+  // fundarCiudad (ver reglas/ciudades.js) rechaza CUALQUIER tile con dueño,
+  // incluso el propio: solo se puede fundar en tierra sin reclamar. Filtrar
+  // por "es mia" (t.dueno === jugadorId) es el error que tenia esta funcion
+  // antes: nunca hay una casilla asi que pase la regla real, asi que la IA
+  // jamas lograba fundar una segunda ciudad.
+  const candidatas = estado.mapa.filter((t) =>
+    !t.dueno && !t.ciudad && t.terreno !== 'water' && t.descubiertoPor.includes(jugadorId));
+  if (candidatas.length === 0) return null;
+
+  let elegida;
+  if (perfil.elegirMejorFundacion) {
+    const mejorPuntaje = Math.max(...candidatas.map(puntajeTerreno));
+    elegida = elegir(rng, candidatas.filter((t) => puntajeTerreno(t) === mejorPuntaje));
+  } else {
+    elegida = elegir(rng, candidatas);
+  }
+
+  const numero = ciudadesDe(estado, jugadorId).length + 1;
+  return { tipo: 'fundarCiudad', x: elegida.x, y: elegida.y, nombre: `${jugador.civilizacion} ${numero}` };
+}
+
+function decidirAccion(estado, jugadorId, rng, perfil) {
+  return decidirConstruccion(estado, jugadorId, perfil) ??
+    decidirReclutamiento(estado, jugadorId, perfil) ??
+    decidirMilitar(estado, jugadorId, rng, perfil) ??
+    decidirFundacion(estado, jugadorId, rng, perfil) ??
+    null;
+}
+
+const EJECUTORES = {
+  construir: (estado, jugadorId, a) => construir(estado, jugadorId, a),
+  reclutar: (estado, jugadorId, a) => reclutar(estado, jugadorId, a),
+  moverEjercito: (estado, jugadorId, a) => moverEjercito(estado, jugadorId, a),
+  atacar: (estado, jugadorId, a, rng) => atacar(estado, jugadorId, a, rng),
+  fundarCiudad: (estado, jugadorId, a) => fundarCiudad(estado, jugadorId, a),
+};
+
+/**
+ * Juega el turno completo de un jugador-bot: MUTA `estado` (aplica cada
+ * evento a medida que decide, igual que MapGameService hace por cada accion
+ * humana) y devuelve la lista plana de eventos generados, terminando siempre
+ * con terminarTurno.
+ *
+ * La dificultad se lee del propio jugador (`jugador.dificultadIA`, fijada al
+ * unirse — ver reglas/partida.js), no se pasa como parametro: asi cualquier
+ * lugar que ya tenga `estado` y un `jugadorId` puede llamar a esto sin tener
+ * que acordarse de propagar la dificultad por separado.
+ */
+export function jugarTurnoIA(estado, jugadorId, rng) {
+  const perfil = perfilDe(estado, jugadorId);
+  const eventos = [];
+  let fallosSeguidos = 0;
+
+  for (let paso = 0; paso < PASOS_MAXIMOS; paso++) {
+    // El "se distrae" tiene que vivir ACA, no adentro de decidirAccion: si
+    // viviera ahi, un salteo aleatorio en un paso cualquiera se confundiria
+    // con "no hay mas nada que hacer" y cortaria el turno entero de un tiro
+    // (rompiendo el for con `break`, no con `continue`). Con el chequeo aca,
+    // un paso salteado simplemente pasa al siguiente: la maquina juega mas
+    // lento/distraido, no un turno vacio por mala suerte en el primer paso.
+    if (perfil.probabilidadSaltear > 0 && rng() < perfil.probabilidadSaltear) continue;
+
+    const decision = decidirAccion(estado, jugadorId, rng, perfil);
+    if (!decision) break;
+
+    try {
+      const evs = EJECUTORES[decision.tipo](estado, jugadorId, decision, rng);
+      aplicar(estado, evs);
+      eventos.push(...evs);
+      fallosSeguidos = 0;
+    } catch (err) {
+      // Una ReglaError significa que la decision ya no era valida (el estado
+      // pudo cambiar entre elegirla y ejecutarla): se descarta ese paso, no
+      // se rompe el turno. Cualquier OTRO error es un bug real y se propaga.
+      if (!(err instanceof ReglaError)) throw err;
+      fallosSeguidos++;
+      if (fallosSeguidos >= FALLOS_SEGUIDOS_MAXIMOS) break;
+    }
+  }
+
+  const cierre = terminarTurno(estado, jugadorId);
+  aplicar(estado, cierre);
+  eventos.push(...cierre);
+  return eventos;
+}

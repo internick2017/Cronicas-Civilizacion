@@ -5,6 +5,7 @@ import Database from 'better-sqlite3';
 import { MapGameRepo } from '../../src/db/MapGameRepo.js';
 import { MapGameService } from '../../src/services/MapGameService.js';
 import { crearMapRoutes } from '../../src/routes/mapRoutes.js';
+import { EDIFICIOS, UNIDADES } from '../../src/domain/mapa/constantes.js';
 
 function crearApp(servicio) {
   const app = express();
@@ -49,7 +50,11 @@ describe('mapRoutes', () => {
 
     const resIniciar = await request(app).post(`/api/map/${id}/iniciar`);
     expect(resIniciar.status).toBe(200);
-    expect(resIniciar.body.estado).toBe('jugando');
+    expect(resIniciar.body.iniciada).toBe(true);
+    // iniciar no exige token (ver problema 2 del review) por lo que NO puede
+    // devolver la vista privada de ningun jugador: sin mapa, sin jugadores.
+    expect(resIniciar.body).not.toHaveProperty('mapa');
+    expect(resIniciar.body).not.toHaveProperty('jugadores');
 
     // el primer jugador en unirse (p1) es quien arranca
     const resAccion = await request(app)
@@ -169,5 +174,67 @@ describe('mapRoutes', () => {
     const serializado = JSON.stringify(res.body);
     expect(serializado).not.toContain('semilla-secreta');
     expect(res.body).not.toHaveProperty('semilla');
+  });
+
+  it('POST /:id/iniciar no expone la vista de ningun jugador (sin token, sin mapa)', async () => {
+    const { app } = crearServicio();
+    const resCrear = await request(app).post('/api/map').send({ nombre: 'T', semilla: 'semilla-secreta' });
+    const { id } = resCrear.body;
+    await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p1', nombre: 'A', civilizacion: 'Incas' });
+    await request(app).post(`/api/map/${id}/unirse`).send({ id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
+
+    // Se llama sin X-Jugador-Token a proposito: iniciar la partida es una
+    // accion de sala de espera, no requiere credenciales de un jugador
+    // puntual, asi que el endpoint tiene que ser seguro incluso sin token.
+    const resIniciar = await request(app).post(`/api/map/${id}/iniciar`);
+    expect(resIniciar.status).toBe(200);
+    expect(resIniciar.body).not.toHaveProperty('mapa');
+    expect(resIniciar.body).not.toHaveProperty('jugadores');
+    expect(resIniciar.body).not.toHaveProperty('recursos');
+    const serializado = JSON.stringify(resIniciar.body);
+    expect(serializado).not.toContain('semilla-secreta');
+  });
+});
+
+describe('GET /api/map/constantes', () => {
+  it('devuelve edificios y unidades con sus costos', async () => {
+    const { app } = crearServicio();
+    const res = await request(app).get('/api/map/constantes');
+    expect(res.status).toBe(200);
+
+    const granero = res.body.edificios.find(e => e.tipo === 'granary');
+    expect(granero.costo).toEqual({ food: 30, wood: 20 });
+    expect(typeof granero.nombre).toBe('string');
+
+    const caballeria = res.body.unidades.find(u => u.tipo === 'cavalry');
+    expect(caballeria.requiereBarracks).toBe(true);
+    expect(caballeria.ataque).toBe(20);
+    expect(caballeria.costo).toEqual({ food: 25, gold: 40, wood: 5 });
+    expect(caballeria.salud).toBe(120);
+
+    // Se compara contra el dominio en vez de contra un numero fijo: la lista
+    // de edificios crece con el balance y un literal obliga a tocar el test
+    // cada vez sin aportar nada.
+    expect(res.body.edificios.map(e => e.tipo).sort()).toEqual(Object.keys(EDIFICIOS).sort());
+    expect(res.body.unidades.map(u => u.tipo).sort()).toEqual(Object.keys(UNIDADES).sort());
+  });
+
+  it('incluye el costo de fundar ciudad', async () => {
+    const { app } = crearServicio();
+    const res = await request(app).get('/api/map/constantes');
+    expect(res.status).toBe(200);
+    expect(res.body.costoCiudad).toEqual({ food: 50, wood: 30, stone: 20 });
+  });
+
+  it('no exige token: son reglas publicas, no estado de partida', async () => {
+    const { app } = crearServicio();
+    const res = await request(app).get('/api/map/constantes');
+    expect(res.status).not.toBe(401);
+  });
+
+  it('incluye el minimo de jugadores para iniciar', async () => {
+    const { app } = crearServicio();
+    const res = await request(app).get('/api/map/constantes');
+    expect(res.body.minJugadores).toBe(2);
   });
 });

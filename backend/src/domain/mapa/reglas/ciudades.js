@@ -1,7 +1,8 @@
 import { tileEn, jugadorPorId, puedePagar } from '../MapGame.js';
-import { COSTO_CIUDAD, EDIFICIOS } from '../constantes.js';
+import { COSTO_CIUDAD, EDIFICIOS, COSTO_MEJORA_CIUDAD } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento, radio1 } from './comun.js';
+import { tieneTecnologiaRequerida } from './tecnologia.js';
 
 export function fundarCiudad(estado, jugadorId, { x, y, nombre }) {
   validarTurno(estado, jugadorId);
@@ -36,6 +37,9 @@ export function construir(estado, jugadorId, { x, y, edificio }) {
   }
 
   const jugador = jugadorPorId(estado, jugadorId);
+  if (!tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) {
+    throw new ReglaError('REQUIERE_TECNOLOGIA', `Ese edificio requiere la tecnología: ${definicion.requiereTecnologia}`);
+  }
   if (!puedePagar(jugador, definicion.costo)) {
     throw new ReglaError('RECURSOS_INSUFICIENTES', 'Recursos insuficientes');
   }
@@ -43,5 +47,28 @@ export function construir(estado, jugadorId, { x, y, edificio }) {
   return [
     evento('RecursosGastados', estado, jugadorId, { costo: definicion.costo }),
     evento('EdificioConstruido', estado, jugadorId, { x, y, edificio }),
+  ];
+}
+
+// Subir el nivel de UNA ciudad puntual, a diferencia de una tecnologia (que
+// es de toda la civilizacion): cada nivel cuesta mas que el anterior, y hoy
+// solo mejora su defensa (defensaCiudad(nivel) ya escalaba con esto, pero
+// nada permitia subir `nivel` mas alla de 1 hasta ahora).
+export function mejorarCiudad(estado, jugadorId, { x, y }) {
+  validarTurno(estado, jugadorId);
+
+  const tile = tileEn(estado, x, y);
+  if (!tile) throw new ReglaError('POSICION_INVALIDA', 'Posición inválida');
+  if (!tile.ciudad || tile.dueno !== jugadorId) throw new ReglaError('CIUDAD_AJENA', 'La ciudad no te pertenece');
+
+  const jugador = jugadorPorId(estado, jugadorId);
+  const costo = COSTO_MEJORA_CIUDAD(tile.ciudad.nivel);
+  if (!puedePagar(jugador, costo)) {
+    throw new ReglaError('RECURSOS_INSUFICIENTES', 'Recursos insuficientes');
+  }
+
+  return [
+    evento('RecursosGastados', estado, jugadorId, { costo }),
+    evento('CiudadMejorada', estado, jugadorId, { x, y }),
   ];
 }

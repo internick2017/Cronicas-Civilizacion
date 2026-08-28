@@ -27,7 +27,7 @@ it('round-trip completo: partida jugando sobrevive guardar+cargar identica (anti
 
   // Ejercito reclutado sobre la capital, con salud y movimiento no-default
   // (cubre `tile.ejercito`, exactamente donde reapareceria el bug de `ciudad`).
-  aplicar(e, reclutar(e, 'p1', { x, y, tipo: 'warrior' }));
+  aplicar(e, reclutar(e, 'p1', { x, y, unidad: 'warrior' }));
   const tileConEjercito = tileEn(e, x, y);
   tileConEjercito.ejercito.salud = 37;
   tileConEjercito.ejercito.movimientoRestante = 1;
@@ -74,4 +74,42 @@ it('cargarPorCodigo y listarActivas', () => {
   expect(fromJSON(repo.cargarPorCodigo('ZZ99')).id).toBe(e.id);
   expect(repo.listarActivas()).toHaveLength(1);
   expect(repo.cargar('inexistente')).toBeNull();
+});
+
+describe('narrativasDe', () => {
+  it('devuelve solo las rondas con narrativa, de la mas vieja a la mas nueva', async () => {
+    repo.guardar(crearEstado({ nombre: 'T', semilla: 's1' }), 'ABC123');
+    const id = repo.listarActivas()[0].id;
+    repo.agregarEventos(id, [
+      { tipo: 'RondaCompletada', turno: 1, jugadorId: null, datos: {} },
+      { tipo: 'RondaCompletada', turno: 2, jugadorId: null, datos: {} },
+      { tipo: 'RondaCompletada', turno: 3, jugadorId: null, datos: {} }
+    ]);
+    repo.guardarNarrativa(id, 1, 'Primera ronda.');
+    repo.guardarNarrativa(id, 3, 'Tercera ronda.');
+
+    const narrativas = await repo.narrativasDe(id);
+    expect(narrativas).toEqual([
+      { ronda: 1, texto: 'Primera ronda.' },
+      { ronda: 3, texto: 'Tercera ronda.' }
+    ]);
+  });
+
+  it('respeta el limite quedandose con las mas recientes', async () => {
+    repo.guardar(crearEstado({ nombre: 'T', semilla: 's2' }), 'DEF456');
+    const id = repo.listarActivas()[0].id;
+    repo.agregarEventos(id, [
+      { tipo: 'RondaCompletada', turno: 1, jugadorId: null, datos: {} },
+      { tipo: 'RondaCompletada', turno: 2, jugadorId: null, datos: {} },
+      { tipo: 'RondaCompletada', turno: 3, jugadorId: null, datos: {} }
+    ]);
+    for (const n of [1, 2, 3]) repo.guardarNarrativa(id, n, `Ronda ${n}.`);
+
+    const narrativas = await repo.narrativasDe(id, 2);
+    expect(narrativas.map(x => x.ronda)).toEqual([2, 3]);
+  });
+
+  it('una partida sin narrativas devuelve arreglo vacio', async () => {
+    expect(await repo.narrativasDe('inexistente')).toEqual([]);
+  });
 });

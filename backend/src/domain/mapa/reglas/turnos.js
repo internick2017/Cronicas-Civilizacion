@@ -1,7 +1,9 @@
 import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_VICTORIA_DOMINACION } from '../constantes.js';
 import { validarTurno, evento } from './comun.js';
+import { produccionPorRasgos } from './cultura.js';
+import { aplicarBonosPorcentuales } from './tecnologia.js';
 
-function siguienteIndiceActivo(estado, excluirIds = null) {
+export function siguienteIndiceActivo(estado, excluirIds = null) {
   const n = estado.jugadores.length;
   let idx = estado.indiceJugadorActual;
   for (let i = 0; i < n; i++) {
@@ -16,13 +18,20 @@ function ciudadesDe(estado, jugadorId) {
   return estado.mapa.filter(t => t.ciudad && t.dueno === jugadorId);
 }
 
-function producirParaJugador(estado, jugadorId) {
+// Exportada para que la vista pueda MOSTRAR el rendimiento por turno sin
+// duplicar la formula: el numero que ve el jugador sale del mismo calculo que
+// despues le suma los recursos (ver visibilidad.js#vistaJugadorPublica).
+export function producirParaJugador(estado, jugadorId) {
   const produccion = {};
   const acumular = (recurso, cantidad) => {
     produccion[recurso] = (produccion[recurso] ?? 0) + cantidad;
   };
+  // Los rasgos culturales rinden POR ciudad, igual que el terreno y los
+  // edificios: valen para las ciudades que ya tenias y para las que fundes.
+  const porRasgos = produccionPorRasgos(estado.jugadores.find(j => j.id === jugadorId));
   for (const tile of ciudadesDe(estado, jugadorId)) {
     for (const [recurso, cantidad] of Object.entries(PRODUCCION_BASE_CIUDAD)) acumular(recurso, cantidad);
+    for (const [recurso, cantidad] of Object.entries(porRasgos)) acumular(recurso, cantidad);
     const bono = BONO_TERRENO_PRODUCCION[tile.terreno] ?? {};
     for (const [recurso, cantidad] of Object.entries(bono)) acumular(recurso, cantidad);
     for (const edificio of tile.ciudad.edificios) {
@@ -30,10 +39,16 @@ function producirParaJugador(estado, jugadorId) {
       for (const [recurso, cantidad] of Object.entries(produccionEdificio)) acumular(recurso, cantidad);
     }
   }
-  return produccion;
+  // Los bonos porcentuales de tecnologia (irrigacion, mineria) se aplican AL
+  // FINAL, sobre el total ya sumado: un 20% de "toda tu comida" tiene que
+  // contar el terreno, los edificios Y los rasgos, no solo la base.
+  return aplicarBonosPorcentuales(produccion, estado.jugadores.find(j => j.id === jugadorId));
 }
 
-function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turnoCierre) {
+// Exportada para que abandonar() use la MISMA evaluacion: si el que se va deja
+// a un solo jugador en pie, la partida tiene que terminar igual que si lo
+// hubieran eliminado peleando.
+export function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turnoCierre) {
   if (activosPostEliminacion.length === 0) {
     return evento('PartidaTerminada', estado, jugadorId, {
       ganador: null,

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { ddl } from './mapSchema.js';
+import { ddl, TABLAS } from './mapSchema.js';
 
 // Convierte SQL escrito con placeholders `?` (estilo sqlite) a `$1, $2, ...`
 // (estilo postgres). Permite mantener una sola redaccion de cada query.
@@ -23,9 +23,47 @@ export class MapGameRepo {
     if (this.dialecto === 'sqlite') {
       for (const stmt of statements) this.db.exec(stmt);
       this.db.exec(indiceTokens);
+      return this._migrar();
+    }
+    return Promise.all([...statements, indiceTokens].map(stmt => this.db.query(stmt)))
+      .then(() => this._migrar());
+  }
+
+  // CREATE TABLE IF NOT EXISTS no toca una tabla que ya existia, asi que una
+  // columna nueva agregada a mapSchema.js nunca aparece en una base con datos
+  // previos (bug real: ver commit 8421b5c, jugador_id en map_game_eventos).
+  // Este migrador es GENERAL, no puntual a esa columna: para cada tabla
+  // declarada, compara sus columnas contra las que la base realmente tiene y
+  // agrega (ALTER TABLE ... ADD COLUMN) las que falten. Se resuelve asi en
+  // vez de puntualmente porque va a haber mas cambios de esquema a futuro y
+  // este mismo mecanismo los cubre sin tocar el migrador de nuevo.
+  // Es idempotente: si ya no falta ninguna columna, no ejecuta ningun ALTER.
+  _migrar() {
+    if (this.dialecto === 'sqlite') {
+      for (const tabla of TABLAS) {
+        const existentes = new Set(this.db.prepare(`PRAGMA table_info(${tabla.nombre})`).all().map(c => c.name));
+        for (const [nombre, tipos] of tabla.columnas) {
+          if (!existentes.has(nombre)) {
+            this.db.exec(`ALTER TABLE ${tabla.nombre} ADD COLUMN ${nombre} ${tipos.sqlite}`);
+          }
+        }
+      }
       return;
     }
-    return Promise.all([...statements, indiceTokens].map(stmt => this.db.query(stmt)));
+    return (async () => {
+      for (const tabla of TABLAS) {
+        const res = await this.db.query(
+          'SELECT column_name FROM information_schema.columns WHERE table_name = $1',
+          [tabla.nombre],
+        );
+        const existentes = new Set(res.rows.map(r => r.column_name));
+        for (const [nombre, tipos] of tabla.columnas) {
+          if (!existentes.has(nombre)) {
+            await this.db.query(`ALTER TABLE ${tabla.nombre} ADD COLUMN ${nombre} ${tipos.postgres}`);
+          }
+        }
+      }
+    })();
   }
 
   guardar(estado, codigo) {
@@ -64,8 +102,8 @@ export class MapGameRepo {
 
   agregarEventos(gameId, eventos) {
     const sql = `
-      INSERT INTO map_game_eventos (game_id, turno, orden, tipo, datos_json)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO map_game_eventos (game_id, turno, orden, tipo, jugador_id, datos_json)
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
     if (this.dialecto === 'sqlite') {
       const siguienteOrden = this.db
@@ -74,7 +112,7 @@ export class MapGameRepo {
       const stmt = this.db.prepare(sql);
       const insertarTodos = this.db.transaction((filas) => {
         filas.forEach((evento, i) => {
-          stmt.run(gameId, evento.turno, siguienteOrden + i, evento.tipo, JSON.stringify(evento.datos));
+          stmt.run(gameId, evento.turno, siguienteOrden + i, evento.tipo, evento.jugadorId ?? null, JSON.stringify(evento.datos));
         });
       });
       insertarTodos(eventos);
@@ -87,7 +125,7 @@ export class MapGameRepo {
       );
       let orden = actual.rows[0].n;
       for (const evento of eventos) {
-        await this.db.query(adaptarPlaceholders(sql), [gameId, evento.turno, orden, evento.tipo, JSON.stringify(evento.datos)]);
+        await this.db.query(adaptarPlaceholders(sql), [gameId, evento.turno, orden, evento.tipo, evento.jugadorId ?? null, JSON.stringify(evento.datos)]);
         orden += 1;
       }
     })();
@@ -101,9 +139,54 @@ export class MapGameRepo {
     return this.db.query(adaptarPlaceholders(sql), [gameId]).then(res => res.rows);
   }
 
+  // Devuelve los eventos de UNA ronda (mismo `turno`) ya reconstruidos con la
+  // forma que espera el narrador: {tipo, jugadorId, datos}. Todas las acciones
+  // de todos los jugadores que ocurrieron mientras esa ronda estaba abierta
+  // comparten el mismo `turno` (ver evento() en reglas/comun.js: usa
+  // estado.turno, que solo avanza al CERRAR la ronda), asi que filtrar por
+  // turno alcanza para juntar todo lo que paso en la ronda, no solo la ultima
+  // accion (que siempre es terminarTurno, cuyos eventos son de contabilidad).
+  eventosDeRonda(gameId, turno) {
+    const sql = 'SELECT * FROM map_game_eventos WHERE game_id = ? AND turno = ? ORDER BY orden ASC';
+    const mapear = (filas) => filas.map(f => ({
+      tipo: f.tipo,
+      turno: f.turno,
+      jugadorId: f.jugador_id,
+      datos: JSON.parse(f.datos_json),
+    }));
+    if (this.dialecto === 'sqlite') {
+      return mapear(this.db.prepare(sql).all(gameId, turno));
+    }
+    return this.db.query(adaptarPlaceholders(sql), [gameId, turno]).then(res => mapear(res.rows));
+  }
+
   guardarNarrativa(gameId, turno, narrativa) {
     const sql = 'UPDATE map_game_eventos SET narrativa = ? WHERE game_id = ? AND turno = ?';
     return this._ejecutar(sql, [narrativa, gameId, turno]);
+  }
+
+  // Lee las ultimas rondas narradas. Hasta ahora la narrativa se escribia y
+  // nunca se leia: sin este metodo el jugador jamas veia el texto.
+  // El GROUP BY evita duplicados cuando una ronda tiene varias filas con la
+  // misma narrativa (una fila por evento de esa ronda, todas actualizadas al
+  // mismo texto por `guardarNarrativa`); es valido tanto en sqlite como en
+  // postgres porque ambas columnas seleccionadas (turno, narrativa) estan en
+  // el GROUP BY, sin columnas sueltas fuera de el.
+  narrativasDe(gameId, limite = 5) {
+    const sql = `
+      SELECT turno, narrativa FROM map_game_eventos
+      WHERE game_id = ? AND narrativa IS NOT NULL
+      GROUP BY turno, narrativa
+      ORDER BY turno ASC
+    `;
+    const mapear = (filas) => filas
+      .map(f => ({ ronda: f.turno, texto: f.narrativa }))
+      .slice(-limite);
+
+    if (this.dialecto === 'sqlite') {
+      return Promise.resolve(mapear(this.db.prepare(sql).all(gameId)));
+    }
+    return this.db.query(adaptarPlaceholders(sql), [gameId]).then(res => mapear(res.rows));
   }
 
   listarActivas() {

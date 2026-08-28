@@ -24,6 +24,9 @@ const TABLAS = [
       ['turno', { sqlite: 'INTEGER NOT NULL', postgres: 'INTEGER NOT NULL' }],
       ['orden', { sqlite: 'INTEGER NOT NULL', postgres: 'INTEGER NOT NULL' }],
       ['tipo', { sqlite: 'TEXT NOT NULL', postgres: 'TEXT NOT NULL' }],
+      // Nullable: hay eventos de contabilidad (RondaCompletada, TurnoAvanzado) cuyo
+      // jugadorId es null porque no son la accion de un jugador en particular.
+      ['jugador_id', { sqlite: 'TEXT', postgres: 'TEXT' }],
       ['datos_json', { sqlite: 'TEXT NOT NULL', postgres: 'TEXT NOT NULL' }],
       ['narrativa', { sqlite: 'TEXT', postgres: 'TEXT' }],
       ['creado', { sqlite: 'DATETIME DEFAULT CURRENT_TIMESTAMP', postgres: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP' }],
@@ -51,3 +54,11 @@ export function ddl(dialecto) {
 }
 
 export const TABLAS_NOMBRES = TABLAS.map(t => t.nombre);
+
+// Se expone la declaracion completa (no solo los nombres) para que el
+// migrador (ver MapGameRepo.migrar) pueda comparar, tabla por tabla, las
+// columnas declaradas aqui contra las que realmente tiene la base y agregar
+// las que falten. Asi CREATE TABLE IF NOT EXISTS y el migrador comparten una
+// unica fuente de verdad: agregar una columna nueva a este archivo alcanza
+// para que se cree tanto en bases nuevas como en bases existentes.
+export { TABLAS };

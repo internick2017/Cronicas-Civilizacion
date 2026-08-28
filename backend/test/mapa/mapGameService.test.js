@@ -43,15 +43,42 @@ describe('MapGameService', () => {
   it('crear+unirse+iniciar feliz devuelve vista con niebla', async () => {
     const { svc } = crearServicio();
     const { id } = await svc.crearPartida({ nombre: 'Mi Partida' });
-    const { vista: vistaUnion } = await svc.unirse(id, { id: 'p1', nombre: 'A', civilizacion: 'Incas' });
+    const { vista: vistaUnion, token: tokenP1 } = await svc.unirse(id, { id: 'p1', nombre: 'A', civilizacion: 'Incas' });
     expect(vistaUnion.jugadores.some(j => j.id === 'p1')).toBe(true);
     // niebla: la mayoria de tiles no estan descubiertos todavia
     expect(vistaUnion.mapa.some(t => t.descubierto === false)).toBe(true);
 
     await svc.unirse(id, { id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
-    const vistaInicio = await svc.iniciar(id);
+
+    const confirmacion = await svc.iniciar(id);
+    // iniciar() ya NO devuelve una vista privada de ningun jugador (ver
+    // problema 2 del review): solo confirma que la partida arranco. La vista
+    // real se pide despues via svc.vista(id, jugadorId, token), con token.
+    expect(confirmacion.iniciada).toBe(true);
+    expect(confirmacion).not.toHaveProperty('mapa');
+    expect(confirmacion).not.toHaveProperty('jugadores');
+
+    const vistaInicio = await svc.vista(id, 'p1', tokenP1);
     expect(vistaInicio.estado).toBe('jugando');
     expect(vistaInicio.mapa.some(t => t.descubierto === true)).toBe(true);
+  });
+
+  it('iniciar no filtra la vista privada de ningun jugador (problema 2 del review)', async () => {
+    const { svc } = crearServicio();
+    const { id } = await svc.crearPartida({ nombre: 'T', semilla: 'semilla-secreta' });
+    await svc.unirse(id, { id: 'p1', nombre: 'A', civilizacion: 'Incas' });
+    await svc.unirse(id, { id: 'p2', nombre: 'B', civilizacion: 'Mayas' });
+
+    const confirmacion = await svc.iniciar(id);
+
+    // Nada de mapa, ciudades, recursos ni semilla debe viajar en la respuesta
+    // de iniciar: cualquiera que conozca el id de la partida puede llamar a
+    // este endpoint sin token, asi que no puede devolver datos de juego.
+    expect(confirmacion).not.toHaveProperty('mapa');
+    expect(confirmacion).not.toHaveProperty('jugadores');
+    expect(confirmacion).not.toHaveProperty('recursos');
+    const serializado = JSON.stringify(confirmacion);
+    expect(serializado).not.toContain('semilla-secreta');
   });
 
   it('accion con ReglaError no persiste nada (atomicidad)', async () => {
@@ -84,6 +111,28 @@ describe('MapGameService', () => {
 
     expect(narrador).toHaveBeenCalledTimes(1);
     const eventosPasados = narrador.mock.calls[0][0];
+    expect(eventosPasados.some(e => e.tipo === 'RondaCompletada')).toBe(true);
+  });
+
+  it('narrador recibe TODOS los eventos de la ronda, no solo los de terminarTurno', async () => {
+    const narrador = vi.fn().mockResolvedValue('una narrativa cualquiera');
+    const { svc } = crearServicio({ narrador });
+    const { id, tokenP1, tokenP2 } = await crearPartidaConDosJugadores(svc);
+
+    // p1 recluta una unidad en su capital antes de terminar el turno: ese
+    // evento (UnidadReclutada) ocurre ANTES del terminarTurno que cierra la
+    // ronda, asi que el narrador tiene que verlo igual.
+    const vistaP1 = await svc.vista(id, 'p1', tokenP1);
+    const capitalP1 = vistaP1.mapa.find(t => t.ciudad && t.dueno === 'p1');
+    await svc.accion(id, 'p1', { tipo: 'reclutar', x: capitalP1.x, y: capitalP1.y, unidad: 'warrior' }, tokenP1);
+    await svc.accion(id, 'p1', { tipo: 'terminarTurno' }, tokenP1);
+    await svc.accion(id, 'p2', { tipo: 'terminarTurno' }, tokenP2); // cierra la ronda
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(narrador).toHaveBeenCalledTimes(1);
+    const eventosPasados = narrador.mock.calls[0][0];
+    expect(eventosPasados.some(e => e.tipo === 'UnidadReclutada')).toBe(true);
     expect(eventosPasados.some(e => e.tipo === 'RondaCompletada')).toBe(true);
   });
 
@@ -144,7 +193,7 @@ describe('MapGameService', () => {
     // ...y una lectura posterior en la MISMA instancia del servicio debe reflejar
     // eso, no el estado a medio mutar que la escritura fallida intento guardar.
     const vistaPostFallo = await svc.vista(id, 'p1', tokenP1);
-    const vistaEsperada = vistaJugador(estadoEnDbDespues, 'p1');
+    const vistaEsperada = { ...vistaJugador(estadoEnDbDespues, 'p1'), narrativas: [] };
     expect(vistaPostFallo).toEqual(vistaEsperada);
     // en particular, el turno NO debe haber avanzado (eso es lo que
     // `terminarTurno` intentaba hacer cuando el guardar fallo)
@@ -250,5 +299,52 @@ describe('MapGameService', () => {
 
     await expect(svc.vista(id, 'p1', t2)).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO' });
     await expect(svc.vista(id, 'p1', undefined)).rejects.toMatchObject({ codigo: 'TOKEN_INVALIDO' });
+  });
+
+  it('reclutar a traves del servicio (como la API real) recluta la unidad pedida, no "reclutar"', async () => {
+    // Reproduce el bug real: MapGameService._accion enruta con `accion.tipo`
+    // ('reclutar', 'construir', ...) y pasa el objeto `accion` COMPLETO, sin
+    // modificar, a la regla elegida (ver REGLAS_POR_TIPO). Si la regla
+    // `reclutar` tambien leyera su unidad bajo el nombre `tipo`, ese campo ya
+    // valdria 'reclutar' (el de enrutamiento) y jamas el tipo de unidad
+    // pedido: UNIDADES['reclutar'] no existe, asi que la accion fallaria
+    // SIEMPRE con UNIDAD_DESCONOCIDA sin importar que mande el cliente. Los
+    // tests de reglas/militar.js llaman a reclutar() directo, salteando este
+    // enrutamiento, por eso el bug sobrevivio. Este test pasa por
+    // svc.accion(), igual que la ruta POST /:id/accion real.
+    const { svc } = crearServicio();
+    const { id, tokenP1 } = await crearPartidaConDosJugadores(svc);
+
+    const antes = await svc.vista(id, 'p1', tokenP1);
+    const capital = antes.mapa.find(t => t.ciudad && t.dueno === 'p1');
+
+    const r = await svc.accion(
+      id,
+      'p1',
+      { tipo: 'reclutar', x: capital.x, y: capital.y, unidad: 'warrior' },
+      tokenP1
+    );
+
+    expect(r.eventos.map(e => e.tipo)).toEqual(['RecursosGastados', 'UnidadReclutada']);
+    const tileReclutado = r.vista.mapa.find(t => t.x === capital.x && t.y === capital.y);
+    expect(tileReclutado.ejercito).toMatchObject({ tipo: 'warrior', dueno: 'p1' });
+  });
+
+  describe('narrativas en la vista', () => {
+    it('la vista incluye las narrativas guardadas de la partida', async () => {
+      const { svc, repo } = crearServicio();
+      const { id, tokenP1 } = await crearPartidaConDosJugadores(svc);
+      await repo.guardarNarrativa(id, 1, 'Algo paso.');
+
+      const vista = await svc.vista(id, 'p1', tokenP1);
+      expect(vista.narrativas).toEqual([{ ronda: 1, texto: 'Algo paso.' }]);
+    });
+
+    it('sin narrativas, el campo existe y esta vacio', async () => {
+      const { svc } = crearServicio();
+      const { id, tokenP1 } = await crearPartidaConDosJugadores(svc);
+      const vista = await svc.vista(id, 'p1', tokenP1);
+      expect(vista.narrativas).toEqual([]);
+    });
   });
 });

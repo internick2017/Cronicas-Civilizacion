@@ -32,6 +32,10 @@ export default [
         location: 'readonly',
         SpeechRecognition: 'readonly',
         webkitSpeechRecognition: 'readonly',
+        performance: 'readonly',
+        requestAnimationFrame: 'readonly',
+        cancelAnimationFrame: 'readonly',
+        ResizeObserver: 'readonly',
       },
     },
     rules: {

@@ -1,5 +1,5 @@
 import { tileEn, jugadorPorId } from './MapGame.js';
-import { UNIDADES, RECURSOS_INICIALES } from './constantes.js';
+import { UNIDADES, RECURSOS_INICIALES, CUARTEL } from './constantes.js';
 import { ReglaError } from './errores.js';
 
 export function aplicar(estado, eventos) {
@@ -12,7 +12,11 @@ export function aplicar(estado, eventos) {
           nombre: datos.nombre,
           civilizacion: datos.civilizacion,
           recursos: { ...RECURSOS_INICIALES },
+          rasgos: [],
+          tecnologias: [],
           activo: true,
+          esBot: Boolean(datos.esBot),
+          dificultadIA: datos.dificultadIA ?? null,
         });
         break;
 
@@ -35,6 +39,29 @@ export function aplicar(estado, eventos) {
         break;
       }
 
+      case 'RasgoAdoptado': {
+        const j = jugadorPorId(estado, jugadorId);
+        // Las partidas creadas antes de que existieran los rasgos no traen el
+        // campo: se crea al vuelo en vez de romper.
+        if (!j.rasgos) j.rasgos = [];
+        j.rasgos.push(datos.rasgo);
+        break;
+      }
+
+      case 'TecnologiaInvestigada': {
+        const j = jugadorPorId(estado, jugadorId);
+        if (!j.tecnologias) j.tecnologias = [];
+        j.tecnologias.push(datos.tecnologia);
+        break;
+      }
+
+      case 'CiudadMejorada': {
+        const t = tileEn(estado, datos.x, datos.y);
+        t.ciudad.nivel += 1;
+        t.ciudad.poblacion += 250;
+        break;
+      }
+
       case 'RecursosGastados': {
         const j = jugadorPorId(estado, jugadorId);
         for (const [r, c] of Object.entries(datos.costo)) j.recursos[r] -= c;
@@ -50,11 +77,16 @@ export function aplicar(estado, eventos) {
       case 'UnidadReclutada': {
         const t = tileEn(estado, datos.x, datos.y);
         const def = UNIDADES[datos.tipo];
+        // bonoMovimiento (del cuartel donde se reclutó, ver reglas/militar.js)
+        // se guarda EN el ejercito, no solo se suma una vez: RondaCompletada
+        // vuelve a llenar movimientoRestante cada ronda, y tiene que seguir
+        // contando ese extra turno tras turno, no solo el primero.
         t.ejercito = {
           tipo: datos.tipo,
           dueno: jugadorId,
           salud: def.salud,
-          movimientoRestante: def.movimiento,
+          movimientoRestante: def.movimiento + (datos.bonoMovimiento ?? 0),
+          bonoMovimiento: datos.bonoMovimiento ?? 0,
         };
         break;
       }
@@ -110,7 +142,17 @@ export function aplicar(estado, eventos) {
 
       case 'RondaCompletada':
         for (const t of estado.mapa) {
-          if (t.ejercito) t.ejercito.movimientoRestante = UNIDADES[t.ejercito.tipo].movimiento;
+          if (!t.ejercito) continue;
+          t.ejercito.movimientoRestante = UNIDADES[t.ejercito.tipo].movimiento + (t.ejercito.bonoMovimiento ?? 0);
+          // Curacion: solo en una ciudad PROPIA con cuartel. `t.dueno` es
+          // quien controla la ciudad, no necesariamente quien tiene el
+          // ejercito parado ahi (nunca deberian diferir: no se puede pisar
+          // una ciudad ajena sin conquistarla), pero se compara para no
+          // curar por accidente una tropa que no es del dueño de la ciudad.
+          if (t.ciudad && t.ciudad.edificios.includes('barracks') && t.ejercito.dueno === t.dueno) {
+            const vidaMaxima = UNIDADES[t.ejercito.tipo].salud;
+            t.ejercito.salud = Math.min(vidaMaxima, t.ejercito.salud + CUARTEL.curacionPorRonda);
+          }
         }
         break;
 

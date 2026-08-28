@@ -2,8 +2,13 @@
 import { ref, onMounted } from 'vue'
 import StoryLobby from './components/StoryLobby.vue'
 import StorySession from './components/StorySession.vue'
+import ModeSelect from './components/mapa/ModeSelect.vue'
+import MapLobby from './components/mapa/MapLobby.vue'
+import MapSession from './components/mapa/MapSession.vue'
+import { useMapApi } from './composables/useMapApi.js'
 
 // App state
+const currentMode = ref(null) // null | 'narrativo' | 'mapa'
 const currentView = ref('lobby') // 'lobby' or 'session'
 const currentSession = ref(null)
 const currentPlayer = ref(null)
@@ -30,6 +35,7 @@ const loadSavedSession = async () => {
         if (playerInSession) {
           currentSession.value = result.data // Use updated session data
           currentPlayer.value = player
+          currentMode.value = 'narrativo'
           currentView.value = 'session'
           return
         }
@@ -60,7 +66,82 @@ const clearSavedSession = () => {
   localStorage.removeItem('cronicas-player')
 }
 
+// --- Restaurar sesion de mapa guardada -----------------------------------
+// MapSession.vue guarda estas 4 claves en cada onMounted (ver guardarSesion),
+// pero hasta ahora nadie las leia: un F5 a mitad de partida dejaba al
+// jugador varado, porque el token solo se emite una vez al unirse y unirse
+// de nuevo a una partida ya iniciada se rechaza (PARTIDA_YA_INICIADA). Aca
+// se intenta re-entrar con las credenciales guardadas; si la partida ya no
+// existe o el token ya no es valido, se limpia la sesion guardada y se
+// vuelve al inicio en vez de dejar una pantalla rota.
+const { vista: pedirVistaMapa } = useMapApi()
+
+const limpiarSesionMapaGuardada = () => {
+  localStorage.removeItem('cronicas-mapa-id')
+  localStorage.removeItem('cronicas-mapa-codigo')
+  localStorage.removeItem('cronicas-mapa-jugadorId')
+  localStorage.removeItem('cronicas-mapa-token')
+}
+
+const loadSavedMapSession = async () => {
+  const id = localStorage.getItem('cronicas-mapa-id')
+  const codigo = localStorage.getItem('cronicas-mapa-codigo')
+  const jugadorId = localStorage.getItem('cronicas-mapa-jugadorId')
+  const token = localStorage.getItem('cronicas-mapa-token')
+
+  if (!id || !codigo || !jugadorId || !token) return false
+
+  try {
+    const vista = await pedirVistaMapa(id, jugadorId, token)
+    mapaPartida.value = { id, codigo, jugadorId, token, vista }
+    currentMode.value = 'mapa'
+    return true
+  } catch (error) {
+    console.warn('No se pudo restaurar la sesion de mapa guardada:', error)
+
+    // El interceptor de useMapApi.js rechaza con `error.response?.data || error`:
+    // - Si el backend respondio (aunque sea con un error), `response.data` es
+    //   el JSON { codigo, mensaje } armado por manejarError() en mapRoutes.js.
+    //   Su presencia (un string en `.codigo`) es justamente lo que distingue
+    //   "el backend nos dijo algo" de "no llego respuesta".
+    // - Si fue un error de red (backend caido, sin conexion, timeout), axios
+    //   nunca recibe response y lo que se propaga es el Error crudo: no tiene
+    //   `.codigo`, tiene en cambio `.message`/`.isAxiosError`/`.code` (ej.
+    //   'ERR_NETWORK', 'ECONNABORTED'), que es un campo DISTINTO al `.codigo`
+    //   de dominio que manda el backend.
+    //
+    // Solo se limpia la sesion guardada cuando el backend identifico, con
+    // certeza, que la partida no existe o que el token ya no sirve. Ante
+    // cualquier otra cosa (error de red, timeout, 500 generico) NO se borra
+    // nada: es preferible dejar la sesion y que el jugador reintente
+    // recargando, a destruir su unica forma de volver a entrar (el token se
+    // emite una unica vez al unirse).
+    const identificaSesionInvalida =
+      error?.codigo === 'PARTIDA_NO_ENCONTRADA' || error?.codigo === 'TOKEN_INVALIDO'
+
+    if (identificaSesionInvalida) {
+      limpiarSesionMapaGuardada()
+    }
+
+    // De cualquier forma (se haya limpiado o no) no hay sesion que restaurar
+    // ahora: cae al selector de modo normal en vez de una pantalla rota. Si
+    // no se limpio, las claves siguen en localStorage para el proximo intento.
+    return false
+  }
+}
+
 // Methods
+const elegirModo = (modo) => {
+  currentMode.value = modo
+}
+
+// Map mode state
+const mapaPartida = ref(null) // { id, codigo, jugadorId, token, vista } | null
+
+const handlePartidaUnida = (datos) => {
+  mapaPartida.value = datos
+}
+
 const handleSessionCreated = (sessionData) => {
   // Session created successfully
   // For now, just show success message
@@ -94,8 +175,12 @@ const clearError = () => {
 }
 
 // Lifecycle
-onMounted(() => {
-  // Load any saved session on app start
+onMounted(async () => {
+  // Se intenta primero restaurar una sesion de mapa guardada; si no hay
+  // ninguna (o no se pudo restaurar), se cae al intento de sesion narrativa,
+  // igual que antes.
+  const restauroMapa = await loadSavedMapSession()
+  if (restauroMapa) return
   loadSavedSession()
 })
 </script>
@@ -109,22 +194,43 @@ onMounted(() => {
       <button @click="clearError" class="close-error">✕</button>
     </div>
 
-    <!-- Story Lobby -->
-    <StoryLobby 
-      v-if="currentView === 'lobby'"
-      @session-created="handleSessionCreated"
-      @session-joined="handleSessionJoined"
-      @error="handleError"
+    <!-- Mode selection -->
+    <ModeSelect
+      v-if="currentMode === null"
+      @elegir-modo="elegirModo"
     />
 
-    <!-- Story Session -->
-    <StorySession 
-      v-else-if="currentView === 'session'"
-      :session-id="currentSession?.id"
-      :current-player-id="currentPlayer?.id"
-      @session-ended="handleSessionEnded"
-      @error="handleError"
-    />
+    <!-- Narrative mode -->
+    <template v-else-if="currentMode === 'narrativo'">
+      <StoryLobby
+        v-if="currentView === 'lobby'"
+        @session-created="handleSessionCreated"
+        @session-joined="handleSessionJoined"
+        @error="handleError"
+      />
+
+      <StorySession
+        v-else-if="currentView === 'session'"
+        :session-id="currentSession?.id"
+        :current-player-id="currentPlayer?.id"
+        @session-ended="handleSessionEnded"
+        @error="handleError"
+      />
+    </template>
+
+    <!-- Map mode -->
+    <template v-else-if="currentMode === 'mapa'">
+      <MapLobby
+        v-if="!mapaPartida"
+        @partida-unida="handlePartidaUnida"
+      />
+      <MapSession
+        v-else
+        :partida-inicial="mapaPartida"
+        @error="handleError"
+        @salir="mapaPartida = null"
+      />
+    </template>
   </div>
 </template>
 
@@ -143,6 +249,15 @@ body {
 
 #app {
   min-height: 100vh;
+}
+
+/* Placeholder shown while a mode's real view is not mounted yet */
+.loading-placeholder {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #bdc3c7;
 }
 
 /* Error toast */
