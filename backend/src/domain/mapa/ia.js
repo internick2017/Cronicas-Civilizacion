@@ -26,6 +26,7 @@ import { moverEjercito } from './reglas/movimiento.js';
 import { atacar } from './reglas/combate.js';
 import { terminarTurno } from './reglas/turnos.js';
 import { bonoDefensaPorRasgos } from './reglas/cultura.js';
+import { tieneTecnologiaRequerida } from './reglas/tecnologia.js';
 import { ReglaError } from './errores.js';
 
 // Backstop duro: protege contra un bug futuro que deje a decidirAccion
@@ -140,12 +141,69 @@ function poderDefensivoEstimado(estado, objetivo) {
   return base * bonoDefensa(objetivo.terreno) * bonoCiudad;
 }
 
+
+// --- Brujula hacia la tierra libre ----------------------------------------
+
+const clave = (x, y) => `${x},${y}`;
+
+/**
+ * Mapa de "a cuantos pasos esta la tierra sin dueño mas cercana", por casilla.
+ *
+ * Es un BFS MULTI-ORIGEN: en vez de buscar un camino por ejercito (N busquedas
+ * por turno), arranca desde TODAS las casillas libres a la vez y se expande
+ * hacia atras. Una sola pasada deja la respuesta para todo el mapa, y como el
+ * BFS avanza por capas, la primera vez que toca una casilla ya es por el camino
+ * mas corto.
+ *
+ * Solo se camina por casillas transitables: el agua y el territorio ajeno no
+ * son camino (para pasar por territorio ajeno habria que atacar, que es otra
+ * decision). Una casilla que no aparece en el Map es una a la que no se puede
+ * llegar sin pelear.
+ */
+export function distanciaATierraLibre(estado, jugadorId) {
+  const distancia = new Map();
+  const cola = [];
+  for (const tile of estado.mapa) {
+    if (tile.terreno !== 'water' && !tile.dueno) {
+      distancia.set(clave(tile.x, tile.y), 0);
+      cola.push(tile);
+    }
+  }
+  for (let i = 0; i < cola.length; i++) {
+    const actual = cola[i];
+    const d = distancia.get(clave(actual.x, actual.y));
+    for (const vecino of vecinosOrtogonales(estado, actual.x, actual.y)) {
+      if (vecino.terreno === 'water') continue;
+      // Ajena: no es camino. La propia si, que es justo el caso que importa
+      // (los ejercitos se entierran en su propio territorio).
+      if (vecino.dueno && vecino.dueno !== jugadorId) continue;
+      const k = clave(vecino.x, vecino.y);
+      if (distancia.has(k)) continue;
+      distancia.set(k, d + 1);
+      cola.push(vecino);
+    }
+  }
+  return distancia;
+}
+
 // --- Decisiones, una por dominio de juego ---------------------------------
 
 function decidirConstruccion(estado, jugadorId, perfil) {
   const jugador = jugadorPorId(estado, jugadorId);
   for (const tile of ciudadesDe(estado, jugadorId)) {
-    const faltantes = perfil.ordenEdificios.filter((tipo) => !tile.ciudad.edificios.includes(tipo));
+    // Se descartan los edificios que exigen una tecnologia que el jugador no
+    // tiene, con la MISMA funcion que usa construir(): la IA todavia no
+    // investiga tecnologias, asi que proponer la universidad (que exige
+    // filosofia) era proponer algo que la regla iba a rechazar siempre. Como
+    // decidirConstruccion es la PRIMERA decision del turno, esa propuesta
+    // imposible se repetia hasta agotar el tope de fallos seguidos y el bot
+    // terminaba el turno sin fundar, mover ni reclutar. Se quedaba inmovil para
+    // siempre con recursos de sobra (medido: 2 ciudades en 200 turnos y 3382 de
+    // oro sin gastar). Solo le pasaba a facil: es la unica que construye en el
+    // orden "de fabrica", el unico que incluye un edificio con tecnologia.
+    const faltantes = perfil.ordenEdificios.filter((tipo) =>
+      !tile.ciudad.edificios.includes(tipo) &&
+      tieneTecnologiaRequerida(jugador, EDIFICIOS[tipo].requiereTecnologia));
     for (const tipo of faltantes) {
       if (puedePagar(jugador, EDIFICIOS[tipo].costo)) {
         return { tipo: 'construir', x: tile.x, y: tile.y, edificio: tipo };
@@ -182,7 +240,17 @@ function decidirReclutamiento(estado, jugadorId, perfil) {
   return null;
 }
 
-function decidirMilitar(estado, jugadorId, rng, perfil) {
+// De un grupo de casillas empatadas, la que deja mas cerca de tierra libre. Si
+// varias empatan tambien en eso (o ninguna es alcanzable) se sortea, que era el
+// comportamiento anterior: la brujula solo agrega criterio donde no habia.
+function masCercaDeTierraLibre(candidatas, brujula, rng) {
+  const distancias = candidatas.map((t) => brujula.get(clave(t.x, t.y)) ?? Infinity);
+  const menor = Math.min(...distancias);
+  if (menor === Infinity) return elegir(rng, candidatas);
+  return elegir(rng, candidatas.filter((t, i) => distancias[i] === menor));
+}
+
+function decidirMilitar(estado, jugadorId, rng, perfil, brujula) {
   for (const origen of ejercitosDe(estado, jugadorId)) {
     if (origen.ejercito.movimientoRestante <= 0) continue;
     const vecinos = vecinosOrtogonales(estado, origen.x, origen.y);
@@ -215,7 +283,12 @@ function decidirMilitar(estado, jugadorId, rng, perfil) {
       (t.dueno ? 0 : 2) + (t.descubiertoPor.includes(jugadorId) ? 0 : 1);
     const mejorPuntaje = Math.max(...transitables.map(puntajeDestino));
     const mejores = transitables.filter((t) => puntajeDestino(t) === mejorPuntaje);
-    const destino = elegir(rng, mejores);
+    // Desempate por brujula. Sin esto, cuando todos los vecinos empatan (el caso
+    // normal: un ejercito enterrado en el medio del territorio propio, donde todo
+    // vale 0) la eleccion era al azar, y los ejercitos deambulaban por lo suyo
+    // hasta tropezarse con la frontera de casualidad. Medido: 11 de 12 ejercitos
+    // rodeados de casillas propias con 109 casillas libres alcanzables.
+    const destino = mejores.length === 1 ? mejores[0] : masCercaDeTierraLibre(mejores, brujula, rng);
     return { tipo: 'moverEjercito', desde: { x: origen.x, y: origen.y }, hasta: { x: destino.x, y: destino.y } };
   }
   return null;
@@ -259,7 +332,7 @@ function decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) 
   return { tipo: 'fundarCiudad', x: elegida.x, y: elegida.y, nombre: `${jugador.civilizacion} ${numero}` };
 }
 
-function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) {
+function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujula) {
   // Fundar va ANTES que reclutar: mientras fue lo ultimo, cualquier edificio o
   // unidad pagable se comia los recursos primero y la maquina casi nunca
   // llegaba a una segunda ciudad. Una ciudad nueva reclama casilla, produce, y
@@ -267,7 +340,7 @@ function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) {
   return decidirConstruccion(estado, jugadorId, perfil) ??
     decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) ??
     decidirReclutamiento(estado, jugadorId, perfil) ??
-    decidirMilitar(estado, jugadorId, rng, perfil) ??
+    decidirMilitar(estado, jugadorId, rng, perfil, brujula) ??
     null;
 }
 
@@ -305,7 +378,12 @@ export function jugarTurnoIA(estado, jugadorId, rng) {
     // lento/distraido, no un turno vacio por mala suerte en el primer paso.
     if (perfil.probabilidadSaltear > 0 && rng() < perfil.probabilidadSaltear) continue;
 
-    const decision = decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno);
+    // La brujula se recalcula en CADA paso, no una vez por turno: el propio
+    // ejercito que acaba de reclamar una casilla cambia el mapa de distancias
+    // para el siguiente. Es un BFS sobre el mapa entero, barato al lado de lo
+    // que cuesta equivocarse de rumbo.
+    const brujula = distanciaATierraLibre(estado, jugadorId);
+    const decision = decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujula);
     if (!decision) break;
 
     try {
