@@ -234,7 +234,18 @@ export const BONO_TERRENO_DEFENSA = {
 export const PRODUCCION_BASE_CIUDAD = {
   food: 5,
   gold: 3,
-  culture: 2
+  culture: 2,
+  // La ciencia rinde desde la primera ciudad, igual que la cultura. Antes era
+  // 0 y su UNICA fuente era la biblioteca, que cuesta 40 de piedra: el mismo
+  // recurso que se come fundar (20 por ciudad), asi que la ciencia siempre
+  // perdia la carrera contra la expansion. Medido: 8 de 9 partidas de 40
+  // turnos terminaban con CERO ciencia y cero tecnologias, o sea que media
+  // rama del juego no existia en una partida normal.
+  //
+  // +1 y no +2 como la cultura a proposito: la biblioteca produce +3, asi que
+  // construirla cuadruplica la ciencia de esa ciudad y sigue siendo una
+  // decision que vale la pena. Con +2 solo la duplicaria.
+  science: 2
 };
 
 export const PORCENTAJE_VICTORIA_DOMINACION = 0.6;

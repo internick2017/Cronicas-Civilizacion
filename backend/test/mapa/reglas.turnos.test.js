@@ -66,11 +66,11 @@ describe('terminarTurno', () => {
     for (const [r, c] of Object.entries(EDIFICIOS.granary.produccion)) esperadoP1[r] = (esperadoP1[r] ?? 0) + c;
     expect(producidoP1).toEqual(esperadoP1);
     // Verificacion concreta contra las constantes reales del proyecto.
-    expect(producidoP1).toEqual({ food: 5 + 1 + 3, gold: 3, culture: 2, wood: 3 });
+    expect(producidoP1).toEqual({ food: 5 + 1 + 3, gold: 3, culture: 2, science: 2, wood: 3 });
 
     // Produccion exacta de p2: base + bono de plains, sin edificios.
     const producidoP2 = evs.find(ev => ev.tipo === 'RecursosProducidos' && ev.datos.jugadorId === 'p2').datos.produccion;
-    expect(producidoP2).toEqual({ food: 5 + 2, gold: 3 + 1, culture: 2 });
+    expect(producidoP2).toEqual({ food: 5 + 2, gold: 3 + 1, culture: 2, science: 2 });
   });
 
   it('jugador sin ciudades queda eliminado al cierre y el orden de turnos lo saltea', () => {
