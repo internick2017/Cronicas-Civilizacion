@@ -128,6 +128,11 @@ describe('terminarTurno', () => {
     for (const [x, y] of coordsP1) {
       e.mapa[y * 3 + x].dueno = 'p1';
     }
+    // (1,1) y (0,2) tocan la ciudad de p2 en (1,2): sin tropa encima volverian a
+    // p2 al cerrar la ronda (ver reglas/fronteras.js) y la victoria no
+    // dispararia. Un ejercito sostiene el frente, que es justo lo que la regla
+    // nueva pide para quedarse con tierra pegada a una ciudad ajena.
+    e.mapa[1 * 3 + 1].ejercito = { tipo: 'warrior', dueno: 'p1', salud: 100, movimientoRestante: 1, bonoMovimiento: 0 };
     expect(5 / 9).toBeLessThan(0.6); // no alcanzaria el umbral contra el mapa total
     expect(5 / 7).toBeGreaterThanOrEqual(0.6); // si alcanza el umbral contra la tierra
 

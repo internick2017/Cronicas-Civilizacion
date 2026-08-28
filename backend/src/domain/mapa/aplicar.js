@@ -108,9 +108,11 @@ export function aplicar(estado, eventos) {
       }
 
       // Territorio que cambia de manos al caer una ciudad (ver
-      // reglas/combate.js). Va como UN evento con la lista y no como N eventos
-      // sueltos, igual que TerritorioDescubierto: el log de eventos se lee
-      // entero en varios lugares y no conviene inflarlo con 8 filas por captura.
+      // reglas/combate.js) o que vuelve solo a la ciudad vecina al cerrar la
+      // ronda (ver reglas/fronteras.js). Van como UN evento con la lista y no
+      // como N eventos sueltos, igual que TerritorioDescubierto: el log se lee
+      // entero en varios lugares y no conviene inflarlo con una fila por casilla.
+      case 'TerritorioRecuperado':
       case 'TerritorioAnexado':
         for (const { x, y } of datos.tiles) {
           const t = tileEn(estado, x, y);

@@ -60,6 +60,11 @@ describe('el objetivo se mide sobre la tierra alcanzable', () => {
     const e = dosIslas();
     // p1 toma 6 de las 9 casillas de la isla (66%), dejando la ciudad de p2.
     for (const [x, y] of [[1, 0], [2, 0], [0, 1], [1, 1], [2, 1]]) tileEn(e, x, y).dueno = 'p1';
+    // (1,1) y (2,1) tocan la ciudad de p2 en (2,2): sin tropa volverian a p2 al
+    // cerrar la ronda (ver reglas/fronteras.js). Este test es sobre el
+    // DENOMINADOR de la dominacion, no sobre la frontera, asi que se sostiene el
+    // frente con un ejercito para aislar lo que se quiere medir.
+    tileEn(e, 2, 1).ejercito = { tipo: 'warrior', dueno: 'p1', salud: 100, movimientoRestante: 1, bonoMovimiento: 0 };
     expect(controlTerritorial(e, 'p1').porcentaje).toBeGreaterThanOrEqual(0.6);
 
     const fin = cerrarRonda(e).find(ev => ev.tipo === 'PartidaTerminada');

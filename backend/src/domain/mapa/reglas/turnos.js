@@ -1,8 +1,10 @@
 import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_VICTORIA_DOMINACION } from '../constantes.js';
+import { tileEn } from '../MapGame.js';
 import { validarTurno, evento } from './comun.js';
 import { produccionPorRasgos } from './cultura.js';
 import { aplicarBonosPorcentuales } from './tecnologia.js';
 import { controlTerritorial } from './dominacion.js';
+import { recuperarFronteras } from './fronteras.js';
 
 export function siguienteIndiceActivo(estado, excluirIds = null) {
   const n = estado.jugadores.length;
@@ -96,6 +98,16 @@ export function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turno
   return null;
 }
 
+// terminarTurno calcula sobre el estado y devuelve eventos sin aplicarlos, pero
+// la recuperacion tiene que verse reflejada YA para que evaluarVictoria mida el
+// mapa correcto. Se aplica solo este evento, con la misma logica que aplicar.js.
+function aplicarRecuperacion(estado, ev) {
+  for (const { x, y } of ev.datos.tiles) {
+    const t = tileEn(estado, x, y);
+    if (t) t.dueno = ev.jugadorId;
+  }
+}
+
 export function terminarTurno(estado, jugadorId) {
   validarTurno(estado, jugadorId);
 
@@ -126,6 +138,15 @@ export function terminarTurno(estado, jugadorId) {
         eventos.push(evento('JugadorEliminado', estado, jugadorId, { jugadorId: jugador.id }));
         eliminados.push(jugador.id);
       }
+    }
+
+    // La frontera se recupera ANTES de RondaCompletada y, sobre todo, antes de
+    // evaluar la victoria: si no, el porcentaje que decide la partida seria el
+    // de un instante que ya no existe.
+    const recuperados = recuperarFronteras(estado);
+    for (const ev of recuperados) {
+      eventos.push(ev);
+      aplicarRecuperacion(estado, ev);
     }
 
     eventos.push(evento('RondaCompletada', estado, jugadorId, {}));
