@@ -118,6 +118,7 @@ const casillasDe = (n) => `${n} ${n === 1 ? 'casilla' : 'casillas'}`;
 
 export function narrarRonda(eventos, jugadores = []) {
   const frases = [];
+  const cierre = []; // lo que anuncia el fin de la partida: siempre lo ultimo
   let indice = 0;
 
   for (const evento of eventos ?? []) {
@@ -226,9 +227,12 @@ export function narrarRonda(eventos, jugadores = []) {
         if (ganador && typeof ganador === 'object') {
           const ganadorNombre = nombreDe(jugadores, ganador.jugadorId);
           const motivo = NOMBRE_VICTORIA[ganador.tipoVictoria] ?? textoSeguro(ganador.tipoVictoria) ?? 'una victoria decisiva';
-          frases.push(`La partida termino: ${ganadorNombre} se impuso por ${motivo}.`);
+          // El anuncio del final se guarda aparte y se agrega al final de todo:
+          // visto jugando, la cronica decia "La partida termino..." y despues
+          // seguia contando casillas, porque el territorio se narra al cierre.
+          cierre.push(`La partida termino: ${ganadorNombre} se impuso por ${motivo}.`);
         } else {
-          frases.push('La partida termino sin vencedores.');
+          cierre.push('La partida termino sin vencedores.');
         }
         break;
       }
@@ -248,6 +252,8 @@ export function narrarRonda(eventos, jugadores = []) {
       frases.push(`${quienGano} se extendio sobre ${casillasDe(cambio.casillas)} sin dueño.`);
     }
   }
+
+  frases.push(...cierre);
 
   if (frases.length === 0) {
     return 'La ronda paso sin sobresaltos. Los pueblos siguieron con lo suyo.';

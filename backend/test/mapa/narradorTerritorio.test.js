@@ -70,6 +70,20 @@ describe('la crónica cuenta los cambios de territorio', () => {
     expect(texto).not.toContain('undefined');
   });
 
+  // Visto jugando: la cronica decia "La partida termino: La Maquina se impuso
+  // por dominacion" y DESPUES seguia contando casillas. El anuncio del final
+  // tiene que ser lo ultimo que se lee.
+  it('el anuncio del final va al final, despues del territorio', () => {
+    const texto = narrarRonda([
+      reclamo('bot-ia', 'p1', 1, 1),
+      { tipo: 'PartidaTerminada', jugadorId: 'bot-ia', datos: { ganador: { jugadorId: 'bot-ia', tipoVictoria: 'dominacion', turno: 16 } } },
+      reclamo('bot-ia', null, 2, 1),
+    ], jugadores);
+
+    const frases = texto.split('. ').filter(Boolean);
+    expect(frases.at(-1)).toMatch(/La partida termino/);
+  });
+
   it('sin eventos de territorio, la crónica no inventa nada', () => {
     const texto = narrarRonda([
       { tipo: 'UnidadReclutada', jugadorId: 'p1', datos: { tipo: 'warrior' } },
