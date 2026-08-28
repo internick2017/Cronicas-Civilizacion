@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { crearEstado, tileEn } from '../../src/domain/mapa/MapGame.js';
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
-import { jugarTurnoIA } from '../../src/domain/mapa/ia.js';
+import { jugarTurnoIA, PERFILES_DIFICULTAD } from '../../src/domain/mapa/ia.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
 
 function partidaCon(semilla, cantidadHumanos = 1) {
@@ -76,13 +76,17 @@ describe('jugarTurnoIA', () => {
     expect(() => jugarTurnoIA(partida, 'bot', crearRng('agua'))).not.toThrow();
   });
 
-  it('respeta el limite de un ejercito por ciudad + 1: no gasta todo en reclutar', () => {
+  // El tope sale del perfil (hoy normal = ciudades + 3) en vez de un numero
+  // clavado: el valor es balance y ya cambio una vez (subio cuando la IA paso a
+  // jugar por dominacion, porque cada ejercito es un reclamador de territorio).
+  // Lo que este test protege es que EXISTA un tope, no cual es.
+  it('respeta el tope de ejercitos de su dificultad: no gasta todo en reclutar', () => {
     const jugador = e.jugadores.find((j) => j.id === 'bot');
     jugador.recursos = { food: 10000, gold: 10000, wood: 10000, stone: 10000, science: 0, culture: 0 };
     jugarIA(e);
     const ejercitos = e.mapa.filter((t) => t.ejercito && t.ejercito.dueno === 'bot').length;
     const ciudades = e.mapa.filter((t) => t.ciudad && t.dueno === 'bot').length;
-    expect(ejercitos).toBeLessThanOrEqual(ciudades + 1);
+    expect(ejercitos).toBeLessThanOrEqual(ciudades + PERFILES_DIFICULTAD.normal.topeEjercitosExtra);
   });
 
   it('descubre territorio nuevo al moverse (no da vueltas siempre sobre lo mismo)', () => {

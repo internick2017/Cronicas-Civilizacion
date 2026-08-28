@@ -49,7 +49,9 @@ export { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT };
 
 // Un solo lugar donde vive QUE tan bien juega cada nivel. Ajustar la
 // dificultad es tocar numeros aca, no reescribir logica.
-const PERFILES_DIFICULTAD = {
+// Se exporta para que los tests puedan afirmar sobre EL TOPE VIGENTE en vez de
+// clavar un numero suelto que quede viejo al primer ajuste de balance.
+export const PERFILES_DIFICULTAD = {
   facil: {
     // 3 de cada 10 pasos, la maquina directamente no hace nada ese paso
     // (como si dudara o se distrajera): juega mas lento y menos a fondo.
@@ -59,9 +61,15 @@ const PERFILES_DIFICULTAD = {
     // lancero en altura) que un jugador nuevo tambien cometeria.
     margenAtaque: 0,
     unidadesPrioridad: ['warrior'],
-    topeEjercitosExtra: 0,
+    // El tope de ejercitos es, en la practica, cuantos "colonos" tiene para ir
+    // reclamando tierra: el territorio se gana caminando (ver
+    // reglas/movimiento.js, que reclama la casilla al pisarla), no fundando.
+    // Con 0 extra la maquina no podia perseguir la victoria por dominacion
+    // aunque quisiera. Sigue habiendo tope: sin el, gastaria todo en tropa.
+    topeEjercitosExtra: 1,
     ordenEdificios: ORDEN_EDIFICIOS_NATURAL,
     elegirMejorFundacion: false,
+    fundacionesPorTurno: 1,
   },
   normal: {
     probabilidadSaltear: 0,
@@ -71,9 +79,10 @@ const PERFILES_DIFICULTAD = {
     // sin llegar a jugar perfecto.
     margenAtaque: 0.9,
     unidadesPrioridad: ['warrior', 'spearman', 'archer'],
-    topeEjercitosExtra: 1,
+    topeEjercitosExtra: 3,
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     elegirMejorFundacion: false,
+    fundacionesPorTurno: 1,
   },
   dificil: {
     probabilidadSaltear: 0,
@@ -82,9 +91,10 @@ const PERFILES_DIFICULTAD = {
     margenAtaque: 1.15,
     // Prioriza unidades de cuartel (mas fuertes) en cuanto estan disponibles.
     unidadesPrioridad: ['cavalry', 'catapult', 'spearman', 'archer', 'warrior'],
-    topeEjercitosExtra: 2,
+    topeEjercitosExtra: 5,
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     elegirMejorFundacion: true,
+    fundacionesPorTurno: 2,
   },
 };
 
@@ -152,14 +162,21 @@ function decidirReclutamiento(estado, jugadorId, perfil) {
   const ciudades = ciudadesDe(estado, jugadorId);
   if (ejercitosDe(estado, jugadorId).length >= ciudades.length + perfil.topeEjercitosExtra) return null;
 
-  const libre = ciudades.find((tile) => !tile.ejercito);
-  if (!libre) return null;
+  const libres = ciudades.filter((tile) => !tile.ejercito);
+  if (libres.length === 0) return null;
 
+  // El bucle recorre PRIMERO la prioridad de unidad y despues las ciudades, no
+  // al reves: mirando una sola ciudad (la primera libre), en cuanto la maquina
+  // tenia mas de una ciudad esa solia ser una nueva sin cuartel, y descartaba
+  // caballeria/catapulta aunque tuviera la capital libre al lado. Elegir la
+  // MEJOR unidad que alguna ciudad pueda producir es lo que el perfil promete.
   for (const tipo of perfil.unidadesPrioridad) {
     const definicion = UNIDADES[tipo];
-    if (definicion.requiereBarracks && !libre.ciudad.edificios.includes('barracks')) continue;
-    if (puedePagar(jugador, definicion.costo)) {
-      return { tipo: 'reclutar', x: libre.x, y: libre.y, unidad: tipo };
+    if (!puedePagar(jugador, definicion.costo)) continue;
+    const ciudad = libres.find((tile) =>
+      !definicion.requiereBarracks || tile.ciudad.edificios.includes('barracks'));
+    if (ciudad) {
+      return { tipo: 'reclutar', x: ciudad.x, y: ciudad.y, unidad: tipo };
     }
   }
   return null;
@@ -190,11 +207,15 @@ function decidirMilitar(estado, jugadorId, rng, perfil) {
       !(t.ejercito && t.ejercito.dueno === jugadorId));
     if (transitables.length === 0) continue;
 
-    // Prioriza explorar (moverse hacia lo que todavia no descubrio) sobre
-    // deambular por territorio ya conocido: una IA que solo pisa lo que ya
-    // ve nunca encuentra al rival ni agranda su propio mapa.
-    const sinExplorar = transitables.filter((t) => !t.descubiertoPor.includes(jugadorId));
-    const destino = elegir(rng, sinExplorar.length ? sinExplorar : transitables);
+    // A donde caminar. La victoria por dominacion se mide en casillas
+    // CONTROLADAS y el unico modo de ganar una es pisar tierra sin dueño, asi
+    // que reclamar pesa mas que explorar; explorar sigue valiendo (abre mapa y
+    // encuentra al rival) y pisar lo propio es el ultimo recurso: no suma nada.
+    const puntajeDestino = (t) =>
+      (t.dueno ? 0 : 2) + (t.descubiertoPor.includes(jugadorId) ? 0 : 1);
+    const mejorPuntaje = Math.max(...transitables.map(puntajeDestino));
+    const mejores = transitables.filter((t) => puntajeDestino(t) === mejorPuntaje);
+    const destino = elegir(rng, mejores);
     return { tipo: 'moverEjercito', desde: { x: origen.x, y: origen.y }, hasta: { x: destino.x, y: destino.y } };
   }
   return null;
@@ -207,7 +228,13 @@ function puntajeTerreno(tile) {
   return Object.values(BONO_TERRENO_PRODUCCION[tile.terreno] ?? {}).reduce((a, b) => a + b, 0);
 }
 
-function decidirFundacion(estado, jugadorId, rng, perfil) {
+// El tope por turno existe porque fundar pasó a decidirse ANTES que reclutar:
+// sin el, con recursos de sobra la maquina encadenaba una fundacion tras otra
+// en un mismo turno (10 ciudades en el turno 1, medido) y llegaba al resto de
+// las decisiones con los bolsillos vacios, sin reclutar ni una unidad. Expandir
+// sostenido es la estrategia; vaciarse de golpe es un pozo.
+function decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) {
+  if (fundacionesEsteTurno >= perfil.fundacionesPorTurno) return null;
   const jugador = jugadorPorId(estado, jugadorId);
   if (!puedePagar(jugador, COSTO_CIUDAD)) return null;
 
@@ -232,11 +259,15 @@ function decidirFundacion(estado, jugadorId, rng, perfil) {
   return { tipo: 'fundarCiudad', x: elegida.x, y: elegida.y, nombre: `${jugador.civilizacion} ${numero}` };
 }
 
-function decidirAccion(estado, jugadorId, rng, perfil) {
+function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) {
+  // Fundar va ANTES que reclutar: mientras fue lo ultimo, cualquier edificio o
+  // unidad pagable se comia los recursos primero y la maquina casi nunca
+  // llegaba a una segunda ciudad. Una ciudad nueva reclama casilla, produce, y
+  // sube el tope de ejercitos (que es el que limita cuanto puede reclamar).
   return decidirConstruccion(estado, jugadorId, perfil) ??
+    decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) ??
     decidirReclutamiento(estado, jugadorId, perfil) ??
     decidirMilitar(estado, jugadorId, rng, perfil) ??
-    decidirFundacion(estado, jugadorId, rng, perfil) ??
     null;
 }
 
@@ -263,6 +294,7 @@ export function jugarTurnoIA(estado, jugadorId, rng) {
   const perfil = perfilDe(estado, jugadorId);
   const eventos = [];
   let fallosSeguidos = 0;
+  let fundacionesEsteTurno = 0;
 
   for (let paso = 0; paso < PASOS_MAXIMOS; paso++) {
     // El "se distrae" tiene que vivir ACA, no adentro de decidirAccion: si
@@ -273,13 +305,14 @@ export function jugarTurnoIA(estado, jugadorId, rng) {
     // lento/distraido, no un turno vacio por mala suerte en el primer paso.
     if (perfil.probabilidadSaltear > 0 && rng() < perfil.probabilidadSaltear) continue;
 
-    const decision = decidirAccion(estado, jugadorId, rng, perfil);
+    const decision = decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno);
     if (!decision) break;
 
     try {
       const evs = EJECUTORES[decision.tipo](estado, jugadorId, decision, rng);
       aplicar(estado, evs);
       eventos.push(...evs);
+      if (decision.tipo === 'fundarCiudad') fundacionesEsteTurno++;
       fallosSeguidos = 0;
     } catch (err) {
       // Una ReglaError significa que la decision ya no era valida (el estado
