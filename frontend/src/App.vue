@@ -93,8 +93,22 @@ const loadSavedMapSession = async () => {
 
   try {
     const vista = await pedirVistaMapa(id, jugadorId, token)
-    mapaPartida.value = { id, codigo, jugadorId, token, vista }
-    currentMode.value = 'mapa'
+
+    // Una partida terminada, o una donde a este jugador ya lo eliminaron, no es
+    // algo a lo que quiera volver: se limpia y no se ofrece.
+    const yo = vista.jugadores?.find(j => j.id === jugadorId)
+    if (vista.estado === 'terminado' || (yo && yo.activo === false)) {
+      limpiarSesionMapaGuardada()
+      return false
+    }
+
+    // OJO: restaurar ya NO significa entrar. Antes esto ponia currentMode en
+    // 'mapa' y te metia directo en la partida guardada, asi que abrir el juego
+    // te dejaba dentro de una partida vieja (a veces esperando el turno de
+    // alguien que no iba a volver) en vez de mostrarte el menu. Ahora la partida
+    // queda OFRECIDA y entrar es una decision del jugador; el F5 en medio de una
+    // partida sigue sin echar a nadie, que es para lo que se hizo esto.
+    partidaGuardada.value = { id, codigo, jugadorId, token, vista }
     return true
   } catch (error) {
     console.warn('No se pudo restaurar la sesion de mapa guardada:', error)
@@ -137,6 +151,19 @@ const elegirModo = (modo) => {
 
 // Map mode state
 const mapaPartida = ref(null) // { id, codigo, jugadorId, token, vista } | null
+// Partida guardada en este navegador que sigue viva, ofrecida en el menu.
+const partidaGuardada = ref(null)
+
+const continuarPartidaGuardada = () => {
+  mapaPartida.value = partidaGuardada.value
+  currentMode.value = 'mapa'
+  partidaGuardada.value = null
+}
+
+const descartarPartidaGuardada = () => {
+  limpiarSesionMapaGuardada()
+  partidaGuardada.value = null
+}
 
 const handlePartidaUnida = (datos) => {
   mapaPartida.value = datos
@@ -179,8 +206,9 @@ onMounted(async () => {
   // Se intenta primero restaurar una sesion de mapa guardada; si no hay
   // ninguna (o no se pudo restaurar), se cae al intento de sesion narrativa,
   // igual que antes.
-  const restauroMapa = await loadSavedMapSession()
-  if (restauroMapa) return
+  // Se busca la partida de mapa guardada para OFRECERLA, no para entrar. La
+  // sesion narrativa se intenta igual: las dos pueden convivir.
+  await loadSavedMapSession()
   loadSavedSession()
 })
 </script>
@@ -195,10 +223,21 @@ onMounted(async () => {
     </div>
 
     <!-- Mode selection -->
-    <ModeSelect
-      v-if="currentMode === null"
-      @elegir-modo="elegirModo"
-    />
+    <template v-if="currentMode === null">
+      <!-- Partida a medio jugar en este navegador. Se ofrece, no se impone. -->
+      <div v-if="partidaGuardada" class="partida-guardada">
+        <div class="partida-guardada-texto">
+          <strong>Tenés una partida empezada</strong>
+          <span>{{ partidaGuardada.vista?.nombre || 'Partida de mapa' }} — turno {{ partidaGuardada.vista?.turno }}</span>
+        </div>
+        <div class="partida-guardada-botones">
+          <button class="btn-continuar" @click="continuarPartidaGuardada">Continuar</button>
+          <button class="btn-descartar" @click="descartarPartidaGuardada">Descartar</button>
+        </div>
+      </div>
+
+      <ModeSelect @elegir-modo="elegirModo" />
+    </template>
 
     <!-- Narrative mode -->
     <template v-else-if="currentMode === 'narrativo'">
@@ -335,4 +374,42 @@ body {
     top: 20px;
   }
 }
+
+.partida-guardada {
+  max-width: 640px;
+  margin: 1.5rem auto 0;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid rgba(46, 204, 113, 0.4);
+  border-radius: 12px;
+  background: rgba(46, 204, 113, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  color: #ecf0f1;
+}
+
+.partida-guardada-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.9rem;
+}
+
+.partida-guardada-texto span { color: #bdc3c7; }
+
+.partida-guardada-botones { display: flex; gap: 0.5rem; }
+
+.btn-continuar,
+.btn-descartar {
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+
+.btn-continuar { background: #27ae60; color: white; }
+.btn-descartar { background: transparent; border-color: rgba(255,255,255,0.25); color: #bdc3c7; }
 </style>
