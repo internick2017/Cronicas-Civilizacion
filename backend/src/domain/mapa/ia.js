@@ -406,8 +406,28 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
     if (origen.ejercito.movimientoRestante <= 0) continue;
     const vecinos = vecinosOrtogonales(estado, origen.x, origen.y);
 
-    const objetivo = vecinos.find((t) =>
-      (t.ejercito && t.ejercito.dueno !== jugadorId) || (t.ciudad && t.dueno !== jugadorId));
+    // Contra QUE pelear cuando hay mas de una opcion al lado. Antes se tomaba el
+    // primer vecino enemigo en orden fijo (arriba, abajo, izquierda, derecha),
+    // asi que con un soldado enemigo arriba y una ciudad indefensa abajo, la
+    // maquina peleaba contra el soldado. Medido en una partida trabada: de 1450
+    // combates, solo 19 fueron contra una ciudad, mientras 30 de las 35 ciudades
+    // del mapa estaban SIN guarnicion, o sea listas para tomar.
+    //
+    // Matar un ejercito en campo abierto no cambia el mapa. Tomar una ciudad da
+    // la ciudad, su anillo entero (ver reglas/combate.js) y, si era la ultima
+    // del rival, lo elimina y libera todo su territorio.
+    const prioridadObjetivo = (t) => {
+      const ciudadEnemiga = t.ciudad && t.dueno !== jugadorId;
+      const ejercitoEnemigo = t.ejercito && t.ejercito.dueno !== jugadorId;
+      if (ciudadEnemiga && !ejercitoEnemigo) return 3; // se captura de una
+      if (ciudadEnemiga) return 2;                     // primero la guarnicion
+      if (ejercitoEnemigo) return 1;                   // no mueve el mapa
+      return 0;
+    };
+    const objetivos = vecinos.filter((t) => prioridadObjetivo(t) > 0);
+    const objetivo = objetivos.length
+      ? objetivos.reduce((mejor, t) => (prioridadObjetivo(t) > prioridadObjetivo(mejor) ? t : mejor))
+      : undefined;
     if (objetivo) {
       const ataquePropio = UNIDADES[origen.ejercito.tipo].ataque;
       // margenAtaque=0 (facil) hace que esto siempre de verdadero: cualquier
