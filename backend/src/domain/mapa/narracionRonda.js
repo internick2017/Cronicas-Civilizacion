@@ -4,11 +4,15 @@
 // tiene efectos secundarios al importarlo (levanta Express, crea el server
 // HTTP y el server de Socket.io al nivel del modulo), lo que impide
 // importarlo limpiamente desde un test.
-import { narrarRonda } from './narradorLocal.js';
+import { narrarRonda, nombreDe } from './narradorLocal.js';
 
-function resumirEventos(eventos) {
+// Los jugadores van por NOMBRE, nunca por id. Metiendo e.jugadorId crudo, la IA
+// escribia el identificador interno tal cual en la cronica: "los ejercitos del
+// bot-ia se movieron como sombras furtivas" (visto jugando). Un id es un dato de
+// la maquina, no un personaje de la historia.
+function resumirEventos(eventos, jugadores) {
   return eventos
-    .map(e => `${e.tipo}${e.jugadorId ? ` (jugador ${e.jugadorId})` : ''}`)
+    .map(e => `${e.tipo}${e.jugadorId ? ` (${nombreDe(jugadores, e.jugadorId)})` : ''}`)
     .join(', ');
 }
 
@@ -24,7 +28,7 @@ function resumirEventos(eventos) {
  * pegarle a la API real de Gemini.
  */
 export async function narrarRondaMapa(eventos, jugadores = [], servicioIA) {
-  const prompt = `Resumi en un parrafo breve, en prosa narrativa, lo que paso en esta ronda de una partida de estrategia por turnos. Eventos: ${resumirEventos(eventos)}`;
+  const prompt = `Resumi en un parrafo breve, en prosa narrativa, lo que paso en esta ronda de una partida de estrategia por turnos. Eventos: ${resumirEventos(eventos, jugadores)}`;
   try {
     const conIa = await servicioIA.generateStoryNarrative(prompt, { mode: 'mapa' });
     if (conIa) return conIa;

@@ -71,7 +71,10 @@ function coordenadas(x, y) {
 // no sea monotono pero siga siendo determinista.
 const elegir = (opciones, semilla) => opciones[semilla % opciones.length];
 
-function nombreDe(jugadores, jugadorId) {
+// Exportada para que el prompt de la IA (ver narracionRonda.js) nombre a los
+// jugadores EXACTAMENTE igual que el narrador local, en vez de tener su propia
+// version que se puede desincronizar.
+export function nombreDe(jugadores, jugadorId) {
   const jugador = jugadores.find(j => j.id === jugadorId);
   return jugador ? jugador.nombre : 'Un pueblo sin nombre';
 }

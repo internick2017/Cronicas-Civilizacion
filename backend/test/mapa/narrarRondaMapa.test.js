@@ -5,6 +5,29 @@ const eventos = [{ tipo: 'CiudadFundada', jugadorId: 'p1', datos: { nombre: 'Cus
 const jugadores = [{ id: 'p1', nombre: 'Pachacutec' }];
 
 describe('narrarRondaMapa (bisagra IA/narrador local)', () => {
+  // Regresion de un bug visto jugando: la cronica decia "los ejercitos del
+  // bot-ia", el identificador interno del jugador maquina, porque el resumen
+  // que se le manda a la IA metia e.jugadorId crudo. El narrador local ya
+  // traducia a nombres; el prompt de la IA no.
+  it('nombra a los jugadores por su nombre, nunca por su id interno', async () => {
+    const servicioIA = { generateStoryNarrative: vi.fn().mockResolvedValue('texto') };
+
+    await narrarRondaMapa(eventos, jugadores, servicioIA);
+
+    const prompt = servicioIA.generateStoryNarrative.mock.calls[0][0];
+    expect(prompt).toContain('Pachacutec');
+    expect(prompt).not.toContain('p1');
+  });
+
+  it('a un jugador que ya no esta en la lista no lo nombra con su id', async () => {
+    const servicioIA = { generateStoryNarrative: vi.fn().mockResolvedValue('texto') };
+    const deOtro = [{ tipo: 'CiudadCapturada', jugadorId: 'fantasma', datos: { x: 1, y: 1 } }];
+
+    await narrarRondaMapa(deOtro, jugadores, servicioIA);
+
+    expect(servicioIA.generateStoryNarrative.mock.calls[0][0]).not.toContain('fantasma');
+  });
+
   it('usa el texto de la IA cuando esta devuelve algo', async () => {
     const servicioIA = { generateStoryNarrative: vi.fn().mockResolvedValue('Texto generado por la IA') };
 
