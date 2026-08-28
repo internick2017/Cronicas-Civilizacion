@@ -3,7 +3,19 @@ import { generarMapa } from './generarMapa.js';
 import { RECURSOS } from './constantes.js';
 import { ReglaError } from './errores.js';
 
-const CONFIG_DEFAULT = { tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial' };
+const CONFIG_DEFAULT = {
+  tamanoMapa: 20,
+  maxJugadores: 4,
+  modoTurno: 'secuencial',
+  // Cuanta tierra hay que controlar para ganar, en POR CIENTO entero (no
+  // fraccion): es lo que el jugador elige en el lobby y lo que se le muestra,
+  // asi que se guarda en la misma unidad para que no haya conversiones dando
+  // vueltas. El default replica la constante historica (60%).
+  porcentajeVictoria: 60,
+  // Rondas antes del final forzado, o null para "sin limite". Con limite, al
+  // llegar gana quien mas territorio tenga.
+  limiteRondas: null,
+};
 
 // Limites duros de la config. Viven en el DOMINIO (no solo en el borde HTTP)
 // porque `generarMapa` asigna tamanoMapa^2 objetos: sin cota, un `config`
@@ -13,6 +25,12 @@ const CONFIG_DEFAULT = { tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial
 const LIMITES_CONFIG = {
   tamanoMapa: { min: 10, max: 60 },
   maxJugadores: { min: 2, max: 8 },
+  // Menos del 30% seria ganar casi sin jugar; mas del 90% es practicamente
+  // imposible con varios jugadores en el mapa.
+  porcentajeVictoria: { min: 30, max: 90 },
+  // El limite es opcional (null), pero si se fija tiene que dar para una
+  // partida de verdad: 5 rondas no alcanzan ni para fundar la segunda ciudad.
+  limiteRondas: { min: 10, max: 500 },
 };
 const MODOS_TURNO = ['secuencial']; // unico modo implementado
 
@@ -30,6 +48,12 @@ function validarEntero(cfg, clave) {
 export function validarConfig(cfg) {
   validarEntero(cfg, 'tamanoMapa');
   validarEntero(cfg, 'maxJugadores');
+  validarEntero(cfg, 'porcentajeVictoria');
+  // null es un valor valido y significa "sin limite"; cualquier otra cosa se
+  // valida como entero en rango.
+  if (cfg.limiteRondas !== null && cfg.limiteRondas !== undefined) {
+    validarEntero(cfg, 'limiteRondas');
+  }
   if (!MODOS_TURNO.includes(cfg.modoTurno)) {
     throw new ReglaError(
       'CONFIG_INVALIDA',

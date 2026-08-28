@@ -599,7 +599,7 @@ onUnmounted(() => {
     </MapDialogo>
 
     <MapDialogo :abierto="ayudaAbierta" titulo="Reglas del juego" @cerrar="ayudaAbierta = false">
-      <MapAyuda :constantes="constantes" />
+      <MapAyuda :constantes="constantes" :config="vista?.config" />
     </MapDialogo>
 
     <MapDialogo :abierto="edificioMenuAbierto !== null" titulo="Ciudad" @cerrar="cerrarMenuEdificio">

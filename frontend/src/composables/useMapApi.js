@@ -13,8 +13,12 @@ api.interceptors.response.use(
 )
 
 export function useMapApi() {
-  const crearPartida = ({ nombre, contraIA, dificultadIA }) =>
-    api.post('/', { nombre, contraIA, dificultadIA })
+  // `config` lleva los parametros que se eligen en el lobby (objetivo de
+  // territorio, tamaño del mapa, limite de rondas). El backend los valida y los
+  // guarda en la partida; la interfaz despues los lee de la vista, no de las
+  // constantes globales, porque cada partida puede tener los suyos.
+  const crearPartida = ({ nombre, contraIA, dificultadIA, config }) =>
+    api.post('/', { nombre, contraIA, dificultadIA, config })
 
   const unirse = (idOCodigo, { id, nombre, civilizacion }) =>
     api.post(`/${idOCodigo}/unirse`, { id, nombre, civilizacion })

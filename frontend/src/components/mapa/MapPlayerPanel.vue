@@ -43,7 +43,19 @@ const tituloRecurso = (recurso) => {
 // la MISMA funcion que decide la victoria (ver reglas/dominacion.js): la barra no
 // puede desincronizarse del final de la partida.
 const dominacion = computed(() => yo.value?.dominacion ?? null)
-const metaDominacion = computed(() => props.constantes?.porcentajeVictoriaDominacion ?? 0.6)
+// El objetivo sale de la CONFIG DE ESTA PARTIDA, no de la constante global: se
+// elige en el lobby, asi que una partida al 50% tiene que mostrar "/ 50%". Leer
+// la constante haria que la barra mintiera en cualquier partida no estandar.
+// Las constantes quedan solo como respaldo para partidas viejas sin el campo.
+const metaDominacion = computed(() => {
+  const deLaPartida = props.vista?.config?.porcentajeVictoria
+  if (deLaPartida) return deLaPartida / 100
+  return props.constantes?.porcentajeVictoriaDominacion ?? 0.6
+})
+
+// Rondas que faltan, si la partida tiene limite. Un limite invisible es una
+// trampa: el jugador tiene que poder ver que se le acaba el tiempo.
+const limiteRondas = computed(() => props.vista?.config?.limiteRondas ?? null)
 const pct = (v) => Math.round(v * 100)
 // La barra se llena al llegar a la META, no al 100% del mapa: si midiera sobre el
 // mapa entero, estar a un paso de ganar se veria como media barra.
@@ -63,7 +75,8 @@ const RECURSOS_ICONOS = {
 <template>
   <div class="player-panel">
     <div class="turno-actual">
-      Turno {{ vista.turno }} — <strong>{{ jugadorActual?.nombre }}</strong>
+      Turno {{ vista.turno }}<span v-if="limiteRondas" class="limite"> / {{ limiteRondas }}</span>
+      — <strong>{{ jugadorActual?.nombre }}</strong>
       <span v-if="jugadorActual?.id === jugadorId" class="tu-turno">(tu turno)</span>
     </div>
 
@@ -125,6 +138,10 @@ const RECURSOS_ICONOS = {
 
 .tu-turno {
   color: #2ecc71;
+}
+
+.limite {
+  color: #f39c12;
 }
 
 .recursos {

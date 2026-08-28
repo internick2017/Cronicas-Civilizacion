@@ -7,7 +7,9 @@ import { computed } from 'vue'
 // sola. Una ayuda con numeros copiados es peor que no tener ayuda, porque
 // miente con cara de verdad.
 const props = defineProps({
-  constantes: { type: Object, default: null }
+  constantes: { type: Object, default: null },
+  // Config de la partida en curso (objetivo de territorio, limite de rondas).
+  config: { type: Object, default: null }
 })
 
 const NOMBRE_RECURSO = {
@@ -48,9 +50,15 @@ const terrenosProductivos = computed(() =>
   (props.constantes?.terrenos || []).filter(t => Object.keys(t.produccion || {}).length > 0)
 )
 
+// El objetivo y la duracion son de ESTA partida (se eligen al crearla), no del
+// juego en general: el panel de reglas tiene que contar las reglas que se estan
+// jugando ahora. Las constantes quedan de respaldo para partidas viejas.
 const porcentajeDominacion = computed(() =>
+  props.config?.porcentajeVictoria ??
   Math.round((props.constantes?.porcentajeVictoriaDominacion ?? 0) * 100)
 )
+
+const limiteRondas = computed(() => props.config?.limiteRondas ?? null)
 
 const umbralAviso = computed(() =>
   Math.round((props.constantes?.umbralAvisoDominacion ?? 0) * 100)
@@ -64,6 +72,10 @@ const umbralAviso = computed(() =>
       <p>
         Ganás si controlás el {{ porcentajeDominacion }}% de las casillas de tierra,
         o si quedás como el único jugador en pie.
+      </p>
+      <p v-if="limiteRondas">
+        Esta partida tiene un límite de <strong>{{ limiteRondas }} rondas</strong>: si nadie
+        llega al {{ porcentajeDominacion }}% antes, gana quien controle más territorio.
       </p>
       <p>
         El agua no cuenta para ese porcentaje. Se reclama territorio

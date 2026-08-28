@@ -59,8 +59,13 @@ export function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turno
   // Dominacion: el calculo vive en reglas/dominacion.js y es EL MISMO que alimenta
   // la barra de progreso que ve el jugador. Si estuvieran separados, tocar uno solo
   // haria que la barra mienta sobre cuando termina la partida.
+  //
+  // El objetivo lo fija la partida (se elige en el lobby, en por ciento entero).
+  // Una partida guardada antes de que el campo existiera cae a la constante
+  // historica, igual que hacen tecnologiasDe/rasgosDe con sus campos.
+  const objetivo = (estado.config.porcentajeVictoria ?? PORCENTAJE_VICTORIA_DOMINACION * 100) / 100;
   for (const jugador of activosPostEliminacion) {
-    if (controlTerritorial(estado, jugador.id).porcentaje >= PORCENTAJE_VICTORIA_DOMINACION) {
+    if (controlTerritorial(estado, jugador.id).porcentaje >= objetivo) {
       return evento('PartidaTerminada', estado, jugadorId, {
         ganador: { jugadorId: jugador.id, tipoVictoria: 'dominacion', turno: turnoCierre },
       });
@@ -72,6 +77,22 @@ export function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turno
       ganador: { jugadorId: unico.id, tipoVictoria: 'ultimo_en_pie', turno: turnoCierre },
     });
   }
+
+  // Limite de rondas: final garantizado para quien no quiere una partida
+  // abierta. Gana el que mas territorio tenga; si van iguales NO se inventa un
+  // ganador (mismo criterio que cuando no queda nadie activo).
+  if (estado.config.limiteRondas && turnoCierre >= estado.config.limiteRondas) {
+    const porTerritorio = activosPostEliminacion
+      .map(j => ({ id: j.id, tiles: controlTerritorial(estado, j.id).tiles }))
+      .sort((a, b) => b.tiles - a.tiles);
+    const hayEmpate = porTerritorio.length > 1 && porTerritorio[0].tiles === porTerritorio[1].tiles;
+    return evento('PartidaTerminada', estado, jugadorId, {
+      ganador: hayEmpate ? null : {
+        jugadorId: porTerritorio[0].id, tipoVictoria: 'limite_rondas', turno: turnoCierre,
+      },
+    });
+  }
+
   return null;
 }
 

@@ -8,6 +8,35 @@ const emit = defineEmits(['partida-unida'])
 const { crearPartida, unirse, iniciar, listarPartidas, obtenerConstantes } = useMapApi()
 
 const nombrePartida = ref('')
+
+// Parametros de la partida, elegidos al crearla. Los valores por defecto son los
+// historicos (60% de la tierra, mapa de 20, sin limite), asi que quien no toca
+// nada juega exactamente lo de siempre.
+const OBJETIVOS = [
+  { valor: 50, etiqueta: '50% — partida corta' },
+  { valor: 60, etiqueta: '60% — equilibrada' },
+  { valor: 75, etiqueta: '75% — larga' },
+]
+const TAMANOS = [
+  { valor: 14, etiqueta: 'Chico (14×14)' },
+  { valor: 20, etiqueta: 'Mediano (20×20)' },
+  { valor: 28, etiqueta: 'Grande (28×28)' },
+]
+const DURACIONES = [
+  { valor: null, etiqueta: 'Sin límite' },
+  { valor: 40, etiqueta: '40 rondas' },
+  { valor: 60, etiqueta: '60 rondas' },
+  { valor: 100, etiqueta: '100 rondas' },
+]
+const porcentajeVictoria = ref(60)
+const tamanoMapa = ref(20)
+const limiteRondas = ref(null)
+
+const configElegida = () => ({
+  porcentajeVictoria: porcentajeVictoria.value,
+  tamanoMapa: tamanoMapa.value,
+  limiteRondas: limiteRondas.value,
+})
 const nombreJugador = ref('')
 const codigoUnirse = ref('')
 const partidasActivas = ref([])
@@ -61,7 +90,10 @@ const crear = async () => {
   error.value = ''
   cargando.value = true
   try {
-    const { id, codigo } = await crearPartida({ nombre: nombrePartida.value })
+    const { id, codigo } = await crearPartida({
+      nombre: nombrePartida.value,
+      config: configElegida(),
+    })
     salaDeEspera.value = await unirseAPartida(id, codigo)
     await cargarPartidas()
   } catch (err) {
@@ -86,7 +118,8 @@ const jugarContraIA = async () => {
     const { id, codigo } = await crearPartida({
       nombre: nombrePartida.value || 'Partida en solitario',
       contraIA: true,
-      dificultadIA: dificultadIA.value
+      dificultadIA: dificultadIA.value,
+      config: configElegida(),
     })
     const sesion = await unirseAPartida(id, codigo)
     await iniciar(id)
@@ -198,6 +231,27 @@ onMounted(() => {
           Nombre de la partida
           <input v-model="nombrePartida" type="text" placeholder="Mi partida" />
         </label>
+        <label class="field">
+          Territorio para ganar
+          <select v-model.number="porcentajeVictoria">
+            <option v-for="o in OBJETIVOS" :key="o.valor" :value="o.valor">{{ o.etiqueta }}</option>
+          </select>
+        </label>
+        <label class="field">
+          Tamaño del mapa
+          <select v-model.number="tamanoMapa">
+            <option v-for="t in TAMANOS" :key="t.valor" :value="t.valor">{{ t.etiqueta }}</option>
+          </select>
+        </label>
+        <label class="field">
+          Duración
+          <select v-model="limiteRondas">
+            <option v-for="d in DURACIONES" :key="String(d.valor)" :value="d.valor">{{ d.etiqueta }}</option>
+          </select>
+        </label>
+        <p class="ayuda-config">
+          Al llegar al límite gana quien controle más territorio.
+        </p>
         <button class="btn-primary" :disabled="cargando" @click="crear">Crear</button>
       </section>
 
@@ -288,6 +342,12 @@ onMounted(() => {
 .panel-ia {
   border-color: rgba(46, 204, 113, 0.35);
   background: rgba(46, 204, 113, 0.08);
+}
+
+.ayuda-config {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.8rem;
+  color: #95a5a6;
 }
 
 .dificultad-lista {

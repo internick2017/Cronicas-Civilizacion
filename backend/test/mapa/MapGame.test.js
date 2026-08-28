@@ -12,7 +12,12 @@ describe('crearEstado', () => {
     expect(e.turno).toBe(0);
     expect(e.jugadores).toEqual([]);
     expect(e.mapa).toHaveLength(400);
-    expect(e.config).toEqual({ tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial' });
+    // El objetivo de territorio y el limite de rondas se eligen en el lobby por
+    // partida; los defaults replican el comportamiento historico (60%, sin limite).
+    expect(e.config).toEqual({
+      tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial',
+      porcentajeVictoria: 60, limiteRondas: null,
+    });
     expect(e.ganador).toBeNull();
   });
 });
