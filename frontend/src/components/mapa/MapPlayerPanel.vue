@@ -4,7 +4,10 @@ import { computed } from 'vue'
 
 const props = defineProps({
   vista: { type: Object, required: true },
-  jugadorId: { type: String, required: true }
+  jugadorId: { type: String, required: true },
+  // Reglas publicas (/api/map/constantes). Opcional: si todavia no cargaron, la
+  // barra de dominacion cae al umbral por defecto en vez de desaparecer.
+  constantes: { type: Object, default: null }
 })
 
 const jugadorActual = computed(() => props.vista.jugadores[props.vista.indiceJugadorActual])
@@ -36,6 +39,22 @@ const tituloRecurso = (recurso) => {
 // Emoji viejos a proposito: 🪵 (madera) y 🪨 (piedra) son de Emoji 13 (2020) y la
 // fuente de Windows 10 no los trae, asi que salian como el cuadradito de glifo
 // faltante. Los de aca son de Emoji 6.0 o anteriores, presentes en todos lados.
+// Progreso hacia la victoria territorial. El porcentaje lo calcula el backend con
+// la MISMA funcion que decide la victoria (ver reglas/dominacion.js): la barra no
+// puede desincronizarse del final de la partida.
+const dominacion = computed(() => yo.value?.dominacion ?? null)
+const metaDominacion = computed(() => props.constantes?.porcentajeVictoriaDominacion ?? 0.6)
+const pct = (v) => Math.round(v * 100)
+// La barra se llena al llegar a la META, no al 100% del mapa: si midiera sobre el
+// mapa entero, estar a un paso de ganar se veria como media barra.
+const avanceDominacion = computed(() => {
+  if (!dominacion.value || metaDominacion.value <= 0) return 0
+  return Math.min(100, (dominacion.value.porcentaje / metaDominacion.value) * 100)
+})
+// Rivales que ya son peligrosos. El backend manda el cuanto y nunca el donde, para
+// no filtrar el mapa que todavia no exploraste.
+const rivalesDominantes = computed(() => props.vista.dominacionRivales ?? [])
+
 const RECURSOS_ICONOS = {
   food: '🌾', gold: '💰', wood: '🌲', stone: '⛰️', science: '🔬', culture: '🎭'
 }
@@ -64,6 +83,21 @@ const RECURSOS_ICONOS = {
           {{ rinde(recurso) ? `+${rinde(recurso)}` : '+0' }}
         </small>
       </span>
+    </div>
+
+    <div v-if="dominacion" class="dominacion" :title="`Controlás ${dominacion.tiles} de ${dominacion.totalTierra} casillas de tierra. Se gana con el ${pct(metaDominacion)}%.`">
+      <div class="dominacion-cabecera">
+        <span>🏆 Dominación</span>
+        <strong :class="{ cerca: avanceDominacion >= 100 }">
+          {{ pct(dominacion.porcentaje) }}% / {{ pct(metaDominacion) }}%
+        </strong>
+      </div>
+      <div class="barra">
+        <div class="barra-llena" :style="{ width: `${avanceDominacion}%` }"></div>
+      </div>
+      <p v-for="rival in rivalesDominantes" :key="rival.id" class="aviso-rival">
+        ⚠️ {{ rival.civilizacion }} domina el {{ pct(rival.porcentaje) }}% del mundo
+      </p>
     </div>
 
     <ul class="jugadores-lista">
@@ -109,6 +143,39 @@ const RECURSOS_ICONOS = {
 /* Un +0 en verde se lee como "todo bien"; en gris apagado se lee como lo que
    es: ese recurso no esta entrando. */
 .rinde.nada { color: #7f8c8d; }
+
+.dominacion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.dominacion-cabecera {
+  display: flex;
+  justify-content: space-between;
+}
+
+.dominacion-cabecera .cerca { color: #f1c40f; }
+
+.barra {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.barra-llena {
+  height: 100%;
+  background: linear-gradient(90deg, #27ae60, #f1c40f);
+  transition: width 0.4s ease;
+}
+
+.aviso-rival {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #e67e22;
+}
 
 .jugadores-lista {
   list-style: none;

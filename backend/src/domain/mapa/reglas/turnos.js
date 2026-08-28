@@ -2,6 +2,7 @@ import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_
 import { validarTurno, evento } from './comun.js';
 import { produccionPorRasgos } from './cultura.js';
 import { aplicarBonosPorcentuales } from './tecnologia.js';
+import { controlTerritorial } from './dominacion.js';
 
 export function siguienteIndiceActivo(estado, excluirIds = null) {
   const n = estado.jugadores.length;
@@ -55,13 +56,11 @@ export function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turno
     });
   }
 
-  // Dominacion: se mide sobre tiles de tierra unicamente (agua nunca es propiedad de nadie,
-  // asi que incluirla haria que el umbral real dependa de cuanta agua generó la semilla).
-  const tilesDeTierra = estado.mapa.filter(t => t.terreno !== 'water');
-  const totalTierra = tilesDeTierra.length;
+  // Dominacion: el calculo vive en reglas/dominacion.js y es EL MISMO que alimenta
+  // la barra de progreso que ve el jugador. Si estuvieran separados, tocar uno solo
+  // haria que la barra mienta sobre cuando termina la partida.
   for (const jugador of activosPostEliminacion) {
-    const propios = tilesDeTierra.filter(t => t.dueno === jugador.id).length;
-    if (totalTierra > 0 && propios / totalTierra >= PORCENTAJE_VICTORIA_DOMINACION) {
+    if (controlTerritorial(estado, jugador.id).porcentaje >= PORCENTAJE_VICTORIA_DOMINACION) {
       return evento('PartidaTerminada', estado, jugadorId, {
         ganador: { jugadorId: jugador.id, tipoVictoria: 'dominacion', turno: turnoCierre },
       });

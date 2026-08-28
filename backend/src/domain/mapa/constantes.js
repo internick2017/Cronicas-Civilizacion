@@ -239,6 +239,12 @@ export const PRODUCCION_BASE_CIUDAD = {
 
 export const PORCENTAJE_VICTORIA_DOMINACION = 0.6;
 
+// A partir de que porcentaje se le avisa al resto que un rival se esta volviendo
+// peligroso (ver reglas/dominacion.js#rivalesDominantes). Esta por debajo del
+// umbral de victoria a proposito: el aviso tiene que llegar con tiempo de
+// reaccionar, no cuando la partida ya esta decidida.
+export const UMBRAL_AVISO_DOMINACION = 0.4;
+
 // Cantidad minima de jugadores para poder iniciar una partida (ver
 // reglas/partida.js#iniciar). Vive aca, junto al resto de las constantes
 // publicas del juego, para que el frontend pueda leerla de /api/map/constantes

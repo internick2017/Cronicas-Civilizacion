@@ -1,6 +1,7 @@
 import { jugadorPorId } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
 import { producirParaJugador } from './turnos.js';
+import { controlTerritorial, rivalesDominantes } from './dominacion.js';
 import { DIFICULTAD_IA_DEFAULT } from '../constantes.js';
 
 function vistaTile(tile, jugadorId) {
@@ -24,6 +25,10 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       // ciudad le lleva dos turnos o quince. Es informacion privada, va junto
       // a los recursos y por el mismo motivo.
       produccion: producirParaJugador(estado, jugador.id),
+      // Progreso hacia la victoria por dominacion. Es informacion privada por el
+      // mismo motivo que los recursos: el porcentaje ajeno dejaria deducir cuanto
+      // mapa oculto tiene tomado el rival.
+      dominacion: controlTerritorial(estado, jugador.id),
     };
   }
   // esBot y dificultadIA no son informacion sensible (a diferencia de
@@ -50,5 +55,8 @@ export function vistaJugador(estado, jugadorId) {
     ganador: estado.ganador,
     jugadores: estado.jugadores.map(j => vistaJugadorPublica(j, jugadorId, estado)),
     mapa: estado.mapa.map(t => vistaTile(t, jugadorId)),
+    // Aviso de rivales que se acercan a la victoria territorial: solo el cuanto,
+    // nunca el donde (ver reglas/dominacion.js#rivalesDominantes).
+    dominacionRivales: rivalesDominantes(estado, jugadorId),
   };
 }

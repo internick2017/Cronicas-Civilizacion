@@ -476,7 +476,7 @@ onUnmounted(() => {
 
 <template>
   <div class="map-session">
-    <MapPlayerPanel :vista="vista" :jugador-id="jugadorId" />
+    <MapPlayerPanel :vista="vista" :jugador-id="jugadorId" :constantes="constantes" />
 
     <div v-if="vista.estado === 'esperando'" class="sala-espera">
       <p class="sala-codigo">

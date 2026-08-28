@@ -51,6 +51,10 @@ const terrenosProductivos = computed(() =>
 const porcentajeDominacion = computed(() =>
   Math.round((props.constantes?.porcentajeVictoriaDominacion ?? 0) * 100)
 )
+
+const umbralAviso = computed(() =>
+  Math.round((props.constantes?.umbralAvisoDominacion ?? 0) * 100)
+)
 </script>
 
 <template>
@@ -60,6 +64,14 @@ const porcentajeDominacion = computed(() =>
       <p>
         Ganás si controlás el {{ porcentajeDominacion }}% de las casillas de tierra,
         o si quedás como el único jugador en pie.
+      </p>
+      <p>
+        El agua no cuenta para ese porcentaje. Se reclama territorio
+        <strong>fundando ciudades</strong>, que se quedan con las casillas de alrededor,
+        y <strong>capturando</strong> las ciudades de los demás. Tu progreso lo ves en la
+        barra 🏆 del panel superior; cuando alguien pasa el
+        {{ umbralAviso }}% del mundo, aparece un aviso para todos, aunque sin revelar
+        dónde está su territorio.
       </p>
     </section>
 
