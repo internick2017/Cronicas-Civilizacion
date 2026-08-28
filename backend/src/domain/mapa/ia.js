@@ -40,6 +40,20 @@ import { ReglaError } from './errores.js';
 // ciudad, que se decide ultima) no llegaban a ejecutarse nunca. Sigue siendo un
 // backstop contra un bucle infinito, no un limite de juego.
 const PASOS_MAXIMOS = 200;
+
+// Nivel a partir del cual una ciudad es MATEMATICAMENTE incapturable: su
+// defensa minima (peor tirada, con cuartel, en colinas) supera al ataque maximo
+// posible del juego (la mejor unidad, con metalurgia y la mejor tirada). Como
+// las ciudades no tienen vida y la captura se juega en una sola tirada, pasado
+// ese nivel no hay ejercito que pueda tomarla nunca.
+//
+// La IA se queda por debajo a proposito. No es solo eficiencia: cuando dos bots
+// mejoraban sin freno, sus ciudades llegaban a nivel 13-15, nadie podia
+// capturar nada, nadie podia ser eliminado y la partida no terminaba jamas
+// (medido: 301 turnos sin ganador). El problema de fondo es de las REGLAS, no
+// de la IA, y esta anotado para decidirlo aparte; esto solo evita que la
+// maquina lo dispare en cada partida larga.
+export const NIVEL_CIUDAD_INCAPTURABLE = 6;
 // Si una decision falla por una ReglaError 5 veces seguidas, algo quedo mal
 // modelado (p.ej. dos "candidatos" que se invalidan mutuamente) y seguir
 // probando no va a arreglarlo: mejor cerrar el turno que quedar reintentando.
@@ -92,6 +106,7 @@ export const PERFILES_DIFICULTAD = {
     // No mejora ciudades: como saltear pasos o construir en el orden de fabrica,
     // es una de las cosas que hace peor a proposito.
     mejoraCiudades: false,
+    nivelMaximoCiudad: 1,
     elegirMejorFundacion: false,
     fundacionesPorTurno: 1,
   },
@@ -109,6 +124,7 @@ export const PERFILES_DIFICULTAD = {
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
     mejoraCiudades: true,
+    nivelMaximoCiudad: 3,
     elegirMejorFundacion: false,
     fundacionesPorTurno: 1,
   },
@@ -123,6 +139,9 @@ export const PERFILES_DIFICULTAD = {
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
     mejoraCiudades: true,
+    // Un nivel mas que normal, pero igual por debajo del umbral donde la ciudad
+    // se vuelve intomable.
+    nivelMaximoCiudad: 4,
     elegirMejorFundacion: true,
     fundacionesPorTurno: 2,
   },
@@ -267,7 +286,9 @@ function decidirInvestigacion(estado, jugadorId, perfil) {
 function decidirMejoraCiudad(estado, jugadorId, perfil) {
   if (!perfil.mejoraCiudades) return null;
   const jugador = jugadorPorId(estado, jugadorId);
-  const ciudades = [...ciudadesDe(estado, jugadorId)].sort((a, b) => a.ciudad.nivel - b.ciudad.nivel);
+  const ciudades = [...ciudadesDe(estado, jugadorId)]
+    .filter((t) => t.ciudad.nivel < Math.min(perfil.nivelMaximoCiudad, NIVEL_CIUDAD_INCAPTURABLE))
+    .sort((a, b) => a.ciudad.nivel - b.ciudad.nivel);
   for (const tile of ciudades) {
     if (puedePagar(jugador, COSTO_MEJORA_CIUDAD(tile.ciudad.nivel))) {
       return { tipo: 'mejorarCiudad', x: tile.x, y: tile.y };
