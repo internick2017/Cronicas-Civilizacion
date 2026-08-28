@@ -5,7 +5,7 @@ import {
 } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
-import { validarTurno, evento } from './comun.js';
+import { validarTurno, evento, radio1 } from './comun.js';
 import { bonoDefensaPorRasgos } from './cultura.js';
 import { bonoAtaquePorTecnologias, bonoDefensaUnidadPorTecnologias } from './tecnologia.js';
 
@@ -103,6 +103,27 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   // Solo se toma la ciudad si queda alguien en pie para tomarla.
   if (ganador === 'atacante' && !ejercitoEnemigo && !atacanteCae) {
     eventos.push(evento('CiudadCapturada', estado, jugadorId, { x: hasta.x, y: hasta.y }));
+
+    // Al caer la ciudad cae tambien el territorio que administraba. Sin esto el
+    // territorio ajeno era INCONQUISTABLE (moverEjercito rechaza casilla ajena,
+    // atacar exige ejercito o ciudad, y capturar volteaba solo la casilla de la
+    // ciudad), asi que con el mapa repartido la partida no podia avanzar mas.
+    //
+    // Se anexa solo lo que era del DUEÑO ANTERIOR: un tercero no paga por una
+    // guerra ajena, y la tierra de nadie sigue de nadie (se gana caminandola,
+    // como siempre). Tampoco se anexan casillas con CIUDAD: si una ciudad vecina
+    // cayera de arrastre, una sola batalla podria encadenar un imperio entero.
+    //
+    // El dueño anterior se lee ACA y no en aplicar.js porque para cuando el
+    // evento se aplique, CiudadCapturada ya le cambio el dueño a la casilla.
+    const duenoAnterior = tileHasta.dueno;
+    const anexadas = radio1(hasta.x, hasta.y)
+      .map(({ x, y }) => tileEn(estado, x, y))
+      .filter(t => t && t.dueno === duenoAnterior && !t.ciudad)
+      .map(t => ({ x: t.x, y: t.y }));
+    if (anexadas.length > 0) {
+      eventos.push(evento('TerritorioAnexado', estado, jugadorId, { tiles: anexadas }));
+    }
   }
 
   return eventos;
