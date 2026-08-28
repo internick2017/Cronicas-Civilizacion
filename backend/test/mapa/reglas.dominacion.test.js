@@ -112,11 +112,15 @@ describe('rivalesDominantes (aviso de rival peligroso)', () => {
 });
 
 describe('la vista expone la dominacion igual que la produccion', () => {
-  it('el jugador propio ve su control territorial', () => {
+  // La vista ya no manda totalTierra ni el porcentaje exacto: revelaban cuanto
+  // mundo hay antes de explorarlo (ver reglas.dominacionPrivada.test.js). El
+  // calculo interno sigue siendo exacto, lo que se recorta es lo que sale.
+  it('el jugador propio ve su control territorial, sin el total del mundo', () => {
     const e = partida3x3();
     poseer(e, 'p1', [[0, 0], [1, 0]]);
     const yo = vistaJugador(e, 'p1').jugadores.find(x => x.id === 'p1');
-    expect(yo.dominacion).toEqual({ tiles: 2, totalTierra: 9, porcentaje: 2 / 9 });
+    expect(yo.dominacion).toEqual({ tiles: 2, porcentaje: 0.22 }); // 2/9 = 22.2%
+    expect(controlTerritorial(e, 'p1').totalTierra).toBe(9);
   });
 
   it('NO expone el control territorial de los demas (filtraria el mapa oculto)', () => {
@@ -130,7 +134,7 @@ describe('la vista expone la dominacion igual que la produccion', () => {
     const e = partida3x3();
     poseer(e, 'p2', [[0, 0], [1, 0], [2, 0], [0, 1]]);
     expect(vistaJugador(e, 'p1').dominacionRivales).toEqual([
-      { id: 'p2', nombre: 'J2', civilizacion: 'Civ2', porcentaje: 4 / 9 },
+      { id: 'p2', nombre: 'J2', civilizacion: 'Civ2', porcentaje: 0.44 }, // 4/9 = 44.4%
     ]);
     expect(vistaJugador(e, 'p2').dominacionRivales).toEqual([]);
   });

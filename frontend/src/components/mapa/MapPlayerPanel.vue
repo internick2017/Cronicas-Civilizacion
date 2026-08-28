@@ -98,7 +98,7 @@ const RECURSOS_ICONOS = {
       </span>
     </div>
 
-    <div v-if="dominacion" class="dominacion" :title="`Controlás ${dominacion.tiles} de ${dominacion.totalTierra} casillas de tierra. Se gana con el ${pct(metaDominacion)}%.`">
+    <div v-if="dominacion" class="dominacion" :title="`Controlás ${dominacion.tiles} casillas de tierra. Se gana con el ${pct(metaDominacion)}% del mundo al que se puede llegar.`">
       <div class="dominacion-cabecera">
         <span>🏆 Dominación</span>
         <strong :class="{ cerca: avanceDominacion >= 100 }">

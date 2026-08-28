@@ -12,6 +12,27 @@ function vistaTile(tile, jugadorId) {
   return { ...resto, descubierto: true };
 }
 
+// El porcentaje se redondea a puntos ENTEROS antes de salir del backend, y el
+// total de casillas de tierra no sale.
+//
+// Por que: visto jugando, con 6 casillas descubiertas de 196 la vista informaba
+// totalTierra 74, o sea cuanto mundo jugable hay antes de explorar nada. Quitar
+// el total no alcanzaba: con `tiles` y un porcentaje exacto el total se despeja
+// dividiendo (1 casilla y 0.0135 dan 74). Redondeado, lo unico deducible es un
+// rango amplio.
+//
+// Hacia ABAJO y no al mas cercano: si redondeara hacia arriba, la barra podria
+// mostrar el objetivo cumplido en una ronda en la que todavia no ganaste.
+// `tiles` si se manda: son TUS casillas, ya las ves en el mapa.
+function porcentajeRedondeado(porcentaje) {
+  return Math.floor(porcentaje * 100) / 100;
+}
+
+function dominacionParaLaVista(estado, jugadorId) {
+  const { tiles, porcentaje } = controlTerritorial(estado, jugadorId);
+  return { tiles, porcentaje: porcentajeRedondeado(porcentaje) };
+}
+
 function vistaJugadorPublica(jugador, jugadorId, estado) {
   const { id, nombre, civilizacion, activo, esBot } = jugador;
   if (jugador.id === jugadorId) {
@@ -28,7 +49,7 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       // Progreso hacia la victoria por dominacion. Es informacion privada por el
       // mismo motivo que los recursos: el porcentaje ajeno dejaria deducir cuanto
       // mapa oculto tiene tomado el rival.
-      dominacion: controlTerritorial(estado, jugador.id),
+      dominacion: dominacionParaLaVista(estado, jugador.id),
     };
   }
   // esBot y dificultadIA no son informacion sensible (a diferencia de
@@ -57,6 +78,7 @@ export function vistaJugador(estado, jugadorId) {
     mapa: estado.mapa.map(t => vistaTile(t, jugadorId)),
     // Aviso de rivales que se acercan a la victoria territorial: solo el cuanto,
     // nunca el donde (ver reglas/dominacion.js#rivalesDominantes).
-    dominacionRivales: rivalesDominantes(estado, jugadorId),
+    dominacionRivales: rivalesDominantes(estado, jugadorId)
+      .map(r => ({ ...r, porcentaje: porcentajeRedondeado(r.porcentaje) })),
   };
 }
