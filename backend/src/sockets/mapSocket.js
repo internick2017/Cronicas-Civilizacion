@@ -1,8 +1,6 @@
 /**
  * Handlers de socket.io del modo mapa. Separados de `server-dynamic.js` (que
- * no es testeable de forma aislada: arranca DB, IA, etc.) siguiendo el mismo
- * patron que ya usa el modo narrativo/legacy (`handleGameSocket` en
- * `gameSocket.js`).
+ * no es testeable de forma aislada: arranca DB, IA, etc.).
  *
  * El jugadorId de un jugador es visible para el resto de los jugadores de la
  * partida (vistaJugador lo expone). Sin verificar el token, cualquiera que lo

@@ -8,17 +8,11 @@ import compression from 'compression';
 import os from 'os';
 
 // Import routes
-import gameRoutes from './routes/gameRoutes.js';
-import playerRoutes from './routes/playerRoutes.js';
 import authRoutes from './routes/authRoutes.js';
-import resourceRoutes from './routes/resourceRoutes.js';
-import cityRoutes from './routes/cityRoutes.js';
-import militaryRoutes from './routes/militaryRoutes.js';
 import narrativeRoutes from './routes/narrativeRoutes.js';
 import { crearMapRoutes } from './routes/mapRoutes.js';
 
 // Import socket handlers
-import { handleGameSocket } from './sockets/gameSocket.js';
 import { registrarMapSocket } from './sockets/mapSocket.js';
 
 // Import dynamic configuration
@@ -27,7 +21,6 @@ import logger from './utils/logger.js';
 import { errorHandler, AppError } from './utils/errors.js';
 import { generalLimiter, apiLimiter, narrativeLimiter } from './middleware/rateLimiter.js';
 import aiService from './services/AIService.js';
-import { GameService } from './services/GameService.js';
 import { MapGameService } from './services/MapGameService.js';
 import { MapGameRepo } from './db/MapGameRepo.js';
 import { narrarRondaMapa as narrarRondaMapaImpl } from './domain/mapa/narracionRonda.js';
@@ -84,10 +77,6 @@ async function initializeConnections() {
     app.locals.pool = pool;
     app.locals.redisClient = redisClient;
 
-    // Initialize GameService with cache client
-    const gameService = GameService.getInstance();
-    gameService.setCacheClient(redisClient);
-
     // Initialize the map-mode repo with the DB matching the active engine.
     let mapGameRepo;
     if (config.database.type === 'sqlite') {
@@ -127,11 +116,6 @@ app.use('/api/', apiLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/players', playerRoutes);
-app.use('/api/resources', resourceRoutes);
-app.use('/api/cities', cityRoutes);
-app.use('/api/military', militaryRoutes);
 // Use special rate limiter for narrative routes during development
 app.use('/api/narrative', narrativeLimiter, narrativeRoutes);
 
@@ -229,9 +213,6 @@ app.get('/debug/players', async (req, res) => {
 io.on('connection', (socket) => {
   logger.info(`Player connected: ${socket.id}`);
   
-  // Handle game-related socket events
-  handleGameSocket(socket, io);
-
   registrarMapSocket(socket, io, mapGameService);
 
   socket.on('disconnect', () => {
