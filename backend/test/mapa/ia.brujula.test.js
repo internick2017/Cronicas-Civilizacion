@@ -52,12 +52,20 @@ describe('brujula hacia la tierra libre', () => {
     expect(dist.get('0,0')).toBe(PRIMERA_LIBRE);
   });
 
-  it('no incluye casillas ajenas ni agua como camino', () => {
+  // Desde que la frontera es permeable, el territorio ajeno SUELTO si es camino
+  // (se toma entrando). Lo que sigue sin serlo es lo defendido: una ciudad
+  // ajena hay que atacarla, no se la atraviesa.
+  it('no incluye ciudades ajenas ni agua como camino, pero si la tierra ajena suelta', () => {
     const e = franja();
-    e.mapa[4].dueno = 'h1';       // muro enemigo en el medio de lo propio
+    e.mapa[4].dueno = 'h1';
+    e.mapa[4].ciudad = { nombre: 'Muro', nivel: 1, poblacion: 500, edificios: [] };
     const dist = distanciaATierraLibre(e, 'bot');
     expect(dist.get('5,0')).toBe(3);        // del lado libre, sigue llegando
-    expect(dist.has('3,0')).toBe(false);    // del otro lado del muro, inalcanzable
+    expect(dist.has('3,0')).toBe(false);    // del otro lado de la ciudad, inalcanzable
+
+    // La misma casilla, sin ciudad: deja de ser un muro.
+    e.mapa[4].ciudad = null;
+    expect(distanciaATierraLibre(e, 'bot').has('3,0')).toBe(true);
   });
 
   it('un ejercito rodeado de casillas propias camina HACIA la frontera, no al azar', () => {
@@ -112,23 +120,29 @@ describe('brujula hacia la tierra libre', () => {
     expect(eventos.filter(ev => ev.tipo !== 'TurnoAvanzado').length).toBeGreaterThan(0);
   });
 
-  it('las tres dificultades siguen ordenadas: facil <= normal <= dificil', () => {
-    const territorioTras = (dificultad) => {
-      const e = crearEstado({ nombre: 'S', semilla: 'orden-1' });
+  // Antes esto comparaba CASILLAS a mitad de partida, y dejo de servir cuando
+  // la IA aprendio a marchar sobre el rival: una ofensiva pasa turnos caminando
+  // hacia una ciudad en vez de reclamando tierra, asi que puede tener menos
+  // casillas en el turno 40 y aun asi ganar mucho antes. Lo que mide si juega
+  // mejor es EN CUANTOS TURNOS GANA.
+  it('la facil gana mas lento que la dificil (la escala de dificultad se sostiene)', () => {
+    const turnosParaGanar = (dificultad) => {
+      const e = crearEstado({ nombre: 'S', semilla: 'escala-1' });
       aplicar(e, unirse(e, { id: 'bot', nombre: 'M', civilizacion: 'A', esBot: true, dificultadIA: dificultad }));
       aplicar(e, unirse(e, { id: 'h1', nombre: 'H', civilizacion: 'B' }));
       aplicar(e, iniciar(e));
-      for (let i = 0; i < 40 && e.estado === 'jugando'; i++) {
+      for (let i = 0; i < 400 && e.estado === 'jugando'; i++) {
         const actual = e.jugadores[e.indiceJugadorActual].id;
-        if (actual === 'bot') jugarTurnoIA(e, 'bot', crearRng(`orden-${i}`));
+        if (actual === 'bot') jugarTurnoIA(e, 'bot', crearRng(`escala-${i}`));
         else aplicar(e, terminarTurno(e, actual));
       }
-      return controlTerritorial(e, 'bot').tiles;
+      return e.estado === 'terminado' ? e.turno : Infinity;
     };
-    const facil = territorioTras('facil');
-    const normal = territorioTras('normal');
-    const dificil = territorioTras('dificil');
-    expect(facil).toBeLessThanOrEqual(normal);
-    expect(normal).toBeLessThanOrEqual(dificil);
+
+    const facil = turnosParaGanar('facil');
+    const dificil = turnosParaGanar('dificil');
+
+    expect(dificil).toBeLessThan(Infinity);   // la dificil gana
+    expect(facil).toBeGreaterThan(dificil);   // y lo hace antes que la facil
   });
 });

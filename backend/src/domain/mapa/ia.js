@@ -95,6 +95,9 @@ export const PERFILES_DIFICULTAD = {
     // lancero en altura) que un jugador nuevo tambien cometeria.
     margenAtaque: 0,
     unidadesPrioridad: ['warrior'],
+    // Nunca marcha sobre el rival: toma lo que le queda al lado y se defiende.
+    // Es la dificultad donde te dejan colonizar en paz.
+    ofensiva: 'nunca',
     // El tope de ejercitos es, en la practica, cuantos "colonos" tiene para ir
     // reclamando tierra: el territorio se gana caminando (ver
     // reglas/movimiento.js, que reclama la casilla al pisarla), no fundando.
@@ -119,7 +122,13 @@ export const PERFILES_DIFICULTAD = {
     margenAtaque: 0.9,
     // legionary aparece recien con la tecnologia formacionMilitar; si no
     // estuviera en la lista, investigarla no cambiaria nada.
-    unidadesPrioridad: ['legionary', 'warrior', 'spearman', 'archer'],
+    // El arquero y el legionario SI pueden tomar una ciudad de nivel bajo; el
+    // guerrero y el lancero no llegan ni con la mejor tirada. Una IA que ataca
+    // tiene que producir algo capaz de capturar, o marcha para nada.
+    unidadesPrioridad: ['legionary', 'archer', 'spearman', 'warrior'],
+    // Coloniza mientras haya mundo que tomar sin pelear; cuando se acaba, va a
+    // la guerra en vez de dar vueltas por lo propio.
+    ofensiva: 'sinTierraLibre',
     topeEjercitosExtra: 3,
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
@@ -134,7 +143,9 @@ export const PERFILES_DIFICULTAD = {
     // "parejo"): prefiere reposicionarse antes que un intercambio parejo.
     margenAtaque: 1.15,
     // Prioriza unidades de cuartel (mas fuertes) en cuanto estan disponibles.
-    unidadesPrioridad: ['cavalry', 'catapult', 'legionary', 'spearman', 'archer', 'warrior'],
+    unidadesPrioridad: ['cavalry', 'catapult', 'legionary', 'archer', 'spearman', 'warrior'],
+    // Presiona desde el principio: coloniza y ataca a la vez.
+    ofensiva: 'siempre',
     topeEjercitosExtra: 5,
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
@@ -146,6 +157,12 @@ export const PERFILES_DIFICULTAD = {
     fundacionesPorTurno: 2,
   },
 };
+
+// Mientras quede mundo sin repartir, la dificultad normal prefiere colonizar
+// antes que pelear (ver `ofensiva: 'sinTierraLibre'` en los perfiles).
+function quedaTierraSinDueno(estado) {
+  return estado.mapa.some((t) => t.terreno !== 'water' && !t.dueno);
+}
 
 function perfilDe(estado, jugadorId) {
   const jugador = jugadorPorId(estado, jugadorId);
@@ -190,29 +207,25 @@ function poderDefensivoEstimado(estado, objetivo) {
 }
 
 
-// --- Brujula hacia la tierra libre ----------------------------------------
+// --- Brujulas -------------------------------------------------------------
 
 const clave = (x, y) => `${x},${y}`;
 
 /**
- * Mapa de "a cuantos pasos esta la tierra sin dueño mas cercana", por casilla.
+ * BFS multi-origen generico: arranca desde TODAS las casillas que cumplen
+ * `esOrigen` a la vez y se expande hacia atras por las que cumplen `esCamino`.
+ * Una sola pasada deja, para cada casilla del mapa, a cuantos pasos esta el
+ * origen mas cercano; como el BFS avanza por capas, la primera vez que toca una
+ * casilla ya es por el camino mas corto.
  *
- * Es un BFS MULTI-ORIGEN: en vez de buscar un camino por ejercito (N busquedas
- * por turno), arranca desde TODAS las casillas libres a la vez y se expande
- * hacia atras. Una sola pasada deja la respuesta para todo el mapa, y como el
- * BFS avanza por capas, la primera vez que toca una casilla ya es por el camino
- * mas corto.
- *
- * Solo se camina por casillas transitables: el agua y el territorio ajeno no
- * son camino (para pasar por territorio ajeno habria que atacar, que es otra
- * decision). Una casilla que no aparece en el Map es una a la que no se puede
- * llegar sin pelear.
+ * Las dos brujulas de abajo son el mismo algoritmo con distinto objetivo, asi
+ * que comparten esto en vez de duplicarlo.
  */
-export function distanciaATierraLibre(estado, jugadorId) {
+function distanciaHasta(estado, esOrigen, esCamino) {
   const distancia = new Map();
   const cola = [];
   for (const tile of estado.mapa) {
-    if (tile.terreno !== 'water' && !tile.dueno) {
+    if (esOrigen(tile)) {
       distancia.set(clave(tile.x, tile.y), 0);
       cola.push(tile);
     }
@@ -221,17 +234,65 @@ export function distanciaATierraLibre(estado, jugadorId) {
     const actual = cola[i];
     const d = distancia.get(clave(actual.x, actual.y));
     for (const vecino of vecinosOrtogonales(estado, actual.x, actual.y)) {
-      if (vecino.terreno === 'water') continue;
-      // Ajena: no es camino. La propia si, que es justo el caso que importa
-      // (los ejercitos se entierran en su propio territorio).
-      if (vecino.dueno && vecino.dueno !== jugadorId) continue;
       const k = clave(vecino.x, vecino.y);
-      if (distancia.has(k)) continue;
+      if (distancia.has(k) || !esCamino(vecino)) continue;
       distancia.set(k, d + 1);
       cola.push(vecino);
     }
   }
   return distancia;
+}
+
+// Por donde puede caminar este jugador: todo lo que no sea agua ni este
+// DEFENDIDO por otro (un ejercito o una ciudad ajena exigen atacar, no son
+// camino). La tierra ajena suelta si es camino desde que la frontera se volvio
+// permeable (ver reglas/movimiento.js).
+const transitablePara = (jugadorId) => (t) =>
+  t.terreno !== 'water' &&
+  !(t.ejercito && t.ejercito.dueno !== jugadorId) &&
+  !(t.ciudad && t.dueno && t.dueno !== jugadorId);
+
+/**
+ * Distancia a la casilla TOMABLE mas cercana: cualquiera que no sea mia, sea
+ * tierra de nadie o territorio ajeno suelto. Antes esta brujula miraba solo la
+ * tierra sin dueño, y por eso, con el mapa repartido, la maquina no veia nada
+ * que ganar aunque tuviera al rival al lado.
+ */
+export function distanciaATierraTomable(estado, jugadorId) {
+  return distanciaHasta(
+    estado,
+    (t) => t.terreno !== 'water' && t.dueno !== jugadorId && !t.ciudad,
+    transitablePara(jugadorId),
+  );
+}
+
+/**
+ * Distancia a la tierra SIN DUEÑO mas cercana. Es la brujula de quien no marcha
+ * sobre el rival (`ofensiva: 'nunca'`): coloniza lo vacio y no navega hacia el
+ * territorio ajeno, aunque la regla del juego ya le permita pisarlo.
+ */
+export function distanciaATierraLibre(estado, jugadorId) {
+  return distanciaHasta(
+    estado,
+    (t) => t.terreno !== 'water' && !t.dueno,
+    transitablePara(jugadorId),
+  );
+}
+
+/**
+ * Distancia a la ciudad enemiga alcanzable mas cercana. Es el objetivo
+ * OFENSIVO: comer casillas sueltas mueve el porcentaje, pero solo tomar
+ * ciudades elimina a alguien y libera su territorio entero.
+ *
+ * La ciudad enemiga es origen pero NO es camino: se llega hasta la casilla de
+ * al lado y desde ahi se ataca.
+ */
+export function distanciaACiudadEnemiga(estado, jugadorId) {
+  return distanciaHasta(
+    estado,
+    (t) => t.ciudad && t.dueno && t.dueno !== jugadorId,
+    transitablePara(jugadorId),
+  );
 }
 
 // --- Decisiones, una por dominio de juego ---------------------------------
@@ -322,18 +383,26 @@ function decidirReclutamiento(estado, jugadorId, perfil) {
   return null;
 }
 
-// De un grupo de casillas empatadas, la que deja mas cerca de tierra libre. Si
-// varias empatan tambien en eso (o ninguna es alcanzable) se sortea, que era el
-// comportamiento anterior: la brujula solo agrega criterio donde no habia.
-function masCercaDeTierraLibre(candidatas, brujula, rng) {
-  const distancias = candidatas.map((t) => brujula.get(clave(t.x, t.y)) ?? Infinity);
-  const menor = Math.min(...distancias);
-  if (menor === Infinity) return elegir(rng, candidatas);
-  return elegir(rng, candidatas.filter((t, i) => distancias[i] === menor));
+// De un grupo de casillas empatadas, la que deja mas cerca del objetivo. Si el
+// objetivo preferido no es alcanzable desde ninguna (p.ej. no hay ninguna ciudad
+// enemiga a la que llegar), cae a la brujula de respaldo; si tampoco, sortea,
+// que era el comportamiento anterior: la brujula solo agrega criterio donde no
+// habia ninguno.
+function masCercaSegun(candidatas, brujulaPreferida, brujulaRespaldo, rng) {
+  for (const brujula of [brujulaPreferida, brujulaRespaldo]) {
+    if (!brujula) continue;
+    const distancias = candidatas.map((t) => brujula.get(clave(t.x, t.y)) ?? Infinity);
+    const menor = Math.min(...distancias);
+    if (menor !== Infinity) {
+      return elegir(rng, candidatas.filter((t, i) => distancias[i] === menor));
+    }
+  }
+  return elegir(rng, candidatas);
 }
 
-function decidirMilitar(estado, jugadorId, rng, perfil, brujula) {
-  for (const origen of ejercitosDe(estado, jugadorId)) {
+function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
+  const ejercitos = ejercitosDe(estado, jugadorId);
+  for (const [indice, origen] of ejercitos.entries()) {
     if (origen.ejercito.movimientoRestante <= 0) continue;
     const vecinos = vecinosOrtogonales(estado, origen.x, origen.y);
 
@@ -351,18 +420,34 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujula) {
       // reposiciona/explora en vez de tirarse a un combate que va a perder).
     }
 
+    // Mismo criterio que reglas/movimiento.js, no una copia de la regla vieja:
+    // solo lo DEFENDIDO (ejercito o ciudad ajena) hay que atacarlo; la tierra
+    // ajena suelta se toma entrando. Mientras esta lista siguio filtrando toda
+    // casilla con dueño ajeno, la maquina no podia cruzar la frontera aunque la
+    // regla ya se lo permitiera: caminaba solo por lo suyo.
     const transitables = vecinos.filter((t) =>
       t.terreno !== 'water' &&
-      !(t.dueno && t.dueno !== jugadorId) &&
+      !(t.ejercito && t.ejercito.dueno !== jugadorId) &&
+      !(t.ciudad && t.dueno && t.dueno !== jugadorId) &&
       !(t.ejercito && t.ejercito.dueno === jugadorId));
     if (transitables.length === 0) continue;
 
     // A donde caminar. La victoria por dominacion se mide en casillas
-    // CONTROLADAS y el unico modo de ganar una es pisar tierra sin dueño, asi
-    // que reclamar pesa mas que explorar; explorar sigue valiendo (abre mapa y
-    // encuentra al rival) y pisar lo propio es el ultimo recurso: no suma nada.
+    // CONTROLADAS, y desde que la frontera es permeable hay DOS formas de ganar
+    // una: pisar tierra de nadie, o pisarle una al rival. Quitarsela al rival
+    // vale mas (el porcentaje se mueve el doble: uno sube y el otro baja);
+    // despues la tierra libre; explorar suma un poco (abre mapa); pisar lo
+    // propio no suma nada y es el ultimo recurso.
+    // Cuanto vale la casilla ajena depende de la agresividad del perfil. Para
+    // una IA ofensiva vale MAS que la tierra libre (el porcentaje se mueve el
+    // doble: uno sube y el otro baja). Para una que no marcha sobre nadie
+    // (facil) vale MENOS: si la tiene al lado la toma, pero prefiere colonizar.
+    // Sin esta distincion, darle valor a la casilla enemiga volvia agresivas a
+    // las tres dificultades y la escala facil < normal < dificil se rompia.
+    const valorAjena = perfil.ofensiva === 'nunca' ? 1 : 3;
     const puntajeDestino = (t) =>
-      (t.dueno ? 0 : 2) + (t.descubiertoPor.includes(jugadorId) ? 0 : 1);
+      (t.dueno === jugadorId ? 0 : t.dueno ? valorAjena : 2) +
+      (t.descubiertoPor.includes(jugadorId) ? 0 : 1);
     const mejorPuntaje = Math.max(...transitables.map(puntajeDestino));
     const mejores = transitables.filter((t) => puntajeDestino(t) === mejorPuntaje);
     // Desempate por brujula. Sin esto, cuando todos los vecinos empatan (el caso
@@ -370,7 +455,23 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujula) {
     // vale 0) la eleccion era al azar, y los ejercitos deambulaban por lo suyo
     // hasta tropezarse con la frontera de casualidad. Medido: 11 de 12 ejercitos
     // rodeados de casillas propias con 109 casillas libres alcanzables.
-    const destino = mejores.length === 1 ? mejores[0] : masCercaDeTierraLibre(mejores, brujula, rng);
+    // Cual de las dos brujulas manda lo decide la agresividad del perfil: la
+    // ofensiva apunta a la ciudad enemiga (tomarla es lo unico que elimina a
+    // alguien y libera su territorio entero), la otra a la casilla mas cercana
+    // que se pueda tomar.
+    // Quien marcha sobre la ciudad enemiga y quien sigue tomando tierra. La
+    // dificultad que presiona DESDE EL PRINCIPIO manda solo la mitad de su
+    // fuerza (los de indice par): mandarlos a todos la volvia mas lenta que
+    // normal contra un rival pasivo, porque abandonaba la colonizacion para
+    // marchar sobre una capital que no la amenazaba (medido: ganaba en el turno
+    // 56-64 contra 31-41 de normal). La que solo ataca cuando se le acabo la
+    // tierra libre va con todo: ya no le queda nada que colonizar.
+    const marchaSobreCiudad = brujulas.ofensiva &&
+      (perfil.ofensiva === 'sinTierraLibre' || indice % 2 === 0);
+    const preferida = marchaSobreCiudad ? brujulas.ofensiva : brujulas.tomable;
+    const destino = mejores.length === 1
+      ? mejores[0]
+      : masCercaSegun(mejores, preferida, brujulas.tomable, rng);
     return { tipo: 'moverEjercito', desde: { x: origen.x, y: origen.y }, hasta: { x: destino.x, y: destino.y } };
   }
   return null;
@@ -414,7 +515,7 @@ function decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) 
   return { tipo: 'fundarCiudad', x: elegida.x, y: elegida.y, nombre: `${jugador.civilizacion} ${numero}` };
 }
 
-function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujula) {
+function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujulas) {
   // Fundar va ANTES que reclutar: mientras fue lo ultimo, cualquier edificio o
   // unidad pagable se comia los recursos primero y la maquina casi nunca
   // llegaba a una segunda ciudad. Una ciudad nueva reclama casilla, produce, y
@@ -423,7 +524,7 @@ function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, bru
     decidirConstruccion(estado, jugadorId, perfil) ??
     decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) ??
     decidirReclutamiento(estado, jugadorId, perfil) ??
-    decidirMilitar(estado, jugadorId, rng, perfil, brujula) ??
+    decidirMilitar(estado, jugadorId, rng, perfil, brujulas) ??
     decidirMejoraCiudad(estado, jugadorId, perfil) ??
     null;
 }
@@ -464,12 +565,23 @@ export function jugarTurnoIA(estado, jugadorId, rng) {
     // lento/distraido, no un turno vacio por mala suerte en el primer paso.
     if (perfil.probabilidadSaltear > 0 && rng() < perfil.probabilidadSaltear) continue;
 
-    // La brujula se recalcula en CADA paso, no una vez por turno: el propio
+    // Las brujulas se recalculan en CADA paso, no una vez por turno: el propio
     // ejercito que acaba de reclamar una casilla cambia el mapa de distancias
-    // para el siguiente. Es un BFS sobre el mapa entero, barato al lado de lo
-    // que cuesta equivocarse de rumbo.
-    const brujula = distanciaATierraLibre(estado, jugadorId);
-    const decision = decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujula);
+    // para el siguiente. Son BFS sobre el mapa entero, baratos al lado de lo que
+    // cuesta equivocarse de rumbo.
+    // Una IA que no marcha sobre el rival navega solo hacia la tierra libre; el
+    // resto, hacia cualquier casilla que pueda tomar (libre o ajena).
+    const tomable = perfil.ofensiva === 'nunca'
+      ? distanciaATierraLibre(estado, jugadorId)
+      : distanciaATierraTomable(estado, jugadorId);
+    const enModoOfensivo = perfil.ofensiva === 'siempre' ||
+      (perfil.ofensiva === 'sinTierraLibre' && !quedaTierraSinDueno(estado));
+    // La brujula ofensiva se calcula solo si hace falta: es un BFS de mas.
+    const brujulas = {
+      tomable,
+      ofensiva: enModoOfensivo ? distanciaACiudadEnemiga(estado, jugadorId) : null,
+    };
+    const decision = decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujulas);
     if (!decision) break;
 
     try {
