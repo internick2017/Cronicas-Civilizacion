@@ -22,11 +22,22 @@ describe('GeminiClient', () => {
     expect(body.contents[0].parts[0].text).toBe('narra esto');
   });
 
-  it('reintenta 2 veces ante error y luego lanza', async () => {
-    fetch.mockResolvedValue({ ok: false, status: 429, json: async () => ({}) });
+  // El ejemplo era un 429, que ahora NO se reintenta (ver abajo). Un 500 es el
+  // caso que los reintentos existen para cubrir: un fallo pasajero de Google.
+  it('reintenta 2 veces ante un error pasajero y luego lanza', async () => {
+    fetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
     const client = new GeminiClient({ apiKey: 'k', retryDelayMs: 1 });
     await expect(client.generate('x')).rejects.toThrow(/Gemini/);
     expect(fetch).toHaveBeenCalledTimes(3); // 1 intento + 2 reintentos
+  });
+
+  // Insistir contra un limite excedido solo lo empeora: cada narracion que
+  // chocaba contra la cuota gastaba TRES llamadas del plan gratuito.
+  it('NO reintenta ante un limite excedido (429), y marca que fue por cuota', async () => {
+    fetch.mockResolvedValue({ ok: false, status: 429, json: async () => ({}) });
+    const client = new GeminiClient({ apiKey: 'k', retryDelayMs: 1 });
+    await expect(client.generate('x')).rejects.toMatchObject({ cuota: true });
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('no reintenta ante errores no recuperables (403)', async () => {

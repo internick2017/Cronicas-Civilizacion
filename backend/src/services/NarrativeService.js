@@ -476,16 +476,19 @@ export class NarrativeService {
     const genre = (session.settings && session.settings.genre) || 'fantasy';
     const mode = (session.settings && session.settings.mode) || 'colaborativo';
 
-    // Throws → propagates with AI_NARRATION_FAILED marker; turnNumber is NOT incremented yet
-    let aiText;
+    // Una falla de la IA NO puede trabar la partida. Antes esto relanzaba con
+    // AI_NARRATION_FAILED y la ronda no cerraba: el turno no avanzaba y los
+    // jugadores quedaban esperando una narracion que, si la cuota estaba
+    // agotada, no iba a llegar nunca. Ahora es el mismo camino que cuando no
+    // hay clave configurada: se narra con el texto local y la partida sigue.
+    let aiText = null;
     try {
       aiText = await this.aiService.generateStoryNarrative(prompt, { language, genre, mode });
     } catch (err) {
-      err.code = 'AI_NARRATION_FAILED';
-      throw err;
+      logger.warn(`La IA no pudo narrar la ronda; se usa el narrador local: ${err.message}`);
     }
 
-    // null means unconfigured — use local fallback so the round always gets some narrative
+    // null = sin clave, sin presupuesto o la IA fallo: siempre hay narrativa.
     const narrative = aiText ?? this.getFallbackNarrative({ characterName: 'los héroes' });
 
     const aiEntry = session.addAINarrative(narrative);

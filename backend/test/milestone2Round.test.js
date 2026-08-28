@@ -107,9 +107,14 @@ describe('M2 — closeRound con resumen, arcos y epílogo automático', () => {
   it('retryNarration en la última ronda dispara el epílogo automático', async () => {
     const { session, ana, beto } = await makeSession(svc, { maxRounds: 3 });
     session.turnNumber = 3;
-    svc.aiService.generateStoryNarrative.mockRejectedValueOnce(new Error('boom'));
+    // La ronda atascada ya no se fabrica haciendo fallar a la IA (eso ahora
+    // cierra con el narrador local): se deja el estado con acciones y sin
+    // narrativa, que es lo que retryNarration existe para destrabar.
     await svc.submitAction(session.id, ana.id, 'a');
-    await expect(svc.submitAction(session.id, beto.id, 'b')).rejects.toThrow();
+    await svc.submitAction(session.id, beto.id, 'b');
+    session.storyHistory = session.storyHistory.filter(e => e.type !== 'ai_narrative');
+    session.turnNumber = 3;
+    session.isActive = true;
     svc.aiService.generateStoryNarrative.mockResolvedValueOnce('final');
     const r = await svc.retryNarration(session.id);
     expect(r.sessionEnded).toBe(true);

@@ -13,7 +13,13 @@ export class GeminiClient {
 
   /**
    * Genera texto. Reintenta 2 veces con espera exponencial ante fallo
-   * (rate limit del free tier incluido).
+   * TRANSITORIO (un 500 de Google, un corte de red).
+   *
+   * El 429 (limite excedido) NO se reintenta: insistir contra un limite es
+   * tirarle nafta al fuego, y antes cada narracion que chocaba contra la cuota
+   * gastaba TRES llamadas en vez de una. El error que sale lleva `cuota: true`
+   * para que el llamador pueda apagar la IA un rato (ver presupuestoIA.js).
+   *
    * @returns {Promise<string>} texto generado
    */
   async generate(prompt, { systemPrompt = '', temperature = 0.8, maxOutputTokens = 500 } = {}) {
@@ -38,7 +44,14 @@ export class GeminiClient {
         });
         if (!res.ok) {
           lastError = new Error(`Gemini HTTP ${res.status}`);
-          if ([400, 401, 403, 404].includes(res.status)) break; // no-retryable
+          // 429 = limite excedido; 403 puede ser cuota o clave sin permiso. Los
+          // dos casos se marcan para que el llamador pause la IA.
+          if (res.status === 429 || res.status === 403) {
+            lastError.cuota = true;
+            const esperar = res.headers?.get?.('retry-after');
+            if (esperar) lastError.reintentarEnMs = Number(esperar) * 1000;
+          }
+          if ([400, 401, 403, 404, 429].includes(res.status)) break; // no-retryable
           continue;
         }
         const data = await res.json();

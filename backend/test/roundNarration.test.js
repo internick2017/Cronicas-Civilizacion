@@ -60,11 +60,20 @@ describe('narración por cierre de ronda', () => {
     expect(prompt).not.toContain('undefined');
   });
 
-  it('una falla de la IA al cerrar ronda lleva el codigo AI_NARRATION_FAILED', async () => {
+  // Este test afirmaba lo contrario: que una falla de la IA relanzaba
+  // AI_NARRATION_FAILED. Con la cuota del plan gratuito agotada eso dejaba la
+  // ronda sin cerrar y la partida trabada para siempre. Decision tomada con el
+  // usuario: mejor una narracion mas pobre que una partida detenida.
+  it('una falla de la IA no traba la ronda: cierra con el narrador local', async () => {
     svc.aiService.generateStoryNarrative.mockRejectedValueOnce(new Error('boom'));
     await svc.submitAction(session.id, ana.id, 'a1');
-    await expect(svc.submitAction(session.id, beto.id, 'a2'))
-      .rejects.toMatchObject({ code: 'AI_NARRATION_FAILED' });
+
+    const turnoAntes = session.turnNumber;
+    await expect(svc.submitAction(session.id, beto.id, 'a2')).resolves.toBeDefined();
+
+    expect(session.turnNumber).toBeGreaterThan(turnoAntes);
+    const ultima = session.storyHistory.filter(e => e.type === 'ai_narrative').at(-1);
+    expect(ultima.narrative.length).toBeGreaterThan(0);
   });
 
   it('el prompt de ronda incluye el inicio de la historia y las narraciones recientes', async () => {
@@ -98,10 +107,20 @@ describe('roundPending — detección de rondas atascadas', () => {
     session.isActive = true;
   });
 
-  it('roundPending es true cuando todos actuaron y la IA no narró', async () => {
-    svc.aiService.generateStoryNarrative.mockRejectedValueOnce(new Error('boom'));
+  // Antes esta ronda atascada se fabricaba haciendo fallar a la IA. Ya no sirve:
+  // una falla de la IA cierra la ronda con el narrador local. roundPending
+  // sigue existiendo para cualquier OTRA razon por la que una ronda quede con
+  // acciones y sin narrativa (por ejemplo un fallo al guardar en la base), asi
+  // que se prueba sobre el estado directamente, que es lo que la funcion mira.
+  it('roundPending es true cuando todos actuaron y no hay narrativa de esa ronda', async () => {
     await svc.submitAction(session.id, ana.id, 'a1');
-    await expect(svc.submitAction(session.id, beto.id, 'a2')).rejects.toThrow();
+    await svc.submitAction(session.id, beto.id, 'a2');
+
+    // Se quita la narrativa de la ronda, dejando el estado "atascado".
+    session.storyHistory = session.storyHistory.filter(e => e.type !== 'ai_narrative');
+    session.turnNumber -= 1;
+    session.currentPlayerIndex = 0;
+
     expect(session.toJSON().roundPending).toBe(true);
   });
 
@@ -114,12 +133,16 @@ describe('roundPending — detección de rondas atascadas', () => {
     expect(session.toJSON().roundPending).toBe(false); // ya narrada
   });
 
-  it('roundPending es true aun con apertura en el mismo turnNumber', async () => {
-    // Opening narrative added at turnNumber 1 (before any actions, same turn)
+  // Lo que este test protege: una narrativa de APERTURA lleva el mismo
+  // turnNumber que las acciones de la primera ronda, y no debe confundirse con
+  // la narrativa de la ronda. Por eso isRoundPending mira si hay narrativa
+  // DESPUES de la ultima accion, no si hay alguna en ese turno.
+  it('roundPending es true aun con apertura en el mismo turnNumber', () => {
     session.addAINarrative('apertura');
-    svc.aiService.generateStoryNarrative.mockRejectedValueOnce(new Error('boom'));
-    await svc.submitAction(session.id, ana.id, 'a1');
-    await expect(svc.submitAction(session.id, beto.id, 'a2')).rejects.toThrow();
+    session.addPlayerAction(ana.id, 'Ana', 'Alba', 'a1');
+    session.addPlayerAction(beto.id, 'Beto', 'Beto', 'a2');
+    session.currentPlayerIndex = 0;
+
     expect(session.toJSON().roundPending).toBe(true);
   });
 });

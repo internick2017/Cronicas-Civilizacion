@@ -1,10 +1,42 @@
 import { GeminiClient } from './GeminiClient.js';
+import { PresupuestoIA } from './presupuestoIA.js';
 import config from '../config/index.js';
+import logger from '../utils/logger.js';
 import { getNarratorSystemPrompt, getOpeningPrompt, getEpiloguePrompt, getSummaryPrompt } from './narrativePrompts.js';
 
 export class AIService {
-  constructor() {
+  constructor({ presupuesto } = {}) {
     this.gemini = new GeminiClient(config.gemini);
+    this.presupuesto = presupuesto ?? new PresupuestoIA();
+  }
+
+  /**
+   * Unico lugar por donde el juego le habla a Gemini. Antes de gastar una
+   * llamada consulta el presupuesto (ver presupuestoIA.js) y, si la API
+   * responde que la cuota se acabo, apaga la IA un rato en vez de reintentar
+   * ronda tras ronda.
+   *
+   * Devuelve null cuando no se puede o no se debe llamar. Todos los llamadores
+   * YA saben tratar null como "usa el texto de respaldo", porque es lo que
+   * devolvia cuando no habia clave configurada: el modo sin IA no es un caso
+   * nuevo, es el que ya existia.
+   */
+  async _generarConPresupuesto(prompt, opciones = {}) {
+    if (!this.gemini.isConfigured()) return null;
+
+    const permiso = this.presupuesto.puedeLlamar();
+    if (!permiso.permitido) {
+      logger.warn?.(`IA salteada (${permiso.motivo}): se usa el narrador local`);
+      return null;
+    }
+
+    this.presupuesto.registrarLlamada();
+    try {
+      return await this.gemini.generate(prompt, opciones);
+    } catch (error) {
+      if (error.cuota) this.presupuesto.registrarCuotaAgotada();
+      throw error;
+    }
   }
 
   /**
@@ -24,7 +56,7 @@ export class AIService {
     try {
       const prompt = this.buildActionPrompt(actionData, gameContext);
 
-      const narrative = await this.gemini.generate(prompt, {
+      const narrative = await this._generarConPresupuesto(prompt, {
         systemPrompt: this.getSystemPrompt(),
         temperature: 0.8,
         maxOutputTokens: 400,
@@ -58,7 +90,7 @@ export class AIService {
       return null; // caller must handle fallback
     }
 
-    return await this.gemini.generate(prompt, {
+    return await this._generarConPresupuesto(prompt, {
       systemPrompt: getNarratorSystemPrompt(language, genre, mode),
       temperature: 0.8,
       maxOutputTokens: 400,
@@ -74,7 +106,7 @@ export class AIService {
    */
   async generateOpening({ language = 'es', genre = 'fantasy', mode = 'colaborativo' } = {}) {
     if (!this.gemini.isConfigured()) return null;
-    return await this.gemini.generate(getOpeningPrompt(language, genre, mode), {
+    return await this._generarConPresupuesto(getOpeningPrompt(language, genre, mode), {
       systemPrompt: getNarratorSystemPrompt(language, genre, mode),
       temperature: 0.9,
       maxOutputTokens: 300,
@@ -93,7 +125,7 @@ export class AIService {
     if (!this.gemini.isConfigured()) return null;
     const prompt = `SINOPSIS ACTUAL:\n${previousSummary || '(la historia recién comienza)'}\n\n` +
       `HECHOS NUEVOS:\n${newNarrative}`;
-    return await this.gemini.generate(prompt, {
+    return await this._generarConPresupuesto(prompt, {
       systemPrompt: getSummaryPrompt(language),
       temperature: 0.4,
       maxOutputTokens: 250,
@@ -110,7 +142,7 @@ export class AIService {
    */
   async generateEpilogue(storySummary, { language = 'es', genre = 'fantasy' } = {}) {
     if (!this.gemini.isConfigured()) return null;
-    return await this.gemini.generate(
+    return await this._generarConPresupuesto(
       `${getEpiloguePrompt(language)}\n\nHISTORIA:\n${storySummary}`,
       { systemPrompt: getNarratorSystemPrompt(language, genre), temperature: 0.8, maxOutputTokens: 400 }
     );
@@ -129,7 +161,7 @@ export class AIService {
     try {
       const prompt = this.buildWorldEventPrompt(gameState);
 
-      const event = await this.gemini.generate(prompt, {
+      const event = await this._generarConPresupuesto(prompt, {
         systemPrompt: this.getWorldEventSystemPrompt(),
         temperature: 0.9,
         maxOutputTokens: 400,

@@ -13,10 +13,17 @@ describe('reintento de narración y reentrada', () => {
     session.isActive = true;
   });
 
-  it('si la IA falla al cerrar ronda, las acciones quedan y retryNarration narra', async () => {
-    svc.aiService.generateStoryNarrative.mockRejectedValueOnce(new Error('boom'));
+  // Una falla de la IA ya NO deja la ronda sin cerrar (cierra con el narrador
+  // local, para que la cuota agotada no trabe la partida). retryNarration sigue
+  // existiendo para una ronda que quedo con acciones y sin narrativa por
+  // cualquier otro motivo, asi que ese es el estado que se arma aca.
+  it('una ronda con acciones y sin narrativa se destraba con retryNarration', async () => {
     await svc.submitAction(session.id, ana.id, 'a1');
-    await expect(svc.submitAction(session.id, beto.id, 'a2')).rejects.toThrow();
+    await svc.submitAction(session.id, beto.id, 'a2');
+    const turno = session.turnNumber - 1;
+    session.storyHistory = session.storyHistory.filter(e => e.type !== 'ai_narrative');
+    session.turnNumber = turno;
+    session.isActive = true;
     svc.aiService.generateStoryNarrative.mockResolvedValueOnce('Ahora sí');
     const r = await svc.retryNarration(session.id);
     expect(r.narrative).toBe('Ahora sí');
