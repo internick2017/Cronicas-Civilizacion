@@ -50,9 +50,42 @@ WshShell.Run "cmd /c title CronicasFrontend && cd /d """ & projectDir & "\fronte
 ' local de mkcert, asi que por HTTPS no entran.
 WshShell.Run "cmd /c title CronicasFrontendLan && cd /d """ & projectDir & "\frontend"" && set SIN_HTTPS=1 && node_modules\.bin\vite.cmd --port 5174 --strictPort > """ & logDir & "\frontend-lan.log"" 2>&1", 0, False
 
-' Los servidores tardan unos segundos en levantar; abrir el navegador antes
-' muestra un error de conexion y asusta al pedo.
-WScript.Sleep 10000
+' Esperar a que el servidor CONTESTE, no una cantidad fija de segundos: con una
+' espera de 10 segundos el navegador llegaba primero y mostraba
+' ERR_CONNECTION_REFUSED (visto por el usuario dos veces seguidas). Vite tarda
+' mas cuando arranca por HTTPS, y en una PC ocupada mas todavia, asi que
+' cualquier numero fijo iba a fallar tarde o temprano.
+'
+' ServerXMLHTTP con setOption(2, 13056) ignora los errores de certificado: el
+' certificado local de mkcert no tiene por que ser valido para este chequeo, lo
+' unico que se pregunta es "¿ya hay alguien atendiendo?".
+Function ServidorListo(url)
+    Dim http
+    ServidorListo = False
+    On Error Resume Next
+    Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    http.setOption 2, 13056
+    http.setTimeouts 2000, 2000, 2000, 2000
+    http.open "GET", url, False
+    http.send
+    If Err.Number = 0 Then ServidorListo = True
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+esperados = 0
+Do While Not ServidorListo("https://localhost:5173") And esperados < 90
+    WScript.Sleep 1000
+    esperados = esperados + 1
+Loop
+
+If esperados >= 90 Then
+    WshShell.Popup "El juego no termino de arrancar despues de 90 segundos." & vbCrLf & vbCrLf & _
+                   "Mira que dice logs\backend.log o logs\frontend.log, o abri jugar.bat " & _
+                   "para ver las ventanas en vivo.", 12, "Cronicas de Civilizacion", 48
+    WScript.Quit
+End If
+
 WshShell.Run "https://localhost:5173", 1, False
 
 WshShell.Popup "Cronicas de Civilizacion iniciado." & vbCrLf & vbCrLf & _
