@@ -131,6 +131,21 @@ export class MapGameRepo {
     })();
   }
 
+  // Cuenta los eventos sin traerlos. Existe porque la semilla del combate se
+  // arma con la CANTIDAD de eventos previos (ver MapGameService#_accion), y
+  // para eso se leia el log ENTERO con eventosDe(): en una partida larga son
+  // decenas de miles de filas con su JSON, leidas de nuevo en CADA ataque
+  // (medido: 19.299 eventos al turno 300, 5.827 ya al turno 100). El numero
+  // que devuelve es identico al de eventosDe().length, asi que las partidas
+  // guardadas siguen resolviendo sus combates igual.
+  contarEventos(gameId) {
+    const sql = 'SELECT COUNT(*) AS n FROM map_game_eventos WHERE game_id = ?';
+    if (this.dialecto === 'sqlite') {
+      return this.db.prepare(sql).get(gameId).n;
+    }
+    return this.db.query(adaptarPlaceholders(sql), [gameId]).then(res => Number(res.rows[0].n));
+  }
+
   eventosDe(gameId) {
     const sql = 'SELECT * FROM map_game_eventos WHERE game_id = ? ORDER BY orden ASC';
     if (this.dialecto === 'sqlite') {

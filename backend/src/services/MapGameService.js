@@ -268,7 +268,10 @@ export class MapGameService {
 
     let eventos;
     if (accion.tipo === 'atacar') {
-      const eventosPrevios = (await this.repo.eventosDe(estado.id)).length;
+      // Contar, no traer: esta semilla solo necesita CUANTOS eventos hubo, y
+      // leer el log completo en cada ataque escala con la duracion de la
+      // partida (ver MapGameRepo#contarEventos).
+      const eventosPrevios = await this.repo.contarEventos(estado.id);
       const rng = crearRng(`combate:${estado.semilla}:${estado.turno}:${eventosPrevios}`);
       eventos = atacar(estado, jugadorId, accion, rng);
     } else {
