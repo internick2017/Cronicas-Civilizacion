@@ -102,11 +102,18 @@ describe('moverEjercito', () => {
       .toThrowError(expect.objectContaining({ codigo: 'TERRENO_INTRANSITABLE' }));
   });
 
-  it('a un tile con dueño enemigo da OBJETIVO_INVALIDO', () => {
+  // Este test afirmaba lo contrario (OBJETIVO_INVALIDO) hasta que la frontera se
+  // volvio permeable: con la regla vieja, una ciudad rodeada por el territorio
+  // de su dueño no tenia ninguna casilla desde donde atacarla y la guerra era
+  // imposible. Solo lo DEFENDIDO (ejercito o ciudad, los dos tests de abajo)
+  // sigue exigiendo atacar; la tierra suelta se disputa entrando.
+  it('a un tile con dueño enemigo pero sin defensor: se entra y se toma', () => {
     aplicar(e, [evento('TerritorioReclamado', e, 'p2', { x: ax, y: ay })]);
 
-    expect(() => moverEjercito(e, 'p1', { desde: { x: cx, y: cy }, hasta: { x: ax, y: ay } }))
-      .toThrowError(expect.objectContaining({ codigo: 'OBJETIVO_INVALIDO' }));
+    const eventos = moverEjercito(e, 'p1', { desde: { x: cx, y: cy }, hasta: { x: ax, y: ay } });
+    aplicar(e, eventos);
+
+    expect(tileEn(e, ax, ay).dueno).toBe('p1');
   });
 
   it('a un tile con ejército enemigo da OBJETIVO_INVALIDO', () => {

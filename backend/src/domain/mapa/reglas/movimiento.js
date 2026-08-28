@@ -25,11 +25,20 @@ export function moverEjercito(estado, jugadorId, { desde, hasta }) {
     throw new ReglaError('TERRENO_INTRANSITABLE', 'El agua es intransitable');
   }
 
-  const esEnemigo =
-    (tileHasta.dueno && tileHasta.dueno !== jugadorId) ||
+  // Solo hay que PELEAR por lo que esta defendido: un ejercito enemigo o una
+  // ciudad enemiga. La tierra ajena suelta se disputa entrando, igual que la
+  // tierra de nadie.
+  //
+  // Antes se rechazaba cualquier casilla con dueño ajeno, y eso volvia la
+  // frontera un muro: como para atacar hay que estar pegado, una ciudad rodeada
+  // por el territorio de su propio dueño quedaba fuera del alcance de todos.
+  // Medido en partidas trabadas: en 3 de 4, TODAS las ciudades del mapa tenian
+  // cero casillas desde donde atacarlas, asi que la guerra era imposible y la
+  // partida no podia terminar.
+  const estaDefendida =
     (tileHasta.ejercito && tileHasta.ejercito.dueno !== jugadorId) ||
     (tileHasta.ciudad && tileHasta.dueno !== jugadorId);
-  if (esEnemigo) throw new ReglaError('OBJETIVO_INVALIDO', 'La casilla es enemiga; usá atacar');
+  if (estaDefendida) throw new ReglaError('OBJETIVO_INVALIDO', 'La casilla es enemiga; usá atacar');
 
   if (tileHasta.ejercito && tileHasta.ejercito.dueno === jugadorId) {
     throw new ReglaError('CASILLA_OCUPADA', 'Ya tenés un ejército en esa casilla');
@@ -42,7 +51,9 @@ export function moverEjercito(estado, jugadorId, { desde, hasta }) {
     }),
   ];
 
-  if (!tileHasta.dueno) {
+  // Se reclama tanto la tierra de nadie como la que era de otro: pisarla es
+  // tomarla. Moverse dentro de lo propio no reclama nada.
+  if (tileHasta.dueno !== jugadorId) {
     eventos.push(evento('TerritorioReclamado', estado, jugadorId, { x: hasta.x, y: hasta.y }));
   }
 
