@@ -15,24 +15,31 @@
 // la IA nunca puede dejar la partida esperando a que ella actue.
 import { tileEn, jugadorPorId, puedePagar } from './MapGame.js';
 import {
-  EDIFICIOS, UNIDADES, COSTO_CIUDAD, BONO_TERRENO_PRODUCCION,
+  EDIFICIOS, UNIDADES, COSTO_CIUDAD, BONO_TERRENO_PRODUCCION, TECNOLOGIAS, COSTO_MEJORA_CIUDAD,
   bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD,
   DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT
 } from './constantes.js';
 import { aplicar } from './aplicar.js';
-import { fundarCiudad, construir } from './reglas/ciudades.js';
+import { fundarCiudad, construir, mejorarCiudad } from './reglas/ciudades.js';
 import { reclutar } from './reglas/militar.js';
 import { moverEjercito } from './reglas/movimiento.js';
 import { atacar } from './reglas/combate.js';
 import { terminarTurno } from './reglas/turnos.js';
 import { bonoDefensaPorRasgos } from './reglas/cultura.js';
-import { tieneTecnologiaRequerida } from './reglas/tecnologia.js';
+import { tieneTecnologiaRequerida, tecnologiasDe } from './reglas/tecnologia.js';
+import { investigar } from './reglas/tecnologia.js';
 import { ReglaError } from './errores.js';
 
 // Backstop duro: protege contra un bug futuro que deje a decidirAccion
 // devolviendo algo valido para siempre (p.ej. una regla nueva que la IA
 // nunca deja de poder pagar). Muy por encima de lo que un turno real usa.
-const PASOS_MAXIMOS = 60;
+// Subido de 60 a 200 cuando la IA paso a jugar por dominacion: con muchas
+// ciudades y muchos ejercitos, un turno legitimo gasta facil 60 pasos solo en
+// construir y mover (medido: 21 edificios + 29 movimientos + 8 reclutas + 2
+// fundaciones = 60 justos), y las decisiones de MENOR prioridad (mejorar una
+// ciudad, que se decide ultima) no llegaban a ejecutarse nunca. Sigue siendo un
+// backstop contra un bucle infinito, no un limite de juego.
+const PASOS_MAXIMOS = 200;
 // Si una decision falla por una ReglaError 5 veces seguidas, algo quedo mal
 // modelado (p.ej. dos "candidatos" que se invalidan mutuamente) y seguir
 // probando no va a arreglarlo: mejor cerrar el turno que quedar reintentando.
@@ -41,10 +48,22 @@ const FALLOS_SEGUIDOS_MAXIMOS = 5;
 // Orden que prioriza aserradero/cantera primero: evita el error de balance
 // que encontramos jugando (madera o piedra en cero para siempre si la
 // capital no cayo en el terreno correcto). Lo usan normal y dificil.
-const ORDEN_EDIFICIOS_BUENO = ['sawmill', 'quarry', 'granary', 'market', 'library', 'barracks'];
+// university va al final y solo sirve una vez investigada 'filosofia'
+// (decidirConstruccion filtra por tecnologia): sin listarla, esa tecnologia no
+// desbloquearia nada en la practica y seria ciencia tirada.
+const ORDEN_EDIFICIOS_BUENO = ['sawmill', 'quarry', 'granary', 'market', 'library', 'barracks', 'university'];
 // Orden "de fabrica" de EDIFICIOS (sin ese criterio): lo que construiria
 // alguien sin pensarlo. Es lo que separa a facil del resto.
 const ORDEN_EDIFICIOS_NATURAL = Object.keys(EDIFICIOS);
+
+// Economia primero: mas comida y mas oro es mas ejercitos y mas ciudades, que
+// es lo que gana por territorio. Filosofia va ultima porque lo que desbloquea
+// (la universidad) produce ciencia, y la ciencia solo compra tecnologias: es la
+// que menos rinde justo cuando quedan pocas por comprar.
+const ORDEN_TECNOLOGIAS_BUENO = ['irrigacion', 'mineria', 'metalurgia', 'fortificacion', 'formacionMilitar', 'filosofia'];
+// El orden "de fabrica", sin ese criterio: lo que investigaria alguien que va
+// tomando lo primero que ve. Mismo papel que ORDEN_EDIFICIOS_NATURAL.
+const ORDEN_TECNOLOGIAS_NATURAL = Object.keys(TECNOLOGIAS);
 
 export { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT };
 
@@ -69,6 +88,10 @@ export const PERFILES_DIFICULTAD = {
     // aunque quisiera. Sigue habiendo tope: sin el, gastaria todo en tropa.
     topeEjercitosExtra: 1,
     ordenEdificios: ORDEN_EDIFICIOS_NATURAL,
+    ordenTecnologias: ORDEN_TECNOLOGIAS_NATURAL,
+    // No mejora ciudades: como saltear pasos o construir en el orden de fabrica,
+    // es una de las cosas que hace peor a proposito.
+    mejoraCiudades: false,
     elegirMejorFundacion: false,
     fundacionesPorTurno: 1,
   },
@@ -79,9 +102,13 @@ export const PERFILES_DIFICULTAD = {
     // perdidos (el caso real que motivo el cambio de combate a dano mutuo),
     // sin llegar a jugar perfecto.
     margenAtaque: 0.9,
-    unidadesPrioridad: ['warrior', 'spearman', 'archer'],
+    // legionary aparece recien con la tecnologia formacionMilitar; si no
+    // estuviera en la lista, investigarla no cambiaria nada.
+    unidadesPrioridad: ['legionary', 'warrior', 'spearman', 'archer'],
     topeEjercitosExtra: 3,
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
+    ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
+    mejoraCiudades: true,
     elegirMejorFundacion: false,
     fundacionesPorTurno: 1,
   },
@@ -91,9 +118,11 @@ export const PERFILES_DIFICULTAD = {
     // "parejo"): prefiere reposicionarse antes que un intercambio parejo.
     margenAtaque: 1.15,
     // Prioriza unidades de cuartel (mas fuertes) en cuanto estan disponibles.
-    unidadesPrioridad: ['cavalry', 'catapult', 'spearman', 'archer', 'warrior'],
+    unidadesPrioridad: ['cavalry', 'catapult', 'legionary', 'spearman', 'archer', 'warrior'],
     topeEjercitosExtra: 5,
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
+    ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
+    mejoraCiudades: true,
     elegirMejorFundacion: true,
     fundacionesPorTurno: 2,
   },
@@ -215,6 +244,38 @@ function decidirConstruccion(estado, jugadorId, perfil) {
 
 // El tope de ejercitos (ciudades + un extra segun dificultad) evita que la IA
 // gaste TODO en soldados y nunca construya ni funde.
+// Investigar se decide PRIMERO y no le saca nada a nadie: las tecnologias se
+// pagan solo con ciencia, y la unica otra decision que gasta ciencia (mejorar
+// una ciudad) se decide ultima justamente para no competir con esta.
+function decidirInvestigacion(estado, jugadorId, perfil) {
+  const jugador = jugadorPorId(estado, jugadorId);
+  const yaTiene = tecnologiasDe(jugador);
+  for (const tecnologia of perfil.ordenTecnologias) {
+    if (yaTiene.includes(tecnologia)) continue;
+    if (puedePagar(jugador, TECNOLOGIAS[tecnologia].costo)) {
+      return { tipo: 'investigar', tecnologia };
+    }
+  }
+  return null;
+}
+
+// Mejorar una ciudad es lo ULTIMO que decide: cuesta oro ademas de ciencia, y
+// ese oro es el mismo con el que recluta. Subir de nivel solo mejora la defensa
+// de esa ciudad; expandirse gana la partida. Asi que se hace con lo que sobra.
+// Se elige la ciudad de menor nivel: el costo escala con el nivel, asi que es
+// tambien la mejora mas barata disponible.
+function decidirMejoraCiudad(estado, jugadorId, perfil) {
+  if (!perfil.mejoraCiudades) return null;
+  const jugador = jugadorPorId(estado, jugadorId);
+  const ciudades = [...ciudadesDe(estado, jugadorId)].sort((a, b) => a.ciudad.nivel - b.ciudad.nivel);
+  for (const tile of ciudades) {
+    if (puedePagar(jugador, COSTO_MEJORA_CIUDAD(tile.ciudad.nivel))) {
+      return { tipo: 'mejorarCiudad', x: tile.x, y: tile.y };
+    }
+  }
+  return null;
+}
+
 function decidirReclutamiento(estado, jugadorId, perfil) {
   const jugador = jugadorPorId(estado, jugadorId);
   const ciudades = ciudadesDe(estado, jugadorId);
@@ -337,10 +398,12 @@ function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, bru
   // unidad pagable se comia los recursos primero y la maquina casi nunca
   // llegaba a una segunda ciudad. Una ciudad nueva reclama casilla, produce, y
   // sube el tope de ejercitos (que es el que limita cuanto puede reclamar).
-  return decidirConstruccion(estado, jugadorId, perfil) ??
+  return decidirInvestigacion(estado, jugadorId, perfil) ??
+    decidirConstruccion(estado, jugadorId, perfil) ??
     decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) ??
     decidirReclutamiento(estado, jugadorId, perfil) ??
     decidirMilitar(estado, jugadorId, rng, perfil, brujula) ??
+    decidirMejoraCiudad(estado, jugadorId, perfil) ??
     null;
 }
 
@@ -350,6 +413,8 @@ const EJECUTORES = {
   moverEjercito: (estado, jugadorId, a) => moverEjercito(estado, jugadorId, a),
   atacar: (estado, jugadorId, a, rng) => atacar(estado, jugadorId, a, rng),
   fundarCiudad: (estado, jugadorId, a) => fundarCiudad(estado, jugadorId, a),
+  investigar: (estado, jugadorId, a) => investigar(estado, jugadorId, a),
+  mejorarCiudad: (estado, jugadorId, a) => mejorarCiudad(estado, jugadorId, a),
 };
 
 /**
