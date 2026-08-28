@@ -79,6 +79,43 @@ export function nombreDe(jugadores, jugadorId) {
   return jugador ? jugador.nombre : 'Un pueblo sin nombre';
 }
 
+/**
+ * Cuenta los cambios de territorio de la ronda, agrupados por quien gano y a
+ * quien se los saco.
+ *
+ * Se agrega en vez de enumerar porque un ejercito reclama UNA casilla por paso:
+ * en una partida larga se midieron 8.193 reclamos. Narrarlos de a uno
+ * inundaria la cronica y la volveria ilegible, que es tan malo como el silencio
+ * que habia antes.
+ *
+ * Exportada para que el prompt de la IA use exactamente el mismo resumen (ver
+ * narracionRonda.js) y las dos voces cuenten lo mismo.
+ *
+ * @returns {Array<{jugadorId: string, duenoAnterior: string|null, casillas: number}>}
+ */
+export function resumirTerritorio(eventos) {
+  const porClave = new Map();
+  for (const evento of eventos ?? []) {
+    const datos = evento.datos || {};
+    let casillas = 0;
+    if (evento.tipo === 'TerritorioReclamado') casillas = 1;
+    else if (evento.tipo === 'TerritorioAnexado') casillas = (datos.tiles ?? []).length;
+    else continue;
+    if (casillas === 0) continue;
+
+    // Un evento viejo, guardado antes de que existiera el campo, no dice de
+    // quien era la casilla: se cuenta como tierra sin dueño en vez de romper.
+    const duenoAnterior = datos.duenoAnterior ?? null;
+    const clave = `${evento.jugadorId}|${duenoAnterior ?? ''}`;
+    const acumulado = porClave.get(clave) ?? { jugadorId: evento.jugadorId, duenoAnterior, casillas: 0 };
+    acumulado.casillas += casillas;
+    porClave.set(clave, acumulado);
+  }
+  return [...porClave.values()];
+}
+
+const casillasDe = (n) => `${n} ${n === 1 ? 'casilla' : 'casillas'}`;
+
 export function narrarRonda(eventos, jugadores = []) {
   const frases = [];
   let indice = 0;
@@ -198,6 +235,17 @@ export function narrarRonda(eventos, jugadores = []) {
 
       default:
         break; // eventos de contabilidad interna: no se narran
+    }
+  }
+
+  // El territorio se narra al final y agregado, no evento por evento: son
+  // muchisimos y lo que importa es el saldo de la ronda, no cada paso.
+  for (const cambio of resumirTerritorio(eventos)) {
+    const quienGano = nombreDe(jugadores, cambio.jugadorId);
+    if (cambio.duenoAnterior) {
+      frases.push(`${quienGano} le arrebato ${casillasDe(cambio.casillas)} a ${nombreDe(jugadores, cambio.duenoAnterior)}.`);
+    } else {
+      frases.push(`${quienGano} se extendio sobre ${casillasDe(cambio.casillas)} sin dueño.`);
     }
   }
 

@@ -53,8 +53,16 @@ export function moverEjercito(estado, jugadorId, { desde, hasta }) {
 
   // Se reclama tanto la tierra de nadie como la que era de otro: pisarla es
   // tomarla. Moverse dentro de lo propio no reclama nada.
+  //
+  // `duenoAnterior` (null si era tierra de nadie) viaja EN el evento porque el
+  // evento tiene que contar lo que paso: quien lo lee despues ya no puede
+  // averiguar de quien era la casilla, porque para entonces el dueño cambio.
+  // Sin esto la cronica podia decir "avanzo sobre 4 casillas" pero nunca "le
+  // arrebato 4 casillas a Nick", que es lo que el jugador necesita saber.
   if (tileHasta.dueno !== jugadorId) {
-    eventos.push(evento('TerritorioReclamado', estado, jugadorId, { x: hasta.x, y: hasta.y }));
+    eventos.push(evento('TerritorioReclamado', estado, jugadorId, {
+      x: hasta.x, y: hasta.y, duenoAnterior: tileHasta.dueno ?? null,
+    }));
   }
 
   return eventos;

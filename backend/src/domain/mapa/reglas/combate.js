@@ -122,7 +122,9 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
       .filter(t => t && t.dueno === duenoAnterior && !t.ciudad)
       .map(t => ({ x: t.x, y: t.y }));
     if (anexadas.length > 0) {
-      eventos.push(evento('TerritorioAnexado', estado, jugadorId, { tiles: anexadas }));
+      eventos.push(evento('TerritorioAnexado', estado, jugadorId, {
+        tiles: anexadas, duenoAnterior,
+      }));
     }
   }
 

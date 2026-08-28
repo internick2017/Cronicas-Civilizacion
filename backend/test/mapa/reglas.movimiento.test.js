@@ -53,7 +53,9 @@ describe('moverEjercito', () => {
     const evs = moverEjercito(e, 'p1', { desde: { x: cx, y: cy }, hasta: { x: ax, y: ay } });
     expect(evs.map(ev => ev.tipo)).toEqual(['EjercitoMovido', 'TerritorioDescubierto', 'TerritorioReclamado']);
     expect(evs[0].datos).toEqual({ desde: { x: cx, y: cy }, hasta: { x: ax, y: ay } });
-    expect(evs[2].datos).toEqual({ x: ax, y: ay });
+    // duenoAnterior viaja en el evento para que la cronica pueda decir a quien
+    // se le quito la casilla; null = era tierra de nadie.
+    expect(evs[2].datos).toEqual({ x: ax, y: ay, duenoAnterior: null });
 
     aplicar(e, evs);
 

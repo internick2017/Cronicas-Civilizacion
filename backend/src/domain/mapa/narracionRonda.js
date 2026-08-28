@@ -4,16 +4,27 @@
 // tiene efectos secundarios al importarlo (levanta Express, crea el server
 // HTTP y el server de Socket.io al nivel del modulo), lo que impide
 // importarlo limpiamente desde un test.
-import { narrarRonda, nombreDe } from './narradorLocal.js';
+import { narrarRonda, nombreDe, resumirTerritorio } from './narradorLocal.js';
 
 // Los jugadores van por NOMBRE, nunca por id. Metiendo e.jugadorId crudo, la IA
 // escribia el identificador interno tal cual en la cronica: "los ejercitos del
 // bot-ia se movieron como sombras furtivas" (visto jugando). Un id es un dato de
 // la maquina, no un personaje de la historia.
 function resumirEventos(eventos, jugadores) {
-  return eventos
-    .map(e => `${e.tipo}${e.jugadorId ? ` (${nombreDe(jugadores, e.jugadorId)})` : ''}`)
-    .join(', ');
+  // Los cambios de territorio se resumen aparte y agregados, con la MISMA
+  // funcion que usa el narrador local. Enumerarlos uno por uno llenaba el
+  // prompt de decenas de lineas identicas (un ejercito reclama una casilla por
+  // paso) y aun asi la IA no podia decir a quien se las quitaron, porque el
+  // dato no viajaba en el evento.
+  const territorio = resumirTerritorio(eventos).map(c => c.duenoAnterior
+    ? `${nombreDe(jugadores, c.jugadorId)} le quito ${c.casillas} casillas a ${nombreDe(jugadores, c.duenoAnterior)}`
+    : `${nombreDe(jugadores, c.jugadorId)} ocupo ${c.casillas} casillas sin dueño`);
+
+  const resto = eventos
+    .filter(e => e.tipo !== 'TerritorioReclamado' && e.tipo !== 'TerritorioAnexado')
+    .map(e => `${e.tipo}${e.jugadorId ? ` (${nombreDe(jugadores, e.jugadorId)})` : ''}`);
+
+  return [...resto, ...territorio].join(', ');
 }
 
 /**
