@@ -12,6 +12,7 @@ import { abandonar } from '../domain/mapa/reglas/abandono.js';
 import { jugarTurnoIA } from '../domain/mapa/ia.js';
 import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT } from '../domain/mapa/constantes.js';
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
+import { embarcar, desembarcar } from '../domain/mapa/reglas/transporte.js';
 import { atacar } from '../domain/mapa/reglas/combate.js';
 import { terminarTurno } from '../domain/mapa/reglas/turnos.js';
 import { vistaJugador } from '../domain/mapa/reglas/visibilidad.js';
@@ -45,6 +46,8 @@ const REGLAS_POR_TIPO = {
   construir: (estado, jugadorId, accion) => construir(estado, jugadorId, accion),
   reclutar: (estado, jugadorId, accion) => reclutar(estado, jugadorId, accion),
   moverEjercito: (estado, jugadorId, accion) => moverEjercito(estado, jugadorId, accion),
+  embarcar: (estado, jugadorId, accion) => embarcar(estado, jugadorId, accion),
+  desembarcar: (estado, jugadorId, accion) => desembarcar(estado, jugadorId, accion),
   adoptarRasgo: (estado, jugadorId, accion) => adoptarRasgo(estado, jugadorId, accion),
   investigar: (estado, jugadorId, accion) => investigar(estado, jugadorId, accion),
   mejorarCiudad: (estado, jugadorId, accion) => mejorarCiudad(estado, jugadorId, accion),

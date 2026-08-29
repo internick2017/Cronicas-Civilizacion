@@ -5,14 +5,27 @@ describe('constantes', () => {
   it('recursos iniciales tienen exactamente las 6 claves', () => {
     expect(Object.keys(RECURSOS_INICIALES).sort()).toEqual([...RECURSOS].sort());
   });
+  // El ataque se afloja a ">= 0" y NO por comodidad: el transporte es la
+  // primera unidad del juego que no puede atacar, y eso es una decision de
+  // diseño (sin escolta es carne, y por eso llevar tropa tiene riesgo), no un
+  // stat sin cargar. Todo lo demas se sigue exigiendo mayor a cero: una unidad
+  // sin defensa, sin vida o sin movimiento si seria un error.
+  //
+  // Para que aflojarlo no tape un descuido futuro, abajo se fija QUIENES pueden
+  // no atacar: si mañana aparece otra con ataque 0 sin querer, ese test falla.
   it('todas las unidades tienen stats completos', () => {
     for (const u of Object.values(UNIDADES)) {
-      expect(u.ataque).toBeGreaterThan(0);
+      expect(u.ataque).toBeGreaterThanOrEqual(0);
       expect(u.defensa).toBeGreaterThan(0);
       expect(u.salud).toBeGreaterThan(0);
       expect(u.movimiento).toBeGreaterThan(0);
       expect(typeof u.requiereBarracks).toBe('boolean');
     }
+  });
+
+  it('la unica unidad que no ataca es el transporte', () => {
+    const sinAtaque = Object.entries(UNIDADES).filter(([, u]) => u.ataque === 0).map(([tipo]) => tipo);
+    expect(sinAtaque).toEqual(['transport']);
   });
   it('cavalry y catapult requieren barracks; warrior no', () => {
     expect(UNIDADES.cavalry.requiereBarracks).toBe(true);

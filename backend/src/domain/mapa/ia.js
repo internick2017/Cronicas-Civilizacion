@@ -16,7 +16,7 @@
 import { tileEn, jugadorPorId, puedePagar } from './MapGame.js';
 import {
   EDIFICIOS, UNIDADES, COSTO_CIUDAD, BONO_TERRENO_PRODUCCION, TECNOLOGIAS, COSTO_MEJORA_CIUDAD,
-  bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, esNaval,
+  bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, esNaval, esTransporte, CAPACIDAD_DE,
   DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT
 } from './constantes.js';
 import { marAdyacente } from './reglas/comun.js';
@@ -25,6 +25,7 @@ import { fundarCiudad, construir, mejorarCiudad } from './reglas/ciudades.js';
 import { reclutar } from './reglas/militar.js';
 import { moverEjercito } from './reglas/movimiento.js';
 import { atacar } from './reglas/combate.js';
+import { embarcar, desembarcar } from './reglas/transporte.js';
 import { terminarTurno } from './reglas/turnos.js';
 import { bonoDefensaPorRasgos } from './reglas/cultura.js';
 import { tieneTecnologiaRequerida, tecnologiasDe } from './reglas/tecnologia.js';
@@ -72,6 +73,14 @@ const FALLOS_SEGUIDOS_MAXIMOS = 5;
 // precaucion de la maquina. El 6 es el tamano donde un buque puede al menos
 // maniobrar; es una perilla, no una verdad medida.
 const MAR_MINIMO_PARA_PUERTO = 6;
+
+// Cuanta tierra inalcanzable tiene que haber para que valga la pena montar una
+// invasion. Sin este piso, cualquier islote de dos casillas dispara la
+// produccion de transportes: medido en 20 partidas, la maquina botaba 28
+// transportes para hacer 3 embarques, o sea madera tirada en barcos que nunca
+// zarpan. No es una regla del juego, es criterio del bot, igual que
+// MAR_MINIMO_PARA_PUERTO.
+const TIERRA_MINIMA_PARA_INVADIR = 8;
 
 // Orden que prioriza aserradero/cantera primero: evita el error de balance
 // que encontramos jugando (madera o piedra en cero para siempre si la
@@ -122,6 +131,8 @@ export const PERFILES_DIFICULTAD = {
     // 'nunca'` y unidadesPrioridad ['warrior']. Facil es la dificultad donde
     // te dejan colonizar en paz, y darle buques la contradice.
     topeBuques: 0,
+    // Sin armada tampoco hay invasion: facil no cruza el mar.
+    topeTransportes: 0,
     ordenEdificios: ORDEN_EDIFICIOS_NATURAL,
     ordenTecnologias: ORDEN_TECNOLOGIAS_NATURAL,
     // No mejora ciudades: como saltear pasos o construir en el orden de fabrica,
@@ -149,6 +160,7 @@ export const PERFILES_DIFICULTAD = {
     ofensiva: 'sinTierraLibre',
     topeEjercitosExtra: 3,
     topeBuques: 1,
+    topeTransportes: 1,
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
     mejoraCiudades: true,
@@ -167,6 +179,7 @@ export const PERFILES_DIFICULTAD = {
     ofensiva: 'siempre',
     topeEjercitosExtra: 5,
     topeBuques: 2,
+    topeTransportes: 1,
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
     mejoraCiudades: true,
@@ -378,6 +391,89 @@ export function distanciaACostaEnemiga(estado, jugadorId) {
   );
 }
 
+/**
+ * La tierra que vale la pena tomar y a la que NO se puede llegar caminando: el
+ * disparador de toda la invasion.
+ *
+ * OJO con como se calcula, porque la primera version estaba mal y no invadia
+ * nunca. Intentaba deducirlo de la brujula terrestre ("si no tiene distancia,
+ * no hay camino"), y eso es falso: distanciaHasta SIEMBRA todos los origenes
+ * con distancia 0, asi que las casillas tomables de la otra isla figuraban en
+ * la brujula igual, con distancia 0, y este conjunto salia siempre vacio.
+ *
+ * Lo correcto es preguntar al reves: desde donde YA estoy (mis ciudades y mis
+ * ejercitos), hasta donde puedo caminar. Lo tomable que quede afuera de ese
+ * alcance es lo que hay que cruzar en barco.
+ */
+export function tierraInalcanzable(estado, jugadorId) {
+  // Los origenes son de TIERRA, y el filtro `terreno !== 'water'` es lo unico
+  // que hace que esto funcione: distanciaHasta siembra los origenes sin
+  // mirar si son camino valido, asi que un buque propio parado en el mar se
+  // convertia en origen y le regalaba distancia a la costa enemiga de al lado.
+  // Resultado: el objetivo de la invasion se evaporaba JUSTO cuando el
+  // transporte llegaba, que es el peor momento posible (medido: 9 casillas
+  // objetivo en vez de 55).
+  const alcanzable = distanciaHasta(
+    estado,
+    (t) => t.terreno !== 'water' &&
+      ((t.ejercito && t.ejercito.dueno === jugadorId) || (t.ciudad && t.dueno === jugadorId)),
+    transitablePara(jugadorId),
+  );
+  const fuera = new Set();
+  for (const t of estado.mapa) {
+    if (t.terreno === 'water' || t.dueno === jugadorId || t.ciudad) continue;
+    if (!alcanzable.has(clave(t.x, t.y))) fuera.add(clave(t.x, t.y));
+  }
+  return fuera;
+}
+
+/**
+ * Una casilla donde un transporte PUEDE bajar tropa de verdad: hay que
+ * invadirla, no la ocupa nadie, y no es una ciudad enemiga.
+ *
+ * La usan la brujula de invasion Y la decision de desembarcar, y comparten esta
+ * funcion a proposito. La primera version tenia dos criterios distintos (la
+ * brujula miraba solo "es inalcanzable", la regla ademas exigia la casilla
+ * libre) y el resultado fue un transporte anclado para siempre frente a una
+ * playa defendida: su brujula le decia "llegaste" y la regla le decia "aca no".
+ * Es exactamente el tipo de desacuerdo que un criterio compartido no permite.
+ */
+const esOrillaDeDesembarco = (jugadorId, inalcanzables) => (t) =>
+  inalcanzables.has(clave(t.x, t.y)) &&
+  !t.ejercito &&
+  !(t.ciudad && t.dueno !== jugadorId);
+
+/**
+ * Distancia por MAR hasta una orilla donde se pueda desembarcar. Es la brujula
+ * del transporte cargado.
+ */
+export function distanciaAInvasion(estado, jugadorId, inalcanzables) {
+  const sirve = esOrillaDeDesembarco(jugadorId, inalcanzables);
+  return distanciaHasta(
+    estado,
+    (t) => t.terreno === 'water' && vecinosOrtogonales(estado, t.x, t.y).some(sirve),
+    navegablePara(jugadorId),
+  );
+}
+
+/**
+ * Distancia por TIERRA hasta un transporte propio con lugar: es como la tropa
+ * encuentra el barco. Se eligio que la tropa camine hasta el barco y no al
+ * reves porque el barco ya nace pegado al puerto, que es adonde la tropa sabe
+ * volver; hacer que el barco vaya a buscar tropa exigiria una brujula mas y
+ * coordinar dos unidades que se mueven a la vez.
+ */
+export function distanciaAEmbarque(estado, jugadorId) {
+  const conLugar = (t) =>
+    t.ejercito && t.ejercito.dueno === jugadorId && esTransporte(t.ejercito.tipo) &&
+    (t.ejercito.carga?.length ?? 0) < CAPACIDAD_DE(t.ejercito.tipo);
+  return distanciaHasta(
+    estado,
+    (t) => t.terreno !== 'water' && vecinosOrtogonales(estado, t.x, t.y).some(conLugar),
+    transitablePara(jugadorId),
+  );
+}
+
 // --- Decisiones, una por dominio de juego ---------------------------------
 
 function decidirConstruccion(estado, jugadorId, perfil) {
@@ -496,7 +592,12 @@ function decidirReclutamiento(estado, jugadorId, perfil) {
 function decidirReclutamientoNaval(estado, jugadorId, perfil) {
   if (!perfil.topeBuques) return null;
 
-  const buques = ejercitosDe(estado, jugadorId).filter((t) => esNaval(t.ejercito.tipo));
+  // Cuenta BUQUES DE GUERRA, no "todo lo naval": mientras conto lo naval, un
+  // transporte vivo le comia el unico lugar de buque que tiene la dificultad
+  // normal, y la maquina navegaba sin escolta. Medido: 1 buque en 20 partidas
+  // de islas. Cada casco tiene su tope porque cumplen trabajos distintos.
+  const buques = ejercitosDe(estado, jugadorId)
+    .filter((t) => esNaval(t.ejercito.tipo) && !esTransporte(t.ejercito.tipo));
   if (buques.length >= perfil.topeBuques) return null;
 
   const jugador = jugadorPorId(estado, jugadorId);
@@ -508,6 +609,71 @@ function decidirReclutamientoNaval(estado, jugadorId, perfil) {
   if (!puerto) return null;
 
   return { tipo: 'reclutar', x: puerto.x, y: puerto.y, unidad: 'warship' };
+}
+
+/**
+ * Botar un transporte, y SOLO si hay algo que invadir: un transporte sin
+ * destino es madera tirada. Por eso depende de la brujula, no del tope a secas.
+ */
+function decidirTransporte(estado, jugadorId, perfil, brujulas) {
+  if (!perfil.topeTransportes) return null;
+  if (!brujulas.inalcanzables || brujulas.inalcanzables.size === 0) return null;
+
+  const flota = ejercitosDe(estado, jugadorId).filter((t) => esTransporte(t.ejercito.tipo));
+  if (flota.length >= perfil.topeTransportes) return null;
+
+  const jugador = jugadorPorId(estado, jugadorId);
+  if (!puedePagar(jugador, UNIDADES.transport.costo)) return null;
+
+  const puerto = ciudadesDe(estado, jugadorId).find((t) =>
+    t.ciudad.edificios.includes('port') &&
+    marAdyacente(estado, t.x, t.y).some((m) => !m.ejercito));
+  if (!puerto) return null;
+
+  return { tipo: 'reclutar', x: puerto.x, y: puerto.y, unidad: 'transport' };
+}
+
+/**
+ * Bajar tropa en la orilla enemiga. Va ANTES que embarcar en el orden del
+ * turno: terminar una invasion vale mas que empezar otra.
+ */
+function decidirDesembarco(estado, jugadorId, brujulas) {
+  if (!brujulas.inalcanzables || brujulas.inalcanzables.size === 0) return null;
+  for (const tile of ejercitosDe(estado, jugadorId)) {
+    const barco = tile.ejercito;
+    if (!esTransporte(barco.tipo) || !(barco.carga?.length > 0)) continue;
+    if (barco.carga[barco.carga.length - 1].movimientoRestante <= 0) continue;
+    // La orilla que justifica la travesia (mismo criterio que la brujula).
+    const orilla = vecinosOrtogonales(estado, tile.x, tile.y)
+      .find(esOrillaDeDesembarco(jugadorId, brujulas.inalcanzables));
+    if (orilla) {
+      return { tipo: 'desembarcar', desde: { x: tile.x, y: tile.y }, hasta: { x: orilla.x, y: orilla.y } };
+    }
+  }
+  return null;
+}
+
+/**
+ * Subir tropa al transporte, pero SOLO si esa tropa no tiene nada que hacer por
+ * tierra. Sin esa condicion la maquina embarcaria a sus colonos mientras todavia
+ * le queda continente por tomar, que es tirar la partida: el territorio se gana
+ * caminando.
+ */
+function decidirEmbarque(estado, jugadorId, brujulas) {
+  if (!brujulas.inalcanzables || brujulas.inalcanzables.size === 0) return null;
+  for (const tile of ejercitosDe(estado, jugadorId)) {
+    const tropa = tile.ejercito;
+    if (esNaval(tropa.tipo) || tropa.movimientoRestante <= 0) continue;
+    // Si su brujula terrestre todavia le ofrece algo, que siga caminando.
+    if (brujulas.tomable.has(clave(tile.x, tile.y))) continue;
+    const barco = vecinosOrtogonales(estado, tile.x, tile.y).find((t) =>
+      t.ejercito && t.ejercito.dueno === jugadorId && esTransporte(t.ejercito.tipo) &&
+      (t.ejercito.carga?.length ?? 0) < CAPACIDAD_DE(t.ejercito.tipo));
+    if (barco) {
+      return { tipo: 'embarcar', desde: { x: tile.x, y: tile.y }, hasta: { x: barco.x, y: barco.y } };
+    }
+  }
+  return null;
 }
 
 // De un grupo de casillas empatadas, la que deja mas cerca del objetivo. Si el
@@ -535,6 +701,13 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
     // decidir si conviene atacar, si no moverse hacia algo), con dos
     // diferencias: por donde puede pasar, y hacia donde apunta su brujula.
     const naval = esNaval(origen.ejercito.tipo);
+    const transporte = esTransporte(origen.ejercito.tipo);
+    const cargado = transporte && (origen.ejercito.carga?.length ?? 0) > 0;
+    // Un transporte VACIO no se mueve: espera junto al puerto a que la tropa
+    // llegue caminando. Si vagara por el mar, la tropa que lo busca nunca lo
+    // alcanzaria, porque su brujula de embarque apunta a donde el barco esta
+    // ahora, no a donde va a estar.
+    if (transporte && !cargado) continue;
     const vecinos = vecinosOrtogonales(estado, origen.x, origen.y);
 
     // Contra QUE pelear cuando hay mas de una opcion al lado. Antes se tomaba el
@@ -555,7 +728,9 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
       if (ejercitoEnemigo) return 1;                   // no mueve el mapa
       return 0;
     };
-    const objetivos = vecinos.filter((t) => prioridadObjetivo(t) > 0);
+    // El transporte no pelea (ataque 0): su unico trabajo es llegar y bajar
+    // tropa, y `atacar` lo rechazaria de todos modos.
+    const objetivos = transporte ? [] : vecinos.filter((t) => prioridadObjetivo(t) > 0);
     const objetivo = objetivos.length
       ? objetivos.reduce((mejor, t) => (prioridadObjetivo(t) > prioridadObjetivo(mejor) ? t : mejor))
       : undefined;
@@ -628,9 +803,15 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
     // castigar la costa. Sin esa segunda mitad una flota sin rival se queda
     // flotando sin hacer nada, que es el bug ya medido una vez con los
     // ejercitos de tierra (11 de 12 rodeados de casillas propias).
+    // Un transporte cargado va a la orilla que hay que invadir. Una tropa a la
+    // que la brujula terrestre ya no le ofrece nada (tipico: se quedo sin
+    // continente) camina hacia el transporte para cruzar.
+    const sinObjetivoTerrestre = !brujulas.tomable.has(clave(origen.x, origen.y));
     const preferida = naval
-      ? brujulas.buqueEnemigo
-      : (marchaSobreCiudad ? brujulas.ofensiva : brujulas.tomable);
+      ? (cargado ? brujulas.invasion : brujulas.buqueEnemigo)
+      : (sinObjetivoTerrestre && brujulas.embarque
+        ? brujulas.embarque
+        : (marchaSobreCiudad ? brujulas.ofensiva : brujulas.tomable));
     const respaldo = naval ? brujulas.costaEnemiga : brujulas.tomable;
     const destino = mejores.length === 1
       ? mejores[0]
@@ -688,6 +869,9 @@ function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, bru
     decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) ??
     decidirReclutamiento(estado, jugadorId, perfil) ??
     decidirReclutamientoNaval(estado, jugadorId, perfil) ??
+    decidirTransporte(estado, jugadorId, perfil, brujulas) ??
+    decidirDesembarco(estado, jugadorId, brujulas) ??
+    decidirEmbarque(estado, jugadorId, brujulas) ??
     decidirMilitar(estado, jugadorId, rng, perfil, brujulas) ??
     decidirMejoraCiudad(estado, jugadorId, perfil) ??
     null;
@@ -698,6 +882,8 @@ const EJECUTORES = {
   reclutar: (estado, jugadorId, a) => reclutar(estado, jugadorId, a),
   moverEjercito: (estado, jugadorId, a) => moverEjercito(estado, jugadorId, a),
   atacar: (estado, jugadorId, a, rng) => atacar(estado, jugadorId, a, rng),
+  embarcar: (estado, jugadorId, a) => embarcar(estado, jugadorId, a),
+  desembarcar: (estado, jugadorId, a) => desembarcar(estado, jugadorId, a),
   fundarCiudad: (estado, jugadorId, a) => fundarCiudad(estado, jugadorId, a),
   investigar: (estado, jugadorId, a) => investigar(estado, jugadorId, a),
   mejorarCiudad: (estado, jugadorId, a) => mejorarCiudad(estado, jugadorId, a),
@@ -746,11 +932,23 @@ export function jugarTurnoIA(estado, jugadorId, rng) {
     // un solo buque. `masCercaSegun` ya ignora una brujula nula.
     const tieneFlota = estado.mapa.some(
       (t) => t.ejercito && t.ejercito.dueno === jugadorId && esNaval(t.ejercito.tipo));
+    // Tierra que vale la pena y a la que no se llega caminando: es lo que
+    // justifica una invasion. Sale de la brujula terrestre que ya se calculo,
+    // asi que no cuesta un BFS extra; las de invasion si, y por eso solo se
+    // calculan cuando esa tierra existe.
+    const inalcanzables = perfil.topeTransportes ? tierraInalcanzable(estado, jugadorId) : new Set();
+    const hayQueCruzar = inalcanzables.size >= TIERRA_MINIMA_PARA_INVADIR;
     const brujulas = {
       tomable,
       ofensiva: enModoOfensivo ? distanciaACiudadEnemiga(estado, jugadorId) : null,
       buqueEnemigo: tieneFlota ? distanciaABuqueEnemigo(estado, jugadorId) : null,
       costaEnemiga: tieneFlota ? distanciaACostaEnemiga(estado, jugadorId) : null,
+      // Vacio cuando no vale la pena cruzar: asi decidirTransporte,
+      // decidirEmbarque y decidirDesembarco se apagan todos con una sola
+      // condicion, en vez de repetir el umbral en cada uno.
+      inalcanzables: hayQueCruzar ? inalcanzables : new Set(),
+      invasion: hayQueCruzar ? distanciaAInvasion(estado, jugadorId, inalcanzables) : null,
+      embarque: hayQueCruzar ? distanciaAEmbarque(estado, jugadorId) : null,
     };
     const decision = decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujulas);
     if (!decision) break;

@@ -189,6 +189,8 @@ const umbralAviso = computed(() =>
                    regla central de la unidad: sin decirlo, el jugador la
                    compra esperando que camine. -->
               <small v-if="u.naval"> · solo navega, nunca pisa tierra</small>
+              <small v-if="u.capacidad"> · lleva {{ u.capacidad }} unidades; si lo hunden, se hunden con él</small>
+              <small v-if="u.ataque === 0"> · no ataca</small>
             </td>
             <td>{{ u.ataque }}</td>
             <td>{{ u.defensa }}</td>

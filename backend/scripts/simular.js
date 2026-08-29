@@ -36,10 +36,12 @@ function leerArgs(argv) {
     semilla: 'lote',
     turnoMaximo: 300,
     sinArmada: false,
+    islas: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--sin-armada') { args.sinArmada = true; continue; }
+    if (a === '--islas') { args.islas = true; continue; }
     const valor = argv[++i];
     if (a === '--partidas') args.partidas = Number(valor);
     else if (a === '--tamano') args.tamano = Number(valor);
@@ -50,8 +52,8 @@ function leerArgs(argv) {
   return args;
 }
 
-function jugarPartida(semilla, { tamano, dificultad, turnoMaximo }) {
-  const e = crearEstado({ nombre: 'sim', semilla, config: { tamanoMapa: tamano } });
+function jugarPartida(semilla, { tamano, dificultad, turnoMaximo, islas }) {
+  const e = crearEstado({ nombre: 'sim', semilla, config: { tamanoMapa: tamano, islas } });
   aplicar(e, unirse(e, { id: 'a', nombre: 'A', civilizacion: 'Incas', esBot: true, dificultadIA: dificultad }));
   aplicar(e, unirse(e, { id: 'b', nombre: 'B', civilizacion: 'Mayas', esBot: true, dificultadIA: dificultad }));
   aplicar(e, iniciar(e));
@@ -62,7 +64,24 @@ function jugarPartida(semilla, { tamano, dificultad, turnoMaximo }) {
     buques: 0, puertos: 0,
     saqueos: 0, oroSaqueado: 0,
     capturas: 0, capturasCosteras: 0,
+    transportes: 0, embarques: 0, desembarcos: 0,
   };
+  // Con islas, importa saber si las capitales quedaron REALMENTE separadas: la
+  // reparticion cae al comportamiento de siempre cuando la semilla no da dos
+  // masas jugables, y una partida asi no prueba nada sobre invasiones.
+  const masaDe = (t) => {
+    const vistos = new Set([`${t.x},${t.y}`]); const cola = [t];
+    for (let i = 0; i < cola.length; i++) {
+      const a = cola[i];
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const v = e.mapa.find(m => m.x === a.x + dx && m.y === a.y + dy);
+        if (v && v.terreno !== 'water' && !vistos.has(`${v.x},${v.y}`)) { vistos.add(`${v.x},${v.y}`); cola.push(v); }
+      }
+    }
+    return vistos;
+  };
+  const capitales = e.mapa.filter(t => t.ciudad);
+  const separadas = capitales.length === 2 && !masaDe(capitales[0]).has(`${capitales[1].x},${capitales[1].y}`);
 
   // El bucle corta por estado terminado o por tope de turnos. El tope es un
   // backstop: una partida que lo alcanza cuenta como NO terminada, que es
@@ -78,6 +97,9 @@ function jugarPartida(semilla, { tamano, dificultad, turnoMaximo }) {
       } else if (ev.tipo === 'UnidadReclutada' && d.tipo === 'warship') metricas.buques++;
       else if (ev.tipo === 'EdificioConstruido' && d.edificio === 'port') metricas.puertos++;
       else if (ev.tipo === 'CiudadSaqueada') { metricas.saqueos++; metricas.oroSaqueado += d.oro ?? 0; }
+      else if (ev.tipo === 'UnidadReclutada' && d.tipo === 'transport') metricas.transportes++;
+      else if (ev.tipo === 'TropaEmbarcada') metricas.embarques++;
+      else if (ev.tipo === 'TropaDesembarcada') metricas.desembarcos++;
       else if (ev.tipo === 'CiudadCapturada') {
         metricas.capturas++;
         // El terreno no cambia durante la partida, asi que preguntar por la
@@ -88,6 +110,7 @@ function jugarPartida(semilla, { tamano, dificultad, turnoMaximo }) {
   }
 
   return {
+    separadas,
     termino: e.estado === 'terminado',
     turnos: e.turno,
     tipoVictoria: e.ganador?.tipoVictoria ?? null,
@@ -123,4 +146,18 @@ console.log(`buques botados             ${suma(r => r.buques)}`);
 console.log(`combates navales           ${suma(r => r.combatesNavales)} de ${suma(r => r.combatesTotales)} combates`);
 console.log(`saqueos                    ${suma(r => r.saqueos)} (${suma(r => r.oroSaqueado)} de oro)`);
 console.log(`capturas de ciudad         ${suma(r => r.capturas)}, de ellas costeras ${suma(r => r.capturasCosteras)}`);
-console.log(`partidas con algo naval    ${resultados.filter(r => r.buques > 0).length}/${resultados.length}\n`);
+console.log(`partidas con algo naval    ${resultados.filter(r => r.buques > 0).length}/${resultados.length}`);
+if (args.islas) {
+  // `separadas` es la unica columna que dice si la partida probaba algo: el
+  // reparto por islas CAE al comportamiento de siempre cuando la semilla no da
+  // dos masas de tierra jugables, y en esas partidas no hay nada que invadir.
+  const sep = resultados.filter(r => r.separadas);
+  console.log(`--- se cruza el mar? ---`);
+  console.log(`capitales en islas distintas ${sep.length}/${resultados.length}`);
+  console.log(`transportes botados          ${suma(r => r.transportes)}`);
+  console.log(`embarques                    ${suma(r => r.embarques)}`);
+  console.log(`DESEMBARCOS                  ${suma(r => r.desembarcos)}`);
+  console.log(`partidas con desembarco      ${resultados.filter(r => r.desembarcos > 0).length}/${resultados.length}`);
+  console.log(`de las separadas, terminadas ${sep.filter(r => r.termino).length}/${sep.length || 0}`);
+}
+console.log('');

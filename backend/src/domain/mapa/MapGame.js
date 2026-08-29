@@ -15,6 +15,12 @@ const CONFIG_DEFAULT = {
   // Rondas antes del final forzado, o null para "sin limite". Con limite, al
   // llegar gana quien mas territorio tenga.
   limiteRondas: null,
+  // Reparte las capitales entre islas distintas en vez de todas en el mismo
+  // continente. Apagado por defecto: solo tiene sentido cuando hay transportes
+  // Y la maquina sabe usarlos, asi que el default lo decide la medicion, no el
+  // entusiasmo. Si la semilla no da dos masas de tierra jugables, la partida
+  // arranca como siempre (ver generarMapa.js#posicionesIniciales).
+  islas: false,
 };
 
 // Limites duros de la config. Viven en el DOMINIO (no solo en el borde HTTP)
@@ -54,6 +60,9 @@ export function validarConfig(cfg) {
   if (cfg.limiteRondas !== null && cfg.limiteRondas !== undefined) {
     validarEntero(cfg, 'limiteRondas');
   }
+  if (typeof cfg.islas !== 'boolean') {
+    throw new ReglaError('CONFIG_INVALIDA', `config.islas debe ser booleano (recibido: ${JSON.stringify(cfg.islas)})`);
+  }
   if (!MODOS_TURNO.includes(cfg.modoTurno)) {
     throw new ReglaError(
       'CONFIG_INVALIDA',
@@ -76,7 +85,7 @@ export function crearEstado({ nombre, semilla, config = {} }) {
     indiceJugadorActual: 0,
     config: cfg,
     jugadores: [],
-    mapa: generarMapa(semilla, cfg.tamanoMapa),
+    mapa: generarMapa(semilla, cfg.tamanoMapa, { islas: cfg.islas === true }),
     ganador: null,
   };
 }

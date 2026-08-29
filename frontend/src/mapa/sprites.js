@@ -59,7 +59,8 @@ export const SPRITE_UNIDAD = {
   // se dibujaba como un guerrero, o sea que la unidad que desbloquea una
   // tecnologia entera era invisible en el tablero.
   legionary: `${BASE}/unidad-legionary.png`,
-  warship: `${BASE}/unidad-warship.png`
+  warship: `${BASE}/unidad-warship.png`,
+  transport: `${BASE}/unidad-transport.png`
 }
 
 // Colores de bando. Se aplican como tinte sobre el MISMO sprite, asi no hacen

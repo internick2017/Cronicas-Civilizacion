@@ -4,54 +4,28 @@ const clave = (x, y) => `${x},${y}`;
 const VECINOS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
 
 /**
- * La tierra que cuenta para la dominacion: solo las islas donde hay al menos
- * una ciudad.
+ * La tierra que cuenta para la dominacion: TODA la tierra del mapa.
  *
  * El agua nunca se cuenta (no es de nadie, e incluirla ataria el umbral real a
- * cuanto oceano genero la semilla). Pero ademas no alcanza con mirar "toda la
- * tierra": no hay movimiento naval, asi que una isla sin ciudades es tierra que
- * NADIE va a pisar en toda la partida, y contarla puede volver la victoria
- * imposible. Medido: en una semilla el mapa salio partido en dos islas y la
- * jugable era el 55.2% del total, o sea que ni conquistando hasta la ultima
- * casilla se llegaba al 60% y la partida no podia terminar nunca.
+ * cuanto oceano genero la semilla).
  *
- * El criterio es "isla con al menos una ciudad", sin mirar si su dueño sigue
- * vivo, para que el denominador sea ESTABLE: si dependiera de los jugadores
- * activos, eliminar a alguien cambiaria el denominador y el porcentaje de todos
- * saltaria de golpe sin que nadie hubiera conquistado nada.
+ * Esto era mas complicado hasta que existio el transporte. Antes se contaban
+ * solo las islas con al menos una ciudad, con este argumento: "no hay
+ * movimiento naval, asi que una isla sin ciudades es tierra que NADIE va a
+ * pisar en toda la partida, y contarla puede volver la victoria imposible"
+ * (medido en su momento: una semilla partida en dos islas donde la jugable era
+ * el 55.2% del total, o sea que ni conquistando hasta la ultima casilla se
+ * llegaba al 60%).
+ *
+ * Ese argumento se cayo entero: con transportes, cualquier isla es alcanzable,
+ * asi que excluirla seria regalar territorio que si se puede conquistar. La
+ * complejidad desaparecio con la razon que la justificaba.
+ *
+ * Consecuencia de balance, anotada a proposito: el denominador CRECE en los
+ * mapas que tienen islas, asi que llegar al 60% pasa a costar mas que antes.
  */
 export function tierraAlcanzable(estado) {
-  const porClave = new Map();
-  for (const t of estado.mapa) {
-    if (t.terreno !== 'water') porClave.set(clave(t.x, t.y), t);
-  }
-  const visitadas = new Set();
-  const alcanzable = [];
-  for (const [k, inicio] of porClave) {
-    if (visitadas.has(k)) continue;
-    // Un componente conexo entero, y recien despues se decide si cuenta.
-    const isla = [];
-    const pila = [inicio];
-    visitadas.add(k);
-    while (pila.length > 0) {
-      const actual = pila.pop();
-      isla.push(actual);
-      for (const [dx, dy] of VECINOS) {
-        const kv = clave(actual.x + dx, actual.y + dy);
-        const vecino = porClave.get(kv);
-        if (vecino && !visitadas.has(kv)) {
-          visitadas.add(kv);
-          pila.push(vecino);
-        }
-      }
-    }
-    if (isla.some(t => t.ciudad)) alcanzable.push(...isla);
-  }
-  // Si TODAVIA no hay ninguna ciudad en el mapa (una partida que no arranco: las
-  // capitales se fundan en iniciar()), no hay isla que privilegiar y se cuenta
-  // toda la tierra. Sin esto el denominador seria 0 y el porcentaje quedaria
-  // indefinido antes de empezar a jugar.
-  return alcanzable.length > 0 ? alcanzable : [...porClave.values()];
+  return estado.mapa.filter(t => t.terreno !== 'water');
 }
 
 // Cuanto del mundo controla un jugador. Exportada para que la vista pueda

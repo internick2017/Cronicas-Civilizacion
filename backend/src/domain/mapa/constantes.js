@@ -175,8 +175,38 @@ export const UNIDADES = {
     requiereBarracks: false,
     naval: true,
     requierePuerto: true
+  },
+  // El transporte: la unica unidad del juego que NO PUEDE ATACAR (ataque 0), y
+  // el unico lugar donde eso es una virtud. Sin escolta es carne, y por eso
+  // llevar tropa a otra isla es una decision con riesgo en vez de un tramite.
+  //
+  // Es una unidad aparte y no "el buque de guerra que ademas carga": si el
+  // mismo casco peleara y transportara, cada combate naval podria ahogar un
+  // ejercito, y la maquina en dificultad normal tiene UN solo buque, asi que
+  // tendria que elegir entre pelear y hacer de ferry.
+  //
+  // Movimiento 3 y no 4: el buque de guerra es mas rapido, asi que puede
+  // escoltarlo y adelantarse.
+  transport: {
+    ataque: 0,
+    defensa: 4,
+    salud: 60,
+    movimiento: 3,
+    costo: { wood: 35, gold: 25, food: 10 },
+    requiereBarracks: false,
+    naval: true,
+    requierePuerto: true,
+    capacidad: 2
   }
 };
+
+// Cuanta tropa puede llevar adentro. Cero para todo lo que no sea transporte.
+export const CAPACIDAD_DE = (tipo) => UNIDADES[tipo]?.capacidad ?? 0;
+export const esTransporte = (tipo) => CAPACIDAD_DE(tipo) > 0;
+// Hay unidades que solo se defienden. Se pregunta por el ataque y no por una
+// bandera aparte para que no puedan desincronizarse: si algo tiene ataque 0,
+// no hay combate que pueda ganar, asi que ofrecerlo seria mentir.
+export const puedeAtacar = (tipo) => (UNIDADES[tipo]?.ataque ?? 0) > 0;
 
 // Una unidad naval vive en el mar y solo en el mar. Se pregunta por el tipo y
 // no por un campo del ejercito para que la respuesta salga siempre de la misma

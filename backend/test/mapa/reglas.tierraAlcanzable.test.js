@@ -5,10 +5,17 @@ import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { terminarTurno } from '../../src/domain/mapa/reglas/turnos.js';
 import { controlTerritorial } from '../../src/domain/mapa/reglas/dominacion.js';
 
-// Mapa 7x3 partido por una columna de agua: isla izquierda (3x3 = 9 casillas,
-// donde estan las ciudades) e isla derecha (3x3 = 9), a la que NADIE puede
-// llegar porque no hay movimiento naval.
-//   x: 0 1 2 | 3 (agua) | 4 5 6
+// Mapa 7x3 partido por una columna de mar: isla izquierda (3x3 = 9 casillas,
+// donde estan las ciudades) e isla derecha (3x3 = 9).
+//   x: 0 1 2 | 3 (mar) | 4 5 6
+//
+// Este archivo cambio de sentido con la etapa B. Antes probaba que la isla sin
+// ciudades NO contara para la dominacion, y el argumento era "no hay movimiento
+// naval, nadie va a pisarla nunca". Con transportes ese argumento se cayo: toda
+// isla es alcanzable, asi que excluirla seria regalar territorio conquistable.
+// Los tests se reescribieron para afirmar la regla NUEVA (cuenta toda la
+// tierra), no se borraron: la regla vieja fue correcta mientras su premisa lo
+// fue, y conviene que quede escrito por que dejo de serlo.
 function dosIslas() {
   const e = crearEstado({ nombre: 'T', semilla: 'islas' });
   aplicar(e, unirse(e, { id: 'p1', nombre: 'A', civilizacion: 'X' }));
@@ -38,45 +45,40 @@ const cerrarRonda = (e) => {
   return eventos;
 };
 
-describe('el objetivo se mide sobre la tierra alcanzable', () => {
-  it('la isla sin ciudades no entra en el denominador', () => {
+describe('el objetivo se mide sobre toda la tierra', () => {
+  it('la isla sin ciudades TAMBIEN entra en el denominador', () => {
     const e = dosIslas();
-    // 18 casillas de tierra en total, 9 en la isla jugable.
+    // 18 casillas de tierra en total, y las 18 cuentan: con transportes, la
+    // isla de la derecha es territorio conquistable como cualquier otro.
     expect(e.mapa.filter(t => t.terreno !== 'water')).toHaveLength(18);
-    expect(controlTerritorial(e, 'p1').totalTierra).toBe(9);
+    expect(controlTerritorial(e, 'p1').totalTierra).toBe(18);
   });
 
-  it('el porcentaje se calcula sobre la isla jugable, no sobre todo el mapa', () => {
+  it('el porcentaje se calcula sobre toda la tierra, no sobre la isla propia', () => {
     const e = dosIslas();
     for (const [x, y] of [[1, 0], [2, 0], [0, 1], [1, 1]]) tileEn(e, x, y).dueno = 'p1';
-    // 5 de 9 en la isla (55.6%), que sobre las 18 del mapa serian 27.8%.
     const control = controlTerritorial(e, 'p1');
     expect(control.tiles).toBe(5);
-    expect(control.porcentaje).toBeCloseTo(5 / 9);
-    expect(control.porcentaje).not.toBeCloseTo(5 / 18);
+    expect(control.porcentaje).toBeCloseTo(5 / 18);
   });
 
-  it('se puede ganar aunque la isla jugable sea menos del 60% del mapa', () => {
+  it('dominar la isla propia ya NO alcanza para ganar: hay que cruzar', () => {
+    // Es la consecuencia de balance del cambio, y la mas importante de fijar:
+    // antes, quedarse con su isla le daba a p1 el 66% y la partida. Ahora la
+    // otra isla cuenta, asi que 9 de 18 es la mitad y hay que invadir.
     const e = dosIslas();
-    // p1 toma 6 de las 9 casillas de la isla (66%), dejando la ciudad de p2.
     for (const [x, y] of [[1, 0], [2, 0], [0, 1], [1, 1], [2, 1]]) tileEn(e, x, y).dueno = 'p1';
-    // (1,1) y (2,1) tocan la ciudad de p2 en (2,2): sin tropa volverian a p2 al
-    // cerrar la ronda (ver reglas/fronteras.js). Este test es sobre el
-    // DENOMINADOR de la dominacion, no sobre la frontera, asi que se sostiene el
-    // frente con un ejercito para aislar lo que se quiere medir.
     tileEn(e, 2, 1).ejercito = { tipo: 'warrior', dueno: 'p1', salud: 100, movimientoRestante: 1, bonoMovimiento: 0 };
-    expect(controlTerritorial(e, 'p1').porcentaje).toBeGreaterThanOrEqual(0.6);
+    expect(controlTerritorial(e, 'p1').porcentaje).toBeLessThan(0.6);
 
     const fin = cerrarRonda(e).find(ev => ev.tipo === 'PartidaTerminada');
-    expect(fin).toBeDefined();
-    expect(fin.datos.ganador).toMatchObject({ jugadorId: 'p1', tipoVictoria: 'dominacion' });
+    expect(fin).toBeUndefined();
   });
 
-  it('una isla con una ciudad SI cuenta, aunque sea chica', () => {
+  it('el mar nunca entra en el denominador', () => {
     const e = dosIslas();
-    // Una ciudad en la isla derecha: pasa a ser parte del mundo jugable.
-    tileEn(e, 5, 1).ciudad = { nombre: 'C3', nivel: 1, poblacion: 500, edificios: [] };
-    tileEn(e, 5, 1).dueno = 'p2';
+    // 21 casillas en el mapa, 3 son mar: quedan 18.
+    expect(e.mapa).toHaveLength(21);
     expect(controlTerritorial(e, 'p1').totalTierra).toBe(18);
   });
 
@@ -86,7 +88,7 @@ describe('el objetivo se mide sobre la tierra alcanzable', () => {
     expect(controlTerritorial(e, 'p1').totalTierra).toBe(21);
   });
 
-  it('el denominador NO cambia al eliminar a un jugador: su ciudad sostiene la isla', () => {
+  it('el denominador NO cambia al eliminar a un jugador', () => {
     const e = dosIslas();
     const antes = controlTerritorial(e, 'p1').totalTierra;
     e.jugadores.find(j => j.id === 'p2').activo = false;

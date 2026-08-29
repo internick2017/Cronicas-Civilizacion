@@ -16,7 +16,8 @@ const NOMBRE_EDIFICIO = {
 };
 const NOMBRE_UNIDAD = {
   warrior: 'Guerrero', archer: 'Arquero', spearman: 'Lancero', cavalry: 'Caballería',
-  catapult: 'Catapulta', legionary: 'Legionario', warship: 'Buque de guerra'
+  catapult: 'Catapulta', legionary: 'Legionario', warship: 'Buque de guerra',
+  transport: 'Transporte'
 };
 // 'Mar' y no 'Agua': desde que el rio es un terreno propio, "agua" nombra a
 // dos cosas con reglas opuestas (una detiene, la otra se vadea) y deja de
@@ -95,7 +96,10 @@ export function crearMapRoutes(servicio) {
         // vista lo usa para invertir el filtro de casillas alcanzables (un
         // buque solo entra al mar) y para no aplicarle el bono del cuartel.
         naval: datos.naval ?? false,
-        requierePuerto: datos.requierePuerto ?? false
+        requierePuerto: datos.requierePuerto ?? false,
+        // Cuanta tropa lleva adentro. Cero para todo lo que no transporta; la
+        // vista lo usa para ofrecer subir y bajar tropa.
+        capacidad: datos.capacidad ?? 0
       })),
       // Tecnologias (que se pagan con ciencia) y el costo de subir el nivel de
       // una ciudad, que no es una tecnologia (es repetible, por ciudad): se

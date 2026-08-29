@@ -1,7 +1,7 @@
 import { tileEn } from '../MapGame.js';
 import {
   UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, CUARTEL,
-  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, SAQUEO, esNaval
+  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, SAQUEO, esNaval, puedeAtacar
 } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
@@ -25,6 +25,13 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
 
   if (tileDesde.ejercito.movimientoRestante <= 0) {
     throw new ReglaError('UNIDAD_SIN_MOVIMIENTO', 'La unidad no tiene movimiento restante');
+  }
+
+  // El transporte es la primera unidad del juego que no pelea (ataque 0). Sin
+  // esta guarda podria "atacar" con poder cero y perder siempre, que es una
+  // accion que el jugador nunca quiso: es carne, y esa es su gracia.
+  if (!puedeAtacar(tileDesde.ejercito.tipo)) {
+    throw new ReglaError('UNIDAD_NO_ATACA', 'Esa unidad no puede atacar');
   }
 
   const ejercitoEnemigo =

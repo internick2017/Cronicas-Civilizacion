@@ -36,7 +36,8 @@ const NOMBRE_UNIDAD = {
   cavalry: 'caballeria',
   legionary: 'legionarios',
   catapult: 'una catapulta',
-  warship: 'un buque de guerra'
+  warship: 'un buque de guerra',
+  transport: 'un transporte'
 };
 
 const NOMBRE_VICTORIA = {
@@ -233,6 +234,24 @@ export function narrarRonda(eventos, jugadores = []) {
       // el botin sea cero, porque perder oro sin perder la ciudad es
       // exactamente el tipo de cosa que decide una partida en silencio si la
       // cronica no la cuenta.
+      // La travesia se cuenta en dos tiempos porque son dos momentos distintos
+      // de la partida: subir la tropa es una apuesta (si hunden el barco se
+      // hunde con el), bajarla es el momento en que la invasion existe.
+      case 'TropaEmbarcada': {
+        const loc = coordenadas(datos.hasta?.x, datos.hasta?.y) || ' en la costa';
+        frases.push(`Tropas de ${quien} subieron a bordo${loc}.`);
+        break;
+      }
+
+      case 'TropaDesembarcada': {
+        const loc = coordenadas(datos.hasta?.x, datos.hasta?.y) || ' en una playa lejana';
+        frases.push(elegir([
+          `${quien} desembarco tropas${loc}.`,
+          `Las naves de ${quien} vomitaron soldados en la orilla${loc}.`
+        ], indice));
+        break;
+      }
+
       case 'CiudadSaqueada': {
         const loc = coordenadas(datos.x, datos.y) || ' en la costa';
         const victima = nombreDe(jugadores, datos.victima);

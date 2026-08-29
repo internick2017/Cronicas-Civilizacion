@@ -14,9 +14,12 @@ describe('crearEstado', () => {
     expect(e.mapa).toHaveLength(400);
     // El objetivo de territorio y el limite de rondas se eligen en el lobby por
     // partida; los defaults replican el comportamiento historico (60%, sin limite).
+    // `islas` se sumó con el transporte y arranca en false: repartir capitales
+    // entre islas solo tiene sentido si hay cómo cruzar Y la máquina sabe
+    // hacerlo, así que el default lo decide la medición.
     expect(e.config).toEqual({
       tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial',
-      porcentajeVictoria: 60, limiteRondas: null,
+      porcentajeVictoria: 60, limiteRondas: null, islas: false,
     });
     expect(e.ganador).toBeNull();
   });

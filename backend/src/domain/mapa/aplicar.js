@@ -102,6 +102,30 @@ export function aplicar(estado, eventos) {
         break;
       }
 
+      // La tropa deja de existir como ejercito en su casilla y pasa a viajar
+      // DENTRO del transporte, conservando su salud: si se guardara solo el
+      // tipo, embarcar seria una curacion gratis mas barata que un cuartel.
+      //
+      // Se guarda tambien su movimiento en cero: embarcar consume el turno de
+      // la tropa (no el del barco, que sigue pudiendo navegar), y RondaCompletada
+      // se lo va a devolver al cerrar la ronda, igual que a cualquier unidad.
+      case 'TropaEmbarcada': {
+        const origen = tileEn(estado, datos.desde.x, datos.desde.y);
+        const barco = tileEn(estado, datos.hasta.x, datos.hasta.y).ejercito;
+        if (!barco.carga) barco.carga = [];
+        barco.carga.push({ ...origen.ejercito, movimientoRestante: 0 });
+        origen.ejercito = null;
+        break;
+      }
+
+      case 'TropaDesembarcada': {
+        const barco = tileEn(estado, datos.desde.x, datos.desde.y).ejercito;
+        const destino = tileEn(estado, datos.hasta.x, datos.hasta.y);
+        const tropa = barco.carga.pop();
+        destino.ejercito = { ...tropa, movimientoRestante: 0 };
+        break;
+      }
+
       case 'TerritorioReclamado': {
         const t = tileEn(estado, datos.x, datos.y);
         t.dueno = jugadorId;
@@ -170,6 +194,12 @@ export function aplicar(estado, eventos) {
         for (const t of estado.mapa) {
           if (!t.ejercito) continue;
           t.ejercito.movimientoRestante = UNIDADES[t.ejercito.tipo].movimiento + (t.ejercito.bonoMovimiento ?? 0);
+          // La tropa que viaja adentro de un transporte tambien recupera su
+          // movimiento: si no, una unidad embarcada quedaria en cero para
+          // siempre y no podria volver a bajar nunca.
+          for (const tropa of t.ejercito.carga ?? []) {
+            tropa.movimientoRestante = UNIDADES[tropa.tipo].movimiento + (tropa.bonoMovimiento ?? 0);
+          }
           // Curacion: solo en una ciudad PROPIA con cuartel. `t.dueno` es
           // quien controla la ciudad, no necesariamente quien tiene el
           // ejercito parado ahi (nunca deberian diferir: no se puede pisar

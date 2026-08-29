@@ -31,11 +31,15 @@ const DURACIONES = [
 const porcentajeVictoria = ref(60)
 const tamanoMapa = ref(20)
 const limiteRondas = ref(null)
+// Apagado por defecto: un mapa de islas es otro juego (mitad del mundo es mar y
+// hay que cruzarlo en transporte), asi que se elige, no se hereda.
+const islas = ref(false)
 
 const configElegida = () => ({
   porcentajeVictoria: porcentajeVictoria.value,
   tamanoMapa: tamanoMapa.value,
   limiteRondas: limiteRondas.value,
+  islas: islas.value,
 })
 const nombreJugador = ref('')
 const codigoUnirse = ref('')
@@ -252,6 +256,15 @@ onMounted(() => {
         <p class="ayuda-config">
           Al llegar al límite gana quien controle más territorio.
         </p>
+        <label class="field field-check">
+          <input v-model="islas" type="checkbox" />
+          <span>Mapa de islas</span>
+        </label>
+        <p class="ayuda-config">
+          La mitad del mundo es mar y cada uno empieza en una isla distinta. Para
+          tocar al rival hay que construir un puerto y cruzar en transporte. Si la
+          semilla no da dos islas grandes, la partida arranca como una normal.
+        </p>
         <button class="btn-primary" :disabled="cargando" @click="crear">Crear</button>
       </section>
 
@@ -344,6 +357,8 @@ onMounted(() => {
   background: rgba(46, 204, 113, 0.08);
 }
 
+.field-check { flex-direction: row; align-items: center; gap: 0.5rem; }
+.field-check input { width: auto; }
 .ayuda-config {
   margin: 0.25rem 0 0.75rem;
   font-size: 0.8rem;

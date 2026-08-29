@@ -13,6 +13,13 @@ import { ReglaError } from './errores.js';
 // las costas y de los biomas sigue saliendo del ruido; el cuantil solo decide
 // donde cae el corte.
 const PROPORCION_AGUA = 0.3;
+// Cuanta agua lleva un mapa de ISLAS. Sin subirla, encender el modo islas casi
+// no hacia nada: medido sobre 40 semillas, con el 30% de siempre solo 10 mapas
+// tenian dos masas de tierra lo bastante grandes como para repartir capitales,
+// asi que 3 de cada 4 partidas "de islas" arrancaban como una partida normal.
+// Con 50% son 36 de 40. Es mucha agua a proposito: un archipielago tiene que
+// parecer un archipielago, y el transporte solo tiene sentido si hay que cruzar.
+const PROPORCION_AGUA_ISLAS = 0.5;
 const PROPORCION_MONTANA = 0.08;
 const PROPORCION_COLINA = 0.15;
 
@@ -177,7 +184,7 @@ function terrenoDe(elevacion, humedad, cortes) {
 // existente. Se usa desde los tests para aislar el efecto del trazado de
 // rios sobre la conectividad del terreno, comparando el mismo mapa base con
 // y sin ese paso.
-export function generarMapa(semilla, tamano, { rios = true } = {}) {
+export function generarMapa(semilla, tamano, { rios = true, islas = false } = {}) {
   // Dos campos independientes: el relieve decide mar/colina/montana, la
   // humedad decide que crece en la tierra baja. Pasos distintos para que los
   // biomas no calquen la forma del relieve.
@@ -197,7 +204,7 @@ export function generarMapa(semilla, tamano, { rios = true } = {}) {
   const humedadesOrdenadas = [...humedades].sort((a, b) => a - b);
 
   const cortes = {
-    mar: cuantil(elevacionesOrdenadas, PROPORCION_AGUA),
+    mar: cuantil(elevacionesOrdenadas, islas ? PROPORCION_AGUA_ISLAS : PROPORCION_AGUA),
     montana: cuantil(elevacionesOrdenadas, 1 - PROPORCION_MONTANA),
     colina: cuantil(elevacionesOrdenadas, 1 - PROPORCION_MONTANA - PROPORCION_COLINA),
     desierto: cuantil(humedadesOrdenadas, PROPORCION_HUMEDAD_DESIERTO),
@@ -228,13 +235,12 @@ export function generarMapa(semilla, tamano, { rios = true } = {}) {
   return mapa;
 }
 
-// Todas las masas de tierra conectadas por vecinos ortogonales. Devuelve la
-// mas grande. Es la unica zona donde se pueden repartir capitales: sin
-// unidades navales, un jugador en otra isla nunca podria ser alcanzado ni
-// alcanzar a nadie, y la partida no podria terminar.
-export function masaPrincipal(mapa, tamano) {
+// Todas las masas de tierra conectadas por vecinos ortogonales, de la mas
+// grande a la mas chica. El rio cuenta como tierra (ver ADR 0001), asi que un
+// arroyo ya no parte un continente en dos.
+export function masasDeTierra(mapa, tamano) {
   const visitado = new Uint8Array(tamano * tamano);
-  let mayor = new Set();
+  const masas = [];
 
   for (let i = 0; i < mapa.length; i++) {
     if (visitado[i] || mapa[i].terreno === 'water') continue;
@@ -259,14 +265,63 @@ export function masaPrincipal(mapa, tamano) {
       }
     }
 
-    if (componente.size > mayor.size) mayor = componente;
+    masas.push(componente);
   }
 
-  return mayor;
+  return masas.sort((a, b) => b.size - a.size);
 }
 
-export function posicionesIniciales(mapa, tamano, cantidad, rng) {
+// La masa de tierra mas grande. Es donde se reparten las capitales cuando la
+// partida NO usa islas: sin transportes, un jugador en otra isla no podria ser
+// alcanzado ni alcanzar a nadie, y la partida no podria terminar.
+export function masaPrincipal(mapa, tamano) {
+  return masasDeTierra(mapa, tamano)[0] ?? new Set();
+}
+
+// Que fraccion de la tierra tiene que tener una masa para que valga la pena
+// empezar una civilizacion ahi. Con menos, el jugador amanece en un peñasco sin
+// lugar para fundar una segunda ciudad: tendria partida perdida antes de mover.
+const FRACCION_MINIMA_MASA = 0.10;
+
+/**
+ * Donde arranca cada jugador.
+ *
+ * Con `islas: false` (el default historico) todas las capitales caen en la masa
+ * de tierra mas grande. Con `islas: true` se reparten entre las masas que sean
+ * lo bastante grandes como para jugar en ellas, y ahi el transporte deja de ser
+ * decorativo: la unica forma de llegar al rival es cruzar.
+ *
+ * Si la semilla no da suficientes masas grandes, se CAE al comportamiento de
+ * siempre en vez de repartir a la fuerza. Es a proposito: el modo islas puede
+ * no estar disponible en un mapa dado, y eso es preferible a arrancar una
+ * partida donde alguien nace en un peñasco de cuatro casillas.
+ */
+export function posicionesIniciales(mapa, tamano, cantidad, rng, { islas = false } = {}) {
   const masa = masaPrincipal(mapa, tamano);
+  let porMasa = null;
+
+  if (islas) {
+    const tierra = mapa.filter(t => t.terreno !== 'water').length;
+    const grandes = masasDeTierra(mapa, tamano)
+      .filter(m => m.size >= tierra * FRACCION_MINIMA_MASA);
+    // Hacen falta al menos dos masas jugables para que "islas" signifique algo.
+    if (grandes.length >= 2) porMasa = grandes;
+  }
+
+  if (porMasa) {
+    // Una capital por masa, dando la vuelta si hay mas jugadores que masas.
+    const pos = [];
+    for (let i = 0; i < cantidad; i++) {
+      const candidatos = [...porMasa[i % porMasa.length]]
+        .filter(idx => !mapa[idx].ciudad && !pos.some(p => p.x === idx % tamano && p.y === Math.floor(idx / tamano)));
+      if (candidatos.length === 0) { pos.length = 0; break; }
+      const idx = candidatos[entero(rng, candidatos.length)];
+      pos.push({ x: idx % tamano, y: Math.floor(idx / tamano) });
+    }
+    if (pos.length === cantidad) return pos;
+    // Si no se pudo, sigue de largo al reparto de siempre.
+  }
+
   const candidatos = [...masa].filter(idx => !mapa[idx].ciudad);
   if (candidatos.length < cantidad) {
     throw new ReglaError('MAPA_SIN_POSICIONES', `No hay ${cantidad} posiciones iniciales viables en este mapa`);

@@ -150,8 +150,14 @@ const alcanzables = computed(() => {
   // Un buque juega al reves que la tropa: solo entra al mar, y nunca a tierra.
   // El dato sale de GET /api/map/constantes, no de una lista de tipos copiada
   // aca: si mañana hay un segundo buque, esto no hay que tocarlo.
-  const esNaval = Boolean(
-    (constantes.value?.unidades || []).find(u => u.tipo === origen.ejercito.tipo)?.naval)
+  const defDe = (tipo) => (constantes.value?.unidades || []).find(u => u.tipo === tipo)
+  const esNaval = Boolean(defDe(origen.ejercito.tipo)?.naval)
+  // Un transporte cargado puede bajar tropa a tierra, y la tropa puede subirse
+  // a un transporte amigo en el mar: son las dos unicas veces que una unidad
+  // "alcanza" una casilla del otro medio, y por eso se tratan como excepciones
+  // explicitas en vez de aflojar el filtro de terreno.
+  const capacidad = defDe(origen.ejercito.tipo)?.capacidad ?? 0
+  const llevaCarga = (origen.ejercito.carga?.length ?? 0) > 0
 
   return [[1, 0], [-1, 0], [0, 1], [0, -1]]
     .map(([dx, dy]) => ({ x: x + dx, y: y + dy }))
@@ -162,6 +168,15 @@ const alcanzables = computed(() => {
       if (!tile) return false
       // Niebla: sin datos para filtrar nada. Candidata (ver comentario arriba).
       if (!tile.descubierto) return true
+
+      // Excepcion 1: la tropa se sube a un transporte propio con lugar.
+      const transporteConLugar = tile.ejercito && tile.ejercito.dueno === jugadorId &&
+        (defDe(tile.ejercito.tipo)?.capacidad ?? 0) > (tile.ejercito.carga?.length ?? 0)
+      if (!esNaval && transporteConLugar) return true
+      // Excepcion 2: el transporte cargado baja tropa a una orilla libre.
+      if (capacidad > 0 && llevaCarga && tile.terreno !== 'water' &&
+        !tile.ejercito && !(tile.ciudad && tile.dueno !== jugadorId)) return true
+
       if (esNaval ? tile.terreno !== 'water' : tile.terreno === 'water') return false
       // Un ejercito propio ya ocupando el destino: movimiento.js lo rechaza
       // con CASILLA_OCUPADA (y no es ataque, asi que tampoco es un objetivo
@@ -291,10 +306,24 @@ const onClickTile = (posicion) => {
       // ciudad), asi que hacia la niebla SIEMPRE se intenta mover, nunca
       // atacar. Es lo correcto: el frontend no puede saber si abajo hay un
       // enemigo, y no debe adivinarlo. Decide el backend.
-      if (esEnemigo(tile)) {
+      // El orden importa: subir y bajar tropa se deciden ANTES que mover o
+      // atacar, porque son las dos acciones donde origen y destino estan en
+      // medios distintos y `moverEjercito` las rechazaria.
+      const origen = tileEn(desde.x, desde.y)
+      const defDe = (tipo) => (constantes.value?.unidades || []).find(u => u.tipo === tipo)
+      const origenEsTransporte = (defDe(origen?.ejercito?.tipo)?.capacidad ?? 0) > 0
+      const destinoEsTransportePropio = tile.ejercito && tile.ejercito.dueno === jugadorId &&
+        (defDe(tile.ejercito.tipo)?.capacidad ?? 0) > 0
+
+      seleccion.value = null
+      if (!origenEsTransporte && destinoEsTransportePropio) {
+        ejecutarAccion({ tipo: 'embarcar', desde, hasta: posicion })
+      } else if (origenEsTransporte && tile.descubierto && tile.terreno !== 'water') {
+        ejecutarAccion({ tipo: 'desembarcar', desde, hasta: posicion })
+      } else if (esEnemigo(tile)) {
+        seleccion.value = { ...desde }
         ataqueAbierto.value = { desde, hasta: posicion }
       } else {
-        seleccion.value = null
         ejecutarAccion({ tipo: 'moverEjercito', desde, hasta: posicion })
       }
       return
