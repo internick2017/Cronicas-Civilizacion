@@ -10,7 +10,11 @@ const props = defineProps({
 })
 const emit = defineEmits(['adoptar'])
 
-const ICONO = { gastronomia: '🍲', idioma: '🗣️', teatro: '🎭', arte: '🏺' }
+const ICONO = {
+  gastronomia: '🍲', idioma: '🗣️', teatro: '🎭', arte: '🏺',
+  creenciasYReligion: '🙏', valoresYNormas: '⚖️', organizacionSocial: '🏘️',
+  saberes: '📜', artesanias: '🧺', tradicionesYCostumbres: '🎉', vestimenta: '👘'
+}
 
 const cultura = computed(() => props.recursos?.culture ?? 0)
 

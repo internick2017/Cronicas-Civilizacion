@@ -290,6 +290,48 @@ export const RASGOS_CULTURALES = {
     costo: 60,
     descripcion: 'Una ciudad que se ama a si misma se defiende mejor.',
     bonoDefensaCiudad: 0.25
+  },
+  creenciasYReligion: {
+    nombre: 'Creencias y religión',
+    costo: 35,
+    descripcion: 'La fe sostiene a la comunidad: cada ciudad rinde mas comida.',
+    produccionCiudad: { food: 1 }
+  },
+  valoresYNormas: {
+    nombre: 'Valores y normas',
+    costo: 45,
+    descripcion: 'Reglas claras organizan mejor la defensa de cada ciudad.',
+    bonoDefensaCiudad: 0.15
+  },
+  organizacionSocial: {
+    nombre: 'Organización social',
+    costo: 40,
+    descripcion: 'Una comunidad bien organizada administra mejor sus recursos.',
+    produccionCiudad: { gold: 1 }
+  },
+  saberes: {
+    nombre: 'Saberes',
+    costo: 45,
+    descripcion: 'El conocimiento transmitido oralmente tambien es ciencia.',
+    produccionCiudad: { science: 1 }
+  },
+  artesanias: {
+    nombre: 'Artesanías',
+    costo: 35,
+    descripcion: 'Manos que tallan y trabajan la materia prima rinden mas madera.',
+    produccionCiudad: { wood: 1 }
+  },
+  tradicionesYCostumbres: {
+    nombre: 'Tradiciones y costumbres',
+    costo: 40,
+    descripcion: 'Celebrar lo propio fortalece la identidad cultural.',
+    produccionCiudad: { culture: 1 }
+  },
+  vestimenta: {
+    nombre: 'Vestimenta',
+    costo: 35,
+    descripcion: 'La ropa tipica distingue a cada pueblo y alimenta su cultura.',
+    produccionCiudad: { culture: 1 }
   }
 };
 
