@@ -70,6 +70,9 @@ describe('atacar', () => {
       ganador: 'atacante',
       danoAtacante: 3,
       danoDefensor: 43,
+      // Campo agregado por la epica naval: una catapulta contra un arquero en
+      // llanura no es un combate naval. Ver reglas/combate.js.
+      naval: false,
     });
 
     aplicar(e, evs);
@@ -122,7 +125,10 @@ describe('atacar', () => {
     const evs = atacar(e, 'p1', { desde: { x: 19, y: 1 }, hasta: { x: 18, y: 1 } }, crearRng('combate-1'));
 
     expect(evs.map(ev => ev.tipo)).toEqual(['CombateResuelto', 'UnidadDestruida']);
-    expect(evs[1].datos).toEqual({ x: 18, y: 1 });
+    // `naval: false` lo agrego la epica naval: el narrador no recibe el mapa,
+    // asi que el evento tiene que decir si lo que murio fue un buque (se
+    // hunde) o tropa de tierra (cae). Un arquero en llanura es false.
+    expect(evs[1].datos).toEqual({ x: 18, y: 1, naval: false });
 
     aplicar(e, evs);
     expect(tileEn(e, 18, 1).ejercito).toBeNull();

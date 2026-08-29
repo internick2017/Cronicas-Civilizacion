@@ -78,7 +78,11 @@ const umbralAviso = computed(() =>
         llega al {{ porcentajeDominacion }}% antes, gana quien controle más territorio.
       </p>
       <p>
-        El agua no cuenta para ese porcentaje. Se reclama territorio
+        <!-- "El mar", no "el agua": el rio TAMBIEN es agua a la vista, pero es
+             tierra vadeable y si cuenta para el porcentaje. Con la palabra
+             vieja el jugador leia que ninguna casilla azul contaba. -->
+        El <strong>mar</strong> no cuenta para ese porcentaje, pero los ríos sí:
+        se cruzan a pie y se poseen como cualquier tierra. Se reclama territorio
         <strong>fundando ciudades</strong>, que se quedan con las casillas de alrededor,
         y <strong>capturando</strong> las ciudades de los demás. Tu progreso lo ves en la
         barra 🏆 del panel superior; cuando alguien pasa el
@@ -103,7 +107,11 @@ const umbralAviso = computed(() =>
           <tr v-for="t in terrenosProductivos" :key="t.tipo">
             <td>{{ t.nombre }}</td>
             <td>{{ produccion(t.produccion) }}</td>
-            <td>{{ t.bonoDefensa > 1 ? `×${t.bonoDefensa}` : '—' }}</td>
+            <!-- Se compara contra 1, no "mayor que 1": el rio es el primer
+                 terreno que PERJUDICA la defensa (×0.8), y con la condicion
+                 vieja su penalidad se mostraba como "—", o sea que la ayuda
+                 escondia justamente lo que hay que saber antes de cruzarlo. -->
+            <td>{{ t.bonoDefensa === 1 ? '—' : `×${t.bonoDefensa}` }}</td>
           </tr>
         </tbody>
       </table>
@@ -175,7 +183,12 @@ const umbralAviso = computed(() =>
             <td>
               {{ u.nombre }}
               <small v-if="u.requiereBarracks"> (necesita cuartel)</small>
+              <small v-if="u.requierePuerto"> (necesita puerto)</small>
               <small v-if="u.requiereTecnologia"> (necesita tecnología)</small>
+              <!-- Que solo navegue no es un detalle de reclutamiento sino la
+                   regla central de la unidad: sin decirlo, el jugador la
+                   compra esperando que camine. -->
+              <small v-if="u.naval"> · solo navega, nunca pisa tierra</small>
             </td>
             <td>{{ u.ataque }}</td>
             <td>{{ u.defensa }}</td>

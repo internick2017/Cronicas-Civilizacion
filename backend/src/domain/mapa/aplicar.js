@@ -1,5 +1,6 @@
 import { tileEn, jugadorPorId } from './MapGame.js';
-import { UNIDADES, RECURSOS_INICIALES, CUARTEL } from './constantes.js';
+import { UNIDADES, RECURSOS_INICIALES, CUARTEL, PUERTO, esNaval } from './constantes.js';
+import { vecinosOrtogonales } from './reglas/comun.js';
 import { ReglaError } from './errores.js';
 
 export function aplicar(estado, eventos) {
@@ -148,6 +149,18 @@ export function aplicar(estado, eventos) {
         break;
       }
 
+      // Un buque vencio a una ciudad costera indefensa y se llevo oro sin
+      // tomarla (ver reglas/combate.js). El oro se TRANSFIERE: lo que pierde
+      // uno lo gana el otro, que es lo que significa saquear. La ciudad, su
+      // dueño y su territorio no se tocan.
+      case 'CiudadSaqueada': {
+        const victima = jugadorPorId(estado, datos.victima);
+        const asaltante = jugadorPorId(estado, jugadorId);
+        if (victima) victima.recursos.gold -= datos.oro;
+        if (asaltante) asaltante.recursos.gold += datos.oro;
+        break;
+      }
+
       case 'TurnoAvanzado':
         estado.indiceJugadorActual = datos.indiceJugadorActual;
         estado.turno = datos.turno;
@@ -165,6 +178,20 @@ export function aplicar(estado, eventos) {
           if (t.ciudad && t.ciudad.edificios.includes('barracks') && t.ejercito.dueno === t.dueno) {
             const vidaMaxima = UNIDADES[t.ejercito.tipo].salud;
             t.ejercito.salud = Math.min(vidaMaxima, t.ejercito.salud + CUARTEL.curacionPorRonda);
+          }
+
+          // Astillero: el espejo naval del cuartel. Un buque no puede pararse
+          // dentro de la ciudad (no pisa tierra), asi que se repara estando en
+          // el mar CONTIGUO a una ciudad propia con puerto. Se compara el dueño
+          // de la ciudad con el del buque por el mismo motivo que arriba: nadie
+          // repara la flota ajena.
+          if (esNaval(t.ejercito.tipo)) {
+            const enPuertoPropio = vecinosOrtogonales(estado, t.x, t.y).some(v =>
+              v.ciudad && v.ciudad.edificios.includes('port') && v.dueno === t.ejercito.dueno);
+            if (enPuertoPropio) {
+              const vidaMaxima = UNIDADES[t.ejercito.tipo].salud;
+              t.ejercito.salud = Math.min(vidaMaxima, t.ejercito.salud + PUERTO.curacionPorRonda);
+            }
           }
         }
         break;

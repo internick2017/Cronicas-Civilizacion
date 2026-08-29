@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev-http": "set SIN_HTTPS=1 && vite --port 5174 --strictPort",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint ."

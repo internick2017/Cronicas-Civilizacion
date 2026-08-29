@@ -2,7 +2,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Application, Container, Sprite, Graphics, Assets } from 'pixi.js'
-import { SPRITE_TERRENO, SPRITE_CIUDAD, SPRITE_UNIDAD, colorDeJugador, cargarSprites } from '../../mapa/sprites.js'
+import { SPRITE_TERRENO, TINTE_TERRENO, SPRITE_CIUDAD, SPRITE_UNIDAD, colorDeJugador, cargarSprites } from '../../mapa/sprites.js'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -26,6 +26,7 @@ const contenedor = ref(null)
 let app = null
 let mundo = null       // container que se mueve y escala (la camara)
 let capaTerreno = null
+let capaCosta = null   // linea de costa (mar/tierra) y ribera (rio/tierra)
 let capaTerritorio = null
 let capaPiezas = null  // ciudades y ejercitos
 let capaOverlay = null // seleccion, alcanzables
@@ -118,6 +119,7 @@ function dibujarTerrenoCompleto() {
   limpiar(capaTerreno)
   terrenoDibujado = new Set()
   actualizarTerreno()
+  dibujarCosta()
 }
 
 // El terreno es ADITIVO: una casilla descubierta nunca vuelve a ocultarse
@@ -139,10 +141,20 @@ function actualizarTerreno() {
     sprite.height = TILE
     sprite.x = tile.x * TILE
     sprite.y = tile.y * TILE
+    // El tinte es lo que separa el mar de la montana y el rio del mar: los
+    // sprites crudos son campos palidos casi indistinguibles (ver el comentario
+    // de TINTE_TERRENO). Sin entrada en la tabla se dibuja tal cual viene.
+    sprite.tint = TINTE_TERRENO[tile.terreno] ?? 0xffffff
     capaTerreno.addChild(sprite)
     terrenoDibujado.add(clave)
   }
 }
+
+// Cuanto tine el color del dueno la casilla que le pertenece. Bajo de 0.22 a
+// 0.15 junto con el repaletizado del terreno: el relleno de territorio se
+// aplica ENCIMA del terreno, asi que cuanto mas fuerte es, mas empareja los
+// terrenos que acabamos de separar a proposito.
+const TERRITORIO_ALPHA = 0.15
 
 function dibujarTerritorio() {
   limpiar(capaTerritorio)
@@ -150,9 +162,75 @@ function dibujarTerritorio() {
   for (const tile of props.vista.mapa) {
     if (!tile.descubierto || !tile.dueno) continue
     g.rect(tile.x * TILE, tile.y * TILE, TILE, TILE)
-      .fill({ color: colorDeJugador(props.vista.jugadores, tile.dueno), alpha: 0.22 })
+      .fill({ color: colorDeJugador(props.vista.jugadores, tile.dueno), alpha: TERRITORIO_ALPHA })
   }
   capaTerritorio.addChild(g)
+}
+
+// --- Costa y ribera ------------------------------------------------------
+// Un mapa de casillas de colores se vuelve un MAPA cuando tiene contorno: la
+// linea de costa es lo que hace que el ojo lea "esto es una isla" en vez de
+// "estas casillas son azules".
+//
+// Dos trazos distintos a proposito, y la diferencia de grosor comunica una
+// regla del juego: la costa (mar contra tierra) es gruesa y oscura porque el
+// mar detiene a los ejercitos; la ribera (rio contra tierra) es fina y clara
+// porque el rio se vadea. Si se dibujaran iguales, la imagen le estaria
+// diciendo al jugador lo contrario de lo que dice la regla, y evitaria cruzar
+// rios por reflejo.
+const COSTA_COLOR = 0x0d2b45
+const COSTA_GROSOR = 3
+const RIBERA_COLOR = 0x2e6b7a
+const RIBERA_GROSOR = 1.5
+
+const esMar = (tile) => tile.terreno === 'water'
+const esRio = (tile) => tile.terreno === 'river'
+
+function dibujarCosta() {
+  // Misma guarda que dibujarPiezas: un watcher puede llegar antes de que
+  // onMounted termine de crear las capas.
+  if (!capaCosta) return
+  limpiar(capaCosta)
+  const g = new Graphics()
+
+  // Solo casillas descubiertas, y solo aristas donde AMBOS lados lo estan. Una
+  // costa dibujada contra la niebla delataria donde hay mar sin haberlo
+  // explorado, que es exactamente lo que la niebla existe para evitar. El
+  // precio aceptado es que el borde de lo explorado queda con la costa
+  // cortada: es lo que el jugador sabe, no lo que hay.
+  const descubiertas = new Map()
+  for (const tile of props.vista.mapa) {
+    if (tile.descubierto) descubiertas.set(`${tile.x}:${tile.y}`, tile)
+  }
+
+  // Solo se miran los vecinos derecha y abajo: asi cada arista compartida se
+  // considera una unica vez, sin necesidad de llevar un set de aristas ya
+  // dibujadas.
+  const aristas = (predicado) => {
+    for (const tile of descubiertas.values()) {
+      for (const [dx, dy] of [[1, 0], [0, 1]]) {
+        const vecino = descubiertas.get(`${tile.x + dx}:${tile.y + dy}`)
+        if (!vecino) continue
+        if (predicado(tile) === predicado(vecino)) continue
+        if (dx === 1) {
+          const x = (tile.x + 1) * TILE
+          g.moveTo(x, tile.y * TILE).lineTo(x, (tile.y + 1) * TILE)
+        } else {
+          const y = (tile.y + 1) * TILE
+          g.moveTo(tile.x * TILE, y).lineTo((tile.x + 1) * TILE, y)
+        }
+      }
+    }
+  }
+
+  aristas(esMar)
+  g.stroke({ width: COSTA_GROSOR, color: COSTA_COLOR, alpha: 0.9 })
+  // La ribera se traza contra "es rio" y no contra "es agua": el borde entre
+  // un rio y el mar donde desemboca ya lo dibujo la costa.
+  aristas(esRio)
+  g.stroke({ width: RIBERA_GROSOR, color: RIBERA_COLOR, alpha: 0.85 })
+
+  capaCosta.addChild(g)
 }
 
 function dibujarPiezas() {
@@ -627,6 +705,11 @@ function actualizarDesdeVista() {
   if (cn !== claveNieblaAnterior) {
     claveNieblaAnterior = cn
     dibujarNiebla()
+    // La costa depende SOLO de que casillas estan descubiertas, porque el
+    // terreno no cambia nunca despues de generado. Asi que la misma clave que
+    // dispara la niebla es exactamente la que tiene que redibujarla, y no hace
+    // falta una clave propia.
+    dibujarCosta()
   }
 
   centrarEnCapitalSiCorresponde()
@@ -712,11 +795,15 @@ onMounted(async () => {
 
   mundo = new Container()
   capaTerreno = new Container()
+  capaCosta = new Container()
   capaTerritorio = new Container()
   capaPiezas = new Container()
   capaOverlay = new Container()
   capaNiebla = new Container()
-  mundo.addChild(capaTerreno, capaTerritorio, capaPiezas, capaOverlay, capaNiebla)
+  // La costa va ENCIMA del territorio: si fuera debajo, el relleno del color
+  // del dueno le pasaria por arriba y la desdibujaria justo en las casillas
+  // donde mas importa, que son las que alguien reclamo sobre la orilla.
+  mundo.addChild(capaTerreno, capaTerritorio, capaCosta, capaPiezas, capaOverlay, capaNiebla)
   app.stage.addChild(mundo)
 
   app.stage.eventMode = 'static'

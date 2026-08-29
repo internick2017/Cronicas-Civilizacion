@@ -1,4 +1,5 @@
 import { tileEn } from '../MapGame.js';
+import { esNaval } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento, radioAlrededor } from './comun.js';
 import { radioVision } from './cultura.js';
@@ -21,8 +22,16 @@ export function moverEjercito(estado, jugadorId, { desde, hasta }) {
     throw new ReglaError('UNIDAD_SIN_MOVIMIENTO', 'La unidad no tiene movimiento restante');
   }
 
-  if (tileHasta.terreno === 'water') {
-    throw new ReglaError('TERRENO_INTRANSITABLE', 'El agua es intransitable');
+  // Cada unidad en su medio, y nunca en el otro. El rio no entra en esta
+  // cuenta a proposito: es tierra vadeable, asi que lo cruza la tropa y NO lo
+  // navega el buque (ver docs/adr/0001).
+  const naval = esNaval(tileDesde.ejercito.tipo);
+  const destinoEsMar = tileHasta.terreno === 'water';
+  if (naval && !destinoEsMar) {
+    throw new ReglaError('TERRENO_INTRANSITABLE', 'Un buque no puede entrar en tierra');
+  }
+  if (!naval && destinoEsMar) {
+    throw new ReglaError('TERRENO_INTRANSITABLE', 'El mar es intransitable para la tropa de tierra');
   }
 
   // Solo hay que PELEAR por lo que esta defendido: un ejercito enemigo o una
@@ -59,7 +68,14 @@ export function moverEjercito(estado, jugadorId, { desde, hasta }) {
   // averiguar de quien era la casilla, porque para entonces el dueño cambio.
   // Sin esto la cronica podia decir "avanzo sobre 4 casillas" pero nunca "le
   // arrebato 4 casillas a Nick", que es lo que el jugador necesita saber.
-  if (tileHasta.dueno !== jugadorId) {
+  //
+  // El MAR se excluye explicitamente, y hace falta decirlo: el dueño del mar
+  // siempre es `null`, asi que `null !== jugadorId` es verdadero y un buque
+  // reclamaria cada casilla que navega. Que el mar no tenga dueño es una
+  // decision de diseño, no un descuido (ver docs/adr/0002): si el oceano
+  // contara, el umbral real de victoria dependeria de cuanto mar genero la
+  // semilla, y todo el balance ya medido dejaria de valer.
+  if (tileHasta.dueno !== jugadorId && !destinoEsMar) {
     eventos.push(evento('TerritorioReclamado', estado, jugadorId, {
       x: hasta.x, y: hasta.y, duenoAnterior: tileHasta.dueno ?? null,
     }));

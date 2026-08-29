@@ -147,6 +147,11 @@ const alcanzables = computed(() => {
   if (!origen?.ejercito || origen.ejercito.dueno !== jugadorId || (origen.ejercito.movimientoRestante ?? 1) <= 0) {
     return []
   }
+  // Un buque juega al reves que la tropa: solo entra al mar, y nunca a tierra.
+  // El dato sale de GET /api/map/constantes, no de una lista de tipos copiada
+  // aca: si mañana hay un segundo buque, esto no hay que tocarlo.
+  const esNaval = Boolean(
+    (constantes.value?.unidades || []).find(u => u.tipo === origen.ejercito.tipo)?.naval)
 
   return [[1, 0], [-1, 0], [0, 1], [0, -1]]
     .map(([dx, dy]) => ({ x: x + dx, y: y + dy }))
@@ -157,7 +162,7 @@ const alcanzables = computed(() => {
       if (!tile) return false
       // Niebla: sin datos para filtrar nada. Candidata (ver comentario arriba).
       if (!tile.descubierto) return true
-      if (tile.terreno === 'water') return false
+      if (esNaval ? tile.terreno !== 'water' : tile.terreno === 'water') return false
       // Un ejercito propio ya ocupando el destino: movimiento.js lo rechaza
       // con CASILLA_OCUPADA (y no es ataque, asi que tampoco es un objetivo
       // valido). No se ofrece como alcanzable.

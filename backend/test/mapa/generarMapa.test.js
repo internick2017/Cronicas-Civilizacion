@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generarMapa, posicionesIniciales, trazarRios, masaPrincipal } from '../../src/domain/mapa/generarMapa.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
+import { TERRENOS } from '../../src/domain/mapa/constantes.js';
 import { ReglaError } from '../../src/domain/mapa/errores.js';
 
 const contarTerreno = (mapa, terreno) => mapa.filter(t => t.terreno === terreno).length;
@@ -29,8 +30,11 @@ describe('generarMapa', () => {
     }
   });
 
+  // La lista de terrenos validos sale de TERRENOS y no de una copia escrita a
+  // mano aca: la copia se desincronizo al agregar 'river' y el test habria
+  // fallado por estar desactualizado, no por un mapa mal generado.
   it('solo usa terrenos conocidos', () => {
-    const validos = new Set(['plains', 'forest', 'mountains', 'desert', 'water', 'hills']);
+    const validos = new Set(TERRENOS);
     for (const t of generarMapa('s', 20)) expect(validos.has(t.terreno)).toBe(true);
   });
 
@@ -284,14 +288,17 @@ describe('generarMapa: rios', () => {
     // test se enfoca solo en la forma del camino.
     trazarRios(mapa, tamano, elevacion, -1000, crearRng('camino'));
 
-    const agua = mapa.filter(t => t.terreno === 'water');
-    expect(agua.length).toBeGreaterThan(1);
-    for (const tile of agua) {
-      const tieneVecinoDeAgua = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+    // El rio deja 'river', no 'water': el mar y el rio son terrenos distintos
+    // desde el ADR 0001. Este test buscaba 'water' porque hasta entonces el
+    // trazado tallaba mar tierra adentro.
+    const rio = mapa.filter(t => t.terreno === 'river');
+    expect(rio.length).toBeGreaterThan(1);
+    for (const tile of rio) {
+      const tieneVecinoDeRio = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
         const vecino = mapa.find(t => t.x === tile.x + dx && t.y === tile.y + dy);
-        return vecino && vecino.terreno === 'water';
+        return vecino && vecino.terreno === 'river';
       });
-      expect(tieneVecinoDeAgua).toBe(true);
+      expect(tieneVecinoDeRio).toBe(true);
     }
   });
 
@@ -305,11 +312,11 @@ describe('generarMapa: rios', () => {
     // es identico, asi que la unica variable es el umbral.
     const mapaNace = mapaSintetico(tamano);
     trazarRios(mapaNace, tamano, elevacion, -1, crearRng('nace'));
-    expect(mapaNace.some(t => t.terreno === 'water')).toBe(true);
+    expect(mapaNace.some(t => t.terreno === 'river')).toBe(true);
 
     const mapaNoNace = mapaSintetico(tamano);
     trazarRios(mapaNoNace, tamano, elevacion, 1, crearRng('nace'));
-    expect(mapaNoNace.every(t => t.terreno !== 'water')).toBe(true);
+    expect(mapaNoNace.every(t => t.terreno !== 'river')).toBe(true);
   });
 
   it('los rios no rompen el determinismo', () => {
@@ -346,7 +353,14 @@ describe('generarMapa: rios', () => {
   // Compara el mismo mapa base con y sin el paso de rios: generarMapa acepta
   // { rios: false } (default true, no rompe la firma) para poder aislar el
   // efecto puntual del trazado sobre la cantidad de masas de tierra.
-  it('los rios no aumentan la cantidad de masas de tierra desconectadas', () => {
+  //
+  // La afirmacion se endurecio de "no aumenta" a "es exactamente la misma"
+  // cuando el rio dejo de ser mar (ADR 0001). Antes el rio tallaba agua tierra
+  // adentro y podia partir un continente, asi que lo unico exigible era que no
+  // empeorara; ahora es tierra vadeable, asi que no puede desconectar NADA y la
+  // igualdad exacta es lo que hay que sostener. Si esto vuelve a ser una
+  // desigualdad, alguien convirtio el rio en agua otra vez.
+  it('los rios no cambian la cantidad de masas de tierra: son tierra vadeable', () => {
     const SEMILLAS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
     const TAMANOS = [10, 20, 30, 60];
 
@@ -358,7 +372,7 @@ describe('generarMapa: rios', () => {
         const componentesCon = contarComponentes(conRios, tamano);
         const componentesSin = contarComponentes(sinRios, tamano);
 
-        expect(componentesCon).toBeLessThanOrEqual(componentesSin);
+        expect(componentesCon).toBe(componentesSin);
       }
     }
   });

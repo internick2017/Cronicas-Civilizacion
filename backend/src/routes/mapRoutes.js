@@ -11,15 +11,19 @@ import {
 // son presentacion, no regla de juego.
 const NOMBRE_EDIFICIO = {
   granary: 'Granero', market: 'Mercado', library: 'Biblioteca',
-  barracks: 'Cuartel', sawmill: 'Aserradero', quarry: 'Cantera', university: 'Universidad'
+  barracks: 'Cuartel', sawmill: 'Aserradero', quarry: 'Cantera', university: 'Universidad',
+  port: 'Puerto'
 };
 const NOMBRE_UNIDAD = {
   warrior: 'Guerrero', archer: 'Arquero', spearman: 'Lancero', cavalry: 'Caballería',
-  catapult: 'Catapulta', legionary: 'Legionario'
+  catapult: 'Catapulta', legionary: 'Legionario', warship: 'Buque de guerra'
 };
+// 'Mar' y no 'Agua': desde que el rio es un terreno propio, "agua" nombra a
+// dos cosas con reglas opuestas (una detiene, la otra se vadea) y deja de
+// servir como etiqueta. Ver CONTEXT.md.
 const NOMBRE_TERRENO = {
   plains: 'Llanura', forest: 'Bosque', mountains: 'Montaña',
-  hills: 'Colinas', desert: 'Desierto', water: 'Agua'
+  hills: 'Colinas', desert: 'Desierto', water: 'Mar', river: 'Río'
 };
 const DIFICULTAD_IA_INFO = {
   facil: { nombre: 'Fácil', descripcion: 'Ataca sin calcular y a veces se distrae; buena para aprender el juego.' },
@@ -71,7 +75,11 @@ export function crearMapRoutes(servicio) {
         nombre: NOMBRE_EDIFICIO[tipo] || tipo,
         costo: datos.costo,
         produccion: datos.produccion,
-        requiereTecnologia: datos.requiereTecnologia ?? null
+        requiereTecnologia: datos.requiereTecnologia ?? null,
+        // El puerto es el unico edificio con una condicion de geografia. La
+        // vista lo necesita para poder decir "requiere costa" en vez de
+        // ofrecer un boton que el backend va a rechazar.
+        requiereCosta: datos.requiereCosta ?? false
       })),
       unidades: Object.entries(UNIDADES).map(([tipo, datos]) => ({
         tipo,
@@ -82,7 +90,12 @@ export function crearMapRoutes(servicio) {
         movimiento: datos.movimiento,
         costo: datos.costo,
         requiereBarracks: datos.requiereBarracks,
-        requiereTecnologia: datos.requiereTecnologia ?? null
+        requiereTecnologia: datos.requiereTecnologia ?? null,
+        // `naval` cambia como se juega la unidad, no solo como se recluta: la
+        // vista lo usa para invertir el filtro de casillas alcanzables (un
+        // buque solo entra al mar) y para no aplicarle el bono del cuartel.
+        naval: datos.naval ?? false,
+        requierePuerto: datos.requierePuerto ?? false
       })),
       // Tecnologias (que se pagan con ciencia) y el costo de subir el nivel de
       // una ciudad, que no es una tecnologia (es repetible, por ciudad): se

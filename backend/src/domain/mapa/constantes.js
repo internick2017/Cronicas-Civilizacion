@@ -1,7 +1,17 @@
 // Constants for game rules extracted from legacy system
 // All values are balance parameters for the turn-based civilization map mode
 
-export const TERRENOS = ['plains', 'forest', 'mountains', 'desert', 'water', 'hills'];
+// 'water' es el MAR: se navega y no se camina. 'river' es el rio: se camina
+// (vadeandolo) y no se navega. Eran un solo terreno hasta ahora, y separarlos
+// es lo que permite que el mar exista como frente propio sin que una flota
+// pueda meterse hasta el centro de un continente por un arroyo de una casilla.
+// Ver docs/adr/0001-mar-y-rio-son-terrenos-distintos.md.
+//
+// Importante para quien agregue reglas: media docena de lugares del dominio y
+// de la IA preguntan `terreno !== 'water'` para decir "es tierra". El rio cae
+// del lado correcto en TODOS ellos sin tocarlos, justamente porque es un
+// terreno propio y no una bandera sobre el agua.
+export const TERRENOS = ['plains', 'forest', 'mountains', 'desert', 'water', 'hills', 'river'];
 
 export const RECURSOS = ['food', 'gold', 'wood', 'stone', 'science', 'culture'];
 
@@ -69,6 +79,22 @@ export const EDIFICIOS = {
     costo: { gold: 70, stone: 40 },
     produccion: { science: 4 },
     requiereTecnologia: 'filosofia'
+  },
+  // La llave de la armada, y la unica condicion ademas de estar en la costa:
+  // NO hace falta ninguna tecnologia. Eso es deliberado y esta razonado en
+  // docs/adr/0003: para tener un buque ya hacen falta dos cosas (ciudad
+  // costera + puerto), y una tercera repetiria el error de la biblioteca, que
+  // era imposible de construir en toda la partida. El riesgo que se evita no
+  // es que la armada quede desbalanceada, es que no aparezca NUNCA.
+  //
+  // No es solo una llave: produce oro por comercio maritimo, para que valga la
+  // pena incluso antes de que el mar importe, y cura buques en el mar contiguo
+  // (ver PUERTO). El cuartel ya habia ensenado que un edificio que solo
+  // desbloquea es un edificio a medias.
+  port: {
+    costo: { wood: 40, stone: 30 },
+    produccion: { gold: 3 },
+    requiereCosta: true
   }
 };
 
@@ -123,8 +149,39 @@ export const UNIDADES = {
     costo: { food: 22, gold: 35, wood: 15 },
     requiereBarracks: false,
     requiereTecnologia: 'formacionMilitar'
+  },
+  // El unico buque del juego. `naval: true` es lo que lo ata al mar: no puede
+  // pisar tierra en ninguna circunstancia, y ninguna unidad de tierra puede
+  // pisar el mar (ver reglas/movimiento.js).
+  //
+  // Los numeros dicen "hostiga, no domina", que es la decision de diseno (ver
+  // docs/adr/0003-la-armada-hostiga-no-conquista.md): pega casi como una
+  // caballeria (20), se muere mas facil que un arquero (80 de salud) y corre
+  // mas que nada en el juego. Y hay algo que lo hace estructuralmente fragil y
+  // no se ve en esta tabla: BONO_TERRENO_DEFENSA no tiene entrada para el mar,
+  // asi que un buque pelea SIEMPRE sin cobertura, mientras la tropa de tierra
+  // se parapeta en montana o bosque. El movimiento 4 no encadena ataques:
+  // atacar deja el movimiento en cero (ver aplicar.js).
+  //
+  // El costo va cargado a madera para que armar flota compita de verdad contra
+  // construir, y sin piedra, que ya se la pelean el puerto, la biblioteca y la
+  // cantera.
+  warship: {
+    ataque: 18,
+    defensa: 6,
+    salud: 70,
+    movimiento: 4,
+    costo: { wood: 50, gold: 40, food: 10 },
+    requiereBarracks: false,
+    naval: true,
+    requierePuerto: true
   }
 };
+
+// Una unidad naval vive en el mar y solo en el mar. Se pregunta por el tipo y
+// no por un campo del ejercito para que la respuesta salga siempre de la misma
+// tabla, y no de lo que alguien haya guardado en un tile.
+export const esNaval = (tipo) => UNIDADES[tipo]?.naval === true;
 
 // Efectos propios del cuartel (ver el comentario junto a EDIFICIOS.barracks):
 // hasta ahora era el unico edificio sin ninguno.
@@ -135,13 +192,41 @@ export const CUARTEL = {
   bonoMovimiento: 1       // punto de movimiento extra para lo reclutado ahi
 };
 
+// Efectos propios del puerto, igual que CUARTEL lo es del cuartel.
+//
+// La curacion es EL MISMO numero que CUARTEL.curacionPorRonda a proposito: el
+// astillero es el espejo del cuartel (uno cura tropa parada en la ciudad, el
+// otro cura buques en el mar contiguo) y no merece una constante distinta para
+// decir lo mismo. Si algun dia se separan, que sea por una razon medida.
+export const PUERTO = {
+  curacionPorRonda: 15
+};
+
+// Saqueo: lo que un buque le roba a una ciudad costera cuando la vence y no
+// puede tomarla (ver docs/adr/0003). Es proporcional con piso y techo, que es
+// el mismo patron que ya usa el dano de combate (DANO_MINIMO / REPLICA_MINIMA
+// sobre un reparto proporcional).
+//
+// Una cantidad fija seria irrelevante contra un jugador rico y brutal contra
+// uno pobre; un porcentaje puro convertiria a quien acumula oro en un premio
+// cada vez mas grande por no gastarlo.
+export const SAQUEO = {
+  fraccion: 0.10,
+  minimo: 5,
+  maximo: 25
+};
+
 export const BONO_TERRENO_PRODUCCION = {
   plains: { food: 2, gold: 1 },
   forest: { wood: 3, food: 1 },
   mountains: { stone: 4, gold: 2 },
   hills: { stone: 2, gold: 1, food: 1 },
   desert: { gold: 1 },
-  water: {}
+  water: {},
+  // El rio es tierra fertil: da comida y nada mas. Junto con su penalidad de
+  // defensa (ver BONO_TERRENO_DEFENSA) hace que fundar sobre un rio sea una
+  // decision y no un accidente del terreno: comes mejor y te defendes peor.
+  river: { food: 2 }
 };
 
 // --- Rasgos culturales ---------------------------------------------------
@@ -225,10 +310,16 @@ export const TECNOLOGIAS = {
   }
 };
 
+// El rio es el PRIMER multiplicador menor a 1 de esta tabla: hasta ahora el
+// terreno solo podia ayudar al defensor, nunca perjudicarlo. Vadear un rio
+// expone, que es lo que un rio hace en la realidad y lo que evita que sea una
+// franja de terreno decorativa. `bonoDefensa` cae a 1.0 por defecto, asi que
+// agregar una entrada aca es todo lo que hace falta.
 export const BONO_TERRENO_DEFENSA = {
   mountains: 1.25,
   hills: 1.25,
-  forest: 1.1
+  forest: 1.1,
+  river: 0.8
 };
 
 export const PRODUCCION_BASE_CIUDAD = {

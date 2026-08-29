@@ -23,6 +23,21 @@ const recursos = computed(() =>
   props.vista.jugadores.find(j => j.id === props.jugadorId)?.recursos || {}
 )
 const tieneBarracks = computed(() => (tile.value?.ciudad?.edificios || []).includes('barracks'))
+const tienePuerto = computed(() => (tile.value?.ciudad?.edificios || []).includes('port'))
+
+// El mar pegado a esta ciudad. Se mira el terreno de los cuatro vecinos
+// ortogonales, igual que `esCostera` en el dominio, y por la misma definicion:
+// el rio NO cuenta, porque se vadea y no se navega.
+const marAdyacente = computed(() => {
+  const t = props.vista.config.tamanoMapa
+  const { x, y } = props.posicion
+  return [[0, -1], [0, 1], [-1, 0], [1, 0]]
+    .map(([dx, dy]) => ({ x: x + dx, y: y + dy }))
+    .filter(p => p.x >= 0 && p.y >= 0 && p.x < t && p.y < t)
+    .map(p => props.vista.mapa[p.y * t + p.x])
+    .filter(tile => tile?.terreno === 'water')
+})
+const esCostera = computed(() => marAdyacente.value.length > 0)
 const yaConstruido = (edificio) => (tile.value?.ciudad?.edificios || []).includes(edificio)
 const misTecnologias = computed(() =>
   props.vista.jugadores.find(j => j.id === props.jugadorId)?.tecnologias || []
@@ -38,6 +53,7 @@ const textoCosto = (costo) =>
 
 const motivoEdificio = (ed) => {
   if (yaConstruido(ed.tipo)) return 'ya construido'
+  if (ed.requiereCosta && !esCostera.value) return 'requiere mar al lado'
   if (ed.requiereTecnologia && !misTecnologias.value.includes(ed.requiereTecnologia)) {
     return `requiere ${nombreTecnologia(ed.requiereTecnologia)}`
   }
@@ -51,21 +67,29 @@ const motivoEdificio = (ed) => {
 // cosa, y "sin recursos" podria estar mal si el precio real (con descuento)
 // si te alcanza.
 const cuartel = computed(() => props.constantes.cuartel || null)
-const costoReal = (costoBase) => {
-  if (!tieneBarracks.value || !cuartel.value) return costoBase
+// El buque queda FUERA del bono del cuartel, igual que en reglas/militar.js:
+// un cuartel entrena tropa, no marineros. Si la vista lo aplicara igual,
+// mostraria un precio que el backend no va a cobrar.
+const conBonoCuartel = (u) => tieneBarracks.value && cuartel.value && !u.naval
+const costoReal = (costoBase, u) => {
+  if (!conBonoCuartel(u)) return costoBase
   return Object.fromEntries(Object.entries(costoBase).map(
     ([r, m]) => [r, Math.round(m * (1 - cuartel.value.descuentoReclutar))]))
 }
 const movimientoReal = (u) =>
-  u.movimiento + (tieneBarracks.value && cuartel.value ? cuartel.value.bonoMovimiento : 0)
+  u.movimiento + (conBonoCuartel(u) ? cuartel.value.bonoMovimiento : 0)
 
 const motivoUnidad = (u) => {
-  if (tile.value?.ejercito) return 'casilla ocupada'
+  // Un buque no ocupa la casilla de la ciudad, nace en el mar de al lado: que
+  // haya guarnicion parada en la ciudad no lo bloquea (ver reglas/militar.js).
+  if (!u.naval && tile.value?.ejercito) return 'casilla ocupada'
   if (u.requiereBarracks && !tieneBarracks.value) return 'requiere cuartel'
+  if (u.requierePuerto && !tienePuerto.value) return 'requiere puerto'
+  if (u.naval && !marAdyacente.value.some(m => !m.ejercito)) return 'sin mar libre donde botarlo'
   if (u.requiereTecnologia && !misTecnologias.value.includes(u.requiereTecnologia)) {
     return `requiere ${nombreTecnologia(u.requiereTecnologia)}`
   }
-  if (!puedePagar(costoReal(u.costo))) return 'sin recursos'
+  if (!puedePagar(costoReal(u.costo, u))) return 'sin recursos'
   return null
 }
 
@@ -123,8 +147,8 @@ const motivoMejora = computed(() => (puedePagar(costoMejora.value) ? null : 'sin
       >
         <strong>{{ u.nombre }}</strong>
         <small>ATQ {{ u.ataque }} · DEF {{ u.defensa }} · MOV {{ movimientoReal(u) }}</small>
-        <small>{{ textoCosto(costoReal(u.costo)) }}</small>
-        <em v-if="tieneBarracks && cuartel" class="bono-cuartel">🏛️ cuartel: -{{ Math.round(cuartel.descuentoReclutar * 100) }}%, +{{ cuartel.bonoMovimiento }} mov</em>
+        <small>{{ textoCosto(costoReal(u.costo, u)) }}</small>
+        <em v-if="conBonoCuartel(u)" class="bono-cuartel">🏛️ cuartel: -{{ Math.round(cuartel.descuentoReclutar * 100) }}%, +{{ cuartel.bonoMovimiento }} mov</em>
         <em v-if="motivoUnidad(u)">{{ motivoUnidad(u) }}</em>
       </button>
     </section>

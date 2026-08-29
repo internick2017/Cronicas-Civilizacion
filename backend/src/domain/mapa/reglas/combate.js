@@ -1,7 +1,7 @@
 import { tileEn } from '../MapGame.js';
 import {
   UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, CUARTEL,
-  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA
+  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, SAQUEO, esNaval
 } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
@@ -78,6 +78,15 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   const danoDefensor = golpe(poderAtaque, ganador === 'atacante');
   const danoAtacante = golpe(poderDefensa, ganador === 'defensor');
 
+  // `naval` viaja EN el evento por el mismo motivo que `duenoAnterior` en
+  // TerritorioReclamado: el narrador recibe la lista de eventos y los
+  // jugadores, nunca el mapa, asi que no tiene forma de averiguar despues si
+  // esto paso en el mar. Sin este campo, hundir una flota se contaria como
+  // "los ejercitos chocaron", y la cronica es justamente lo que diferencia a
+  // este juego de un juego de estrategia cualquiera.
+  const atacanteEsNaval = esNaval(tileDesde.ejercito.tipo);
+  const combateNaval = atacanteEsNaval || Boolean(ejercitoEnemigo && esNaval(ejercitoEnemigo.tipo));
+
   const eventos = [
     evento('CombateResuelto', estado, jugadorId, {
       desde: { x: desde.x, y: desde.y },
@@ -85,6 +94,7 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
       ganador,
       danoAtacante,
       danoDefensor,
+      naval: combateNaval,
     }),
   ];
 
@@ -93,15 +103,44 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   const atacanteCae = tileDesde.ejercito.salud - danoAtacante <= 0;
   const defensorCae = Boolean(ejercitoEnemigo) && ejercitoEnemigo.salud - danoDefensor <= 0;
 
+  // Tambien lleva `naval`, y por unidad: un buque se HUNDE y un soldado cae.
+  // Los dos lados pueden morir en el mismo combate, y no tienen por que ser
+  // del mismo medio (una catapulta en la costa puede hundir un buque y caer
+  // ella misma), asi que el flag se calcula por separado para cada uno.
   if (defensorCae) {
-    eventos.push(evento('UnidadDestruida', estado, jugadorId, { x: hasta.x, y: hasta.y }));
+    eventos.push(evento('UnidadDestruida', estado, jugadorId, {
+      x: hasta.x, y: hasta.y, naval: esNaval(ejercitoEnemigo.tipo),
+    }));
   }
   if (atacanteCae) {
-    eventos.push(evento('UnidadDestruida', estado, jugadorId, { x: desde.x, y: desde.y }));
+    eventos.push(evento('UnidadDestruida', estado, jugadorId, {
+      x: desde.x, y: desde.y, naval: atacanteEsNaval,
+    }));
   }
 
   // Solo se toma la ciudad si queda alguien en pie para tomarla.
   if (ganador === 'atacante' && !ejercitoEnemigo && !atacanteCae) {
+    // Un buque vence pero NO toma: no pisa tierra. Sin esta rama la regla
+    // quedaba muerta, porque las ciudades no tienen vida y lo unico que podia
+    // pasar al ganarle a una ciudad indefensa era capturarla. El saqueo es lo
+    // que le da sentido a "hostiga" contra una costa desguarnecida (ver
+    // docs/adr/0003).
+    if (esNaval(tileDesde.ejercito.tipo)) {
+      const oroVictima = defensor?.recursos?.gold ?? 0;
+      // Proporcional con piso y techo, y ademas acotado a lo que la victima
+      // realmente tiene: si no tiene oro el saqueo no da nada, pero el combate
+      // ocurrio igual y el buque pudo haberse llevado dano. Hostigar nunca es
+      // gratis.
+      const oro = Math.min(
+        oroVictima,
+        Math.min(SAQUEO.maximo, Math.max(SAQUEO.minimo, Math.round(oroVictima * SAQUEO.fraccion)))
+      );
+      eventos.push(evento('CiudadSaqueada', estado, jugadorId, {
+        x: hasta.x, y: hasta.y, oro, victima: tileHasta.dueno,
+      }));
+      return eventos;
+    }
+
     eventos.push(evento('CiudadCapturada', estado, jugadorId, { x: hasta.x, y: hasta.y }));
 
     // Al caer la ciudad cae tambien el territorio que administraba. Sin esto el

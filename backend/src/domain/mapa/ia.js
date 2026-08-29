@@ -16,9 +16,10 @@
 import { tileEn, jugadorPorId, puedePagar } from './MapGame.js';
 import {
   EDIFICIOS, UNIDADES, COSTO_CIUDAD, BONO_TERRENO_PRODUCCION, TECNOLOGIAS, COSTO_MEJORA_CIUDAD,
-  bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD,
+  bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, esNaval,
   DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT
 } from './constantes.js';
+import { marAdyacente } from './reglas/comun.js';
 import { aplicar } from './aplicar.js';
 import { fundarCiudad, construir, mejorarCiudad } from './reglas/ciudades.js';
 import { reclutar } from './reglas/militar.js';
@@ -59,13 +60,26 @@ export const NIVEL_CIUDAD_INCAPTURABLE = 6;
 // probando no va a arreglarlo: mejor cerrar el turno que quedar reintentando.
 const FALLOS_SEGUIDOS_MAXIMOS = 5;
 
+// Cuantas casillas de mar conectadas necesita ver la maquina para que valga la
+// pena construir un puerto ahi.
+//
+// Un lago de una sola casilla es mar valido para la REGLA: un humano puede
+// gastar madera y piedra en un puerto sobre un charco y sacar un buque que no
+// va a ningun lado, y esta bien que pueda, porque lo ve. La maquina no ve,
+// ejecuta reglas, y ya perdio turnos enteros una vez por proponer un edificio
+// imposible. Este limite vive ACA, en la heuristica del bot, y no en el
+// dominio: "cuerpo de agua minimo" no es un concepto del juego, es una
+// precaucion de la maquina. El 6 es el tamano donde un buque puede al menos
+// maniobrar; es una perilla, no una verdad medida.
+const MAR_MINIMO_PARA_PUERTO = 6;
+
 // Orden que prioriza aserradero/cantera primero: evita el error de balance
 // que encontramos jugando (madera o piedra en cero para siempre si la
 // capital no cayo en el terreno correcto). Lo usan normal y dificil.
 // university va al final y solo sirve una vez investigada 'filosofia'
 // (decidirConstruccion filtra por tecnologia): sin listarla, esa tecnologia no
 // desbloquearia nada en la practica y seria ciencia tirada.
-const ORDEN_EDIFICIOS_BUENO = ['sawmill', 'quarry', 'granary', 'market', 'library', 'barracks', 'university'];
+const ORDEN_EDIFICIOS_BUENO = ['sawmill', 'quarry', 'granary', 'market', 'port', 'library', 'barracks', 'university'];
 // Orden "de fabrica" de EDIFICIOS (sin ese criterio): lo que construiria
 // alguien sin pensarlo. Es lo que separa a facil del resto.
 const ORDEN_EDIFICIOS_NATURAL = Object.keys(EDIFICIOS);
@@ -104,6 +118,10 @@ export const PERFILES_DIFICULTAD = {
     // Con 0 extra la maquina no podia perseguir la victoria por dominacion
     // aunque quisiera. Sigue habiendo tope: sin el, gastaria todo en tropa.
     topeEjercitosExtra: 1,
+    // Sin armada, y no por ser mala jugadora: su perfil dice `ofensiva:
+    // 'nunca'` y unidadesPrioridad ['warrior']. Facil es la dificultad donde
+    // te dejan colonizar en paz, y darle buques la contradice.
+    topeBuques: 0,
     ordenEdificios: ORDEN_EDIFICIOS_NATURAL,
     ordenTecnologias: ORDEN_TECNOLOGIAS_NATURAL,
     // No mejora ciudades: como saltear pasos o construir en el orden de fabrica,
@@ -130,6 +148,7 @@ export const PERFILES_DIFICULTAD = {
     // la guerra en vez de dar vueltas por lo propio.
     ofensiva: 'sinTierraLibre',
     topeEjercitosExtra: 3,
+    topeBuques: 1,
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
     mejoraCiudades: true,
@@ -147,6 +166,7 @@ export const PERFILES_DIFICULTAD = {
     // Presiona desde el principio: coloniza y ataca a la vez.
     ofensiva: 'siempre',
     topeEjercitosExtra: 5,
+    topeBuques: 2,
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
     mejoraCiudades: true,
@@ -295,6 +315,69 @@ export function distanciaACiudadEnemiga(estado, jugadorId) {
   );
 }
 
+/**
+ * Cuantas casillas de mar CONECTADAS hay a partir de (x, y), con corte
+ * temprano: no interesa el tamano exacto del oceano, solo si llega al minimo.
+ * Un mapa de 60x60 puede tener 1000 casillas de agua y contarlas todas en cada
+ * decision de construccion seria caro al pedo.
+ */
+function tamanoDelMar(estado, x, y, tope) {
+  const vistos = new Set([clave(x, y)]);
+  const cola = [{ x, y }];
+  for (let i = 0; i < cola.length && vistos.size < tope; i++) {
+    for (const vecino of vecinosOrtogonales(estado, cola[i].x, cola[i].y)) {
+      const k = clave(vecino.x, vecino.y);
+      if (vecino.terreno !== 'water' || vistos.has(k)) continue;
+      vistos.add(k);
+      cola.push(vecino);
+    }
+  }
+  return vistos.size;
+}
+
+// Si a la maquina le conviene poner un puerto en esta ciudad: tiene que tocar
+// el mar Y ese mar tiene que dar para algo.
+function puertoUtil(estado, x, y) {
+  const mares = marAdyacente(estado, x, y);
+  return mares.some((t) => tamanoDelMar(estado, t.x, t.y, MAR_MINIMO_PARA_PUERTO) >= MAR_MINIMO_PARA_PUERTO);
+}
+
+// Por donde navega este jugador: mar que no este ocupado por un buque
+// enemigo. Es el espejo exacto de transitablePara, con el medio invertido.
+const navegablePara = (jugadorId) => (t) =>
+  t.terreno === 'water' &&
+  !(t.ejercito && t.ejercito.dueno !== jugadorId);
+
+/**
+ * Distancia al buque enemigo mas cercano. Es el objetivo PREFERIDO de la
+ * flota: mientras haya algo que hundir, el mar se disputa antes que la costa.
+ */
+export function distanciaABuqueEnemigo(estado, jugadorId) {
+  return distanciaHasta(
+    estado,
+    (t) => t.terreno === 'water' && t.ejercito && t.ejercito.dueno !== jugadorId,
+    navegablePara(jugadorId),
+  );
+}
+
+/**
+ * Distancia al mar pegado a una ciudad enemiga: desde ahi se la hostiga. El
+ * origen es el MAR y no la ciudad, porque un buque no pisa tierra ni en el
+ * BFS: si la ciudad fuera origen, la brujula prometeria un destino al que la
+ * flota no puede llegar.
+ *
+ * Es el objetivo de RESPALDO. Sin el, una flota que ya limpio el mar se
+ * quedaria flotando sin nada que hacer.
+ */
+export function distanciaACostaEnemiga(estado, jugadorId) {
+  return distanciaHasta(
+    estado,
+    (t) => t.terreno === 'water' && vecinosOrtogonales(estado, t.x, t.y)
+      .some((v) => v.ciudad && v.dueno && v.dueno !== jugadorId),
+    navegablePara(jugadorId),
+  );
+}
+
 // --- Decisiones, una por dominio de juego ---------------------------------
 
 function decidirConstruccion(estado, jugadorId, perfil) {
@@ -310,9 +393,20 @@ function decidirConstruccion(estado, jugadorId, perfil) {
     // siempre con recursos de sobra (medido: 2 ciudades en 200 turnos y 3382 de
     // oro sin gastar). Solo le pasaba a facil: es la unica que construye en el
     // orden "de fabrica", el unico que incluye un edificio con tecnologia.
+    // El filtro de COSTA es del mismo tipo que el de tecnologia de arriba, y
+    // por la misma razon exacta: `construir` rechaza el puerto en una ciudad
+    // sin mar al lado, y como esta es la PRIMERA decision del turno, proponerlo
+    // en una ciudad de tierra adentro se repetiria hasta agotar el tope de
+    // fallos y dejaria a la maquina sin fundar, mover ni reclutar ese turno.
+    // Es literalmente el bug de la universidad otra vez, con otro edificio.
+    //
+    // `puertoUtil` es mas estricto que la regla a proposito (exige ademas un
+    // mar de tamano razonable): un puerto sobre un charco es legal y es plata
+    // tirada. Ver MAR_MINIMO_PARA_PUERTO.
     const faltantes = perfil.ordenEdificios.filter((tipo) =>
       !tile.ciudad.edificios.includes(tipo) &&
-      tieneTecnologiaRequerida(jugador, EDIFICIOS[tipo].requiereTecnologia));
+      tieneTecnologiaRequerida(jugador, EDIFICIOS[tipo].requiereTecnologia) &&
+      (!EDIFICIOS[tipo].requiereCosta || puertoUtil(estado, tile.x, tile.y)));
     for (const tipo of faltantes) {
       if (puedePagar(jugador, EDIFICIOS[tipo].costo)) {
         return { tipo: 'construir', x: tile.x, y: tile.y, edificio: tipo };
@@ -361,7 +455,13 @@ function decidirMejoraCiudad(estado, jugadorId, perfil) {
 function decidirReclutamiento(estado, jugadorId, perfil) {
   const jugador = jugadorPorId(estado, jugadorId);
   const ciudades = ciudadesDe(estado, jugadorId);
-  if (ejercitosDe(estado, jugadorId).length >= ciudades.length + perfil.topeEjercitosExtra) return null;
+  // Solo la tropa de TIERRA cuenta contra este tope. Si los buques contaran,
+  // cada barco seria un colono menos, y como el territorio se gana caminando
+  // (ver reglas/movimiento.js), una maquina con armada se estaria suicidando
+  // en la carrera por la dominacion. Los buques tienen su propio tope, chico,
+  // en decidirReclutamientoNaval.
+  const terrestres = ejercitosDe(estado, jugadorId).filter((t) => !esNaval(t.ejercito.tipo));
+  if (terrestres.length >= ciudades.length + perfil.topeEjercitosExtra) return null;
 
   const libres = ciudades.filter((tile) => !tile.ejercito);
   if (libres.length === 0) return null;
@@ -381,6 +481,33 @@ function decidirReclutamiento(estado, jugadorId, perfil) {
     }
   }
   return null;
+}
+
+/**
+ * Botar un buque. Es una decision aparte de decidirReclutamiento y no una
+ * entrada mas en `unidadesPrioridad`, porque su tope es independiente del de
+ * tierra (ver el comentario alli).
+ *
+ * Las dos condiciones que pide `reclutar` (puerto construido, y una casilla de
+ * mar libre donde botarlo) se comprueban ACA antes de proponer nada: una
+ * decision que la regla va a rechazar gasta uno de los cinco fallos seguidos
+ * que la maquina se permite antes de cerrar el turno.
+ */
+function decidirReclutamientoNaval(estado, jugadorId, perfil) {
+  if (!perfil.topeBuques) return null;
+
+  const buques = ejercitosDe(estado, jugadorId).filter((t) => esNaval(t.ejercito.tipo));
+  if (buques.length >= perfil.topeBuques) return null;
+
+  const jugador = jugadorPorId(estado, jugadorId);
+  if (!puedePagar(jugador, UNIDADES.warship.costo)) return null;
+
+  const puerto = ciudadesDe(estado, jugadorId).find((t) =>
+    t.ciudad.edificios.includes('port') &&
+    marAdyacente(estado, t.x, t.y).some((m) => !m.ejercito));
+  if (!puerto) return null;
+
+  return { tipo: 'reclutar', x: puerto.x, y: puerto.y, unidad: 'warship' };
 }
 
 // De un grupo de casillas empatadas, la que deja mas cerca del objetivo. Si el
@@ -404,6 +531,10 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
   const ejercitos = ejercitosDe(estado, jugadorId);
   for (const [indice, origen] of ejercitos.entries()) {
     if (origen.ejercito.movimientoRestante <= 0) continue;
+    // Un buque juega el MISMO bucle que la tropa de tierra (elegir objetivo,
+    // decidir si conviene atacar, si no moverse hacia algo), con dos
+    // diferencias: por donde puede pasar, y hacia donde apunta su brujula.
+    const naval = esNaval(origen.ejercito.tipo);
     const vecinos = vecinosOrtogonales(estado, origen.x, origen.y);
 
     // Contra QUE pelear cuando hay mas de una opcion al lado. Antes se tomaba el
@@ -446,7 +577,7 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
     // casilla con dueño ajeno, la maquina no podia cruzar la frontera aunque la
     // regla ya se lo permitiera: caminaba solo por lo suyo.
     const transitables = vecinos.filter((t) =>
-      t.terreno !== 'water' &&
+      (naval ? t.terreno === 'water' : t.terreno !== 'water') &&
       !(t.ejercito && t.ejercito.dueno !== jugadorId) &&
       !(t.ciudad && t.dueno && t.dueno !== jugadorId) &&
       !(t.ejercito && t.ejercito.dueno === jugadorId));
@@ -465,8 +596,13 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
     // Sin esta distincion, darle valor a la casilla enemiga volvia agresivas a
     // las tres dificultades y la escala facil < normal < dificil se rompia.
     const valorAjena = perfil.ofensiva === 'nunca' ? 1 : 3;
+    // En el mar no hay dueño ni territorio que ganar (ver docs/adr/0002), asi
+    // que para un buque TODAS las casillas valen lo mismo y quien decide es la
+    // brujula, entera. Si se le dejara el puntaje terrestre, el bono por
+    // casilla sin descubrir ganaria siempre y la flota se iria a explorar en
+    // vez de ir a donde esta el enemigo.
     const puntajeDestino = (t) =>
-      (t.dueno === jugadorId ? 0 : t.dueno ? valorAjena : 2) +
+      naval ? 0 : (t.dueno === jugadorId ? 0 : t.dueno ? valorAjena : 2) +
       (t.descubiertoPor.includes(jugadorId) ? 0 : 1);
     const mejorPuntaje = Math.max(...transitables.map(puntajeDestino));
     const mejores = transitables.filter((t) => puntajeDestino(t) === mejorPuntaje);
@@ -488,10 +624,17 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
     // tierra libre va con todo: ya no le queda nada que colonizar.
     const marchaSobreCiudad = brujulas.ofensiva &&
       (perfil.ofensiva === 'sinTierraLibre' || indice % 2 === 0);
-    const preferida = marchaSobreCiudad ? brujulas.ofensiva : brujulas.tomable;
+    // La flota busca primero al buque enemigo y, si no hay ninguno, va a
+    // castigar la costa. Sin esa segunda mitad una flota sin rival se queda
+    // flotando sin hacer nada, que es el bug ya medido una vez con los
+    // ejercitos de tierra (11 de 12 rodeados de casillas propias).
+    const preferida = naval
+      ? brujulas.buqueEnemigo
+      : (marchaSobreCiudad ? brujulas.ofensiva : brujulas.tomable);
+    const respaldo = naval ? brujulas.costaEnemiga : brujulas.tomable;
     const destino = mejores.length === 1
       ? mejores[0]
-      : masCercaSegun(mejores, preferida, brujulas.tomable, rng);
+      : masCercaSegun(mejores, preferida, respaldo, rng);
     return { tipo: 'moverEjercito', desde: { x: origen.x, y: origen.y }, hasta: { x: destino.x, y: destino.y } };
   }
   return null;
@@ -544,6 +687,7 @@ function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, bru
     decidirConstruccion(estado, jugadorId, perfil) ??
     decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) ??
     decidirReclutamiento(estado, jugadorId, perfil) ??
+    decidirReclutamientoNaval(estado, jugadorId, perfil) ??
     decidirMilitar(estado, jugadorId, rng, perfil, brujulas) ??
     decidirMejoraCiudad(estado, jugadorId, perfil) ??
     null;
@@ -597,9 +741,16 @@ export function jugarTurnoIA(estado, jugadorId, rng) {
     const enModoOfensivo = perfil.ofensiva === 'siempre' ||
       (perfil.ofensiva === 'sinTierraLibre' && !quedaTierraSinDueno(estado));
     // La brujula ofensiva se calcula solo si hace falta: es un BFS de mas.
+    // Las brujulas navales solo se calculan si esta maquina TIENE flota: son
+    // dos BFS mas por paso, y la enorme mayoria de las partidas se juegan sin
+    // un solo buque. `masCercaSegun` ya ignora una brujula nula.
+    const tieneFlota = estado.mapa.some(
+      (t) => t.ejercito && t.ejercito.dueno === jugadorId && esNaval(t.ejercito.tipo));
     const brujulas = {
       tomable,
       ofensiva: enModoOfensivo ? distanciaACiudadEnemiga(estado, jugadorId) : null,
+      buqueEnemigo: tieneFlota ? distanciaABuqueEnemigo(estado, jugadorId) : null,
+      costaEnemiga: tieneFlota ? distanciaACostaEnemiga(estado, jugadorId) : null,
     };
     const decision = decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujulas);
     if (!decision) break;

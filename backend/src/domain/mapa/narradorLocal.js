@@ -9,7 +9,8 @@ const NOMBRE_EDIFICIO = {
   barracks: 'un cuartel',
   sawmill: 'un aserradero',
   quarry: 'una cantera',
-  university: 'una universidad'
+  university: 'una universidad',
+  port: 'un puerto'
 };
 
 const NOMBRE_RASGO = {
@@ -34,7 +35,8 @@ const NOMBRE_UNIDAD = {
   spearman: 'lanceros',
   cavalry: 'caballeria',
   legionary: 'legionarios',
-  catapult: 'una catapulta'
+  catapult: 'una catapulta',
+  warship: 'un buque de guerra'
 };
 
 const NOMBRE_VICTORIA = {
@@ -178,14 +180,31 @@ export function narrarRonda(eventos, jugadores = []) {
         const danoDefensor = numeroSeguro(datos.danoDefensor);
         const danoAtacante = numeroSeguro(datos.danoAtacante);
 
+        // `datos.naval` lo pone reglas/combate.js cuando alguno de los dos
+        // bandos es un buque. Los eventos viejos no lo traen y caen al relato
+        // terrestre de siempre, que es el correcto para ellos.
+        const enElMar = datos.naval === true;
+
         if (datos.ganador === 'atacante') {
-          frases.push(danoDefensor !== null
-            ? `${quien} ataco${loc} y se impuso, causando ${danoDefensor} de dano.`
-            : `${quien} ataco${loc} y se impuso.`);
+          if (enElMar) {
+            frases.push(danoDefensor !== null
+              ? `La flota de ${quien} se impuso${loc}, causando ${danoDefensor} de dano.`
+              : `La flota de ${quien} se impuso${loc}.`);
+          } else {
+            frases.push(danoDefensor !== null
+              ? `${quien} ataco${loc} y se impuso, causando ${danoDefensor} de dano.`
+              : `${quien} ataco${loc} y se impuso.`);
+          }
         } else if (datos.ganador === 'defensor') {
-          frases.push(danoAtacante !== null
-            ? `${quien} ataco${loc} pero fue rechazado, sufriendo ${danoAtacante} de dano.`
-            : `${quien} ataco${loc} pero fue rechazado.`);
+          if (enElMar) {
+            frases.push(danoAtacante !== null
+              ? `La flota de ${quien} fue repelida${loc}, sufriendo ${danoAtacante} de dano.`
+              : `La flota de ${quien} fue repelida${loc}.`);
+          } else {
+            frases.push(danoAtacante !== null
+              ? `${quien} ataco${loc} pero fue rechazado, sufriendo ${danoAtacante} de dano.`
+              : `${quien} ataco${loc} pero fue rechazado.`);
+          }
         } else {
           // `ganador` ausente o con un valor inesperado: se narra el hecho sin afirmar
           // un desenlace que no esta confirmado por el evento.
@@ -197,8 +216,30 @@ export function narrarRonda(eventos, jugadores = []) {
       case 'UnidadDestruida': {
         // El evento solo trae {x, y}: no identifica al dueno de la unidad destruida
         // (ver aplicar.js), asi que no podemos nombrar al bando derrotado.
+        // Un buque no "cae": se hunde. El evento trae `naval` justamente
+        // porque aca no hay forma de mirar el terreno.
+        if (datos.naval === true) {
+          const enMar = coordenadas(datos.x, datos.y) || ' en alta mar';
+          frases.push(`Un buque se fue a pique${enMar}.`);
+          break;
+        }
         const loc = coordenadas(datos.x, datos.y) || ' en el campo de batalla';
         frases.push(`Una unidad cayo en combate${loc}.`);
+        break;
+      }
+
+      // Un buque vencio a una ciudad costera y se llevo su oro sin poder
+      // tomarla: no pisa tierra (ver docs/adr/0003). Se narra SIEMPRE, aunque
+      // el botin sea cero, porque perder oro sin perder la ciudad es
+      // exactamente el tipo de cosa que decide una partida en silencio si la
+      // cronica no la cuenta.
+      case 'CiudadSaqueada': {
+        const loc = coordenadas(datos.x, datos.y) || ' en la costa';
+        const victima = nombreDe(jugadores, datos.victima);
+        const oro = numeroSeguro(datos.oro);
+        frases.push(oro
+          ? `La flota de ${quien} asalto un puerto de ${victima}${loc} y se llevo ${oro} de oro.`
+          : `La flota de ${quien} asalto un puerto de ${victima}${loc}, pero no habia nada que saquear.`);
         break;
       }
 

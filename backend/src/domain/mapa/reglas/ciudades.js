@@ -1,7 +1,7 @@
 import { tileEn, jugadorPorId, puedePagar } from '../MapGame.js';
 import { COSTO_CIUDAD, EDIFICIOS, COSTO_MEJORA_CIUDAD } from '../constantes.js';
 import { ReglaError } from '../errores.js';
-import { validarTurno, evento, radio1 } from './comun.js';
+import { validarTurno, evento, radio1, esCostera } from './comun.js';
 import { tieneTecnologiaRequerida } from './tecnologia.js';
 
 export function fundarCiudad(estado, jugadorId, { x, y, nombre }) {
@@ -34,6 +34,14 @@ export function construir(estado, jugadorId, { x, y, edificio }) {
   if (!definicion) throw new ReglaError('EDIFICIO_DESCONOCIDO', `Edificio desconocido: ${edificio}`);
   if (tile.ciudad.edificios.includes(edificio)) {
     throw new ReglaError('EDIFICIO_DUPLICADO', 'Ese edificio ya fue construido');
+  }
+
+  // El puerto es el unico edificio con una condicion de GEOGRAFIA y no de
+  // tecnologia ni de recursos: sin mar al lado no hay donde amarrar. Se
+  // comprueba aca, con el resto de las precondiciones, y no en el costo,
+  // porque no es algo que se pueda pagar.
+  if (definicion.requiereCosta && !esCostera(estado, x, y)) {
+    throw new ReglaError('REQUIERE_COSTA', 'Ese edificio requiere una ciudad con mar adyacente');
   }
 
   const jugador = jugadorPorId(estado, jugadorId);

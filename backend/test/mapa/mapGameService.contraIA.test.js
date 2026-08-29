@@ -68,18 +68,41 @@ describe('partidas contra la máquina', () => {
     expect(r.eventos.filter(e => e.tipo === 'TurnoAvanzado').length).toBeGreaterThanOrEqual(2);
   });
 
+  // Este test afirmaba que tras 8 rondas el turno siempre vuelve al humano, y
+  // era INESTABLE desde antes de existir el rio: el humano de este test nunca
+  // se mueve ni se defiende, asi que el bot puede tomarle la capital y ganar
+  // por ultimo en pie dentro de esas 8 rondas. Medido sobre 200 partidas: 3
+  // terminaban antes de la ronda 8 con el rio siendo agua, y 6 con el rio
+  // convertido en tierra vadeable (el mapa quedo mas conectado y el bot llega
+  // antes). O sea que fallaba 1 de cada 30 corridas y nadie lo habia visto.
+  //
+  // Lo que este test quiere probar de verdad es que la partida NO SE TRABA: que
+  // el turno alterna y avanza. Que termine es un final legitimo, no un cuelgue,
+  // asi que ahora se acepta como salida valida y se corta ahi.
   it('se puede jugar varias rondas seguidas sin que la partida se trabe', async () => {
     const svc = crearServicio();
     const { id } = await svc.crearPartida({ nombre: 'Solo', contraIA: true });
     const { token } = await svc.unirse(id, { id: 'yo', nombre: 'Yo', civilizacion: 'Incas' });
     await svc.iniciar(id);
 
+    let rondasJugadas = 0;
+    let termino = false;
     for (let ronda = 0; ronda < 8; ronda++) {
       const r = await svc.accion(id, 'yo', { tipo: 'terminarTurno' }, token);
+      if (r.vista.estado === 'terminado') {
+        // Si termino, tiene que haber terminado de verdad: con un ganador.
+        expect(r.vista.ganador).not.toBeNull();
+        termino = true;
+        break;
+      }
+      // Mientras la partida siga viva, el bot jugo y devolvio el turno.
       expect(r.vista.jugadores[r.vista.indiceJugadorActual].id).toBe('yo');
+      rondasJugadas++;
     }
+
     const vista = await svc.vista(id, 'yo', token);
-    expect(vista.turno).toBeGreaterThanOrEqual(8);
+    expect(vista.turno).toBeGreaterThanOrEqual(rondasJugadas);
+    if (!termino) expect(vista.turno).toBeGreaterThanOrEqual(8);
   });
 
   it('el bot solo no le sirve un token: no se puede jugar en su nombre', async () => {
