@@ -121,13 +121,13 @@ describe('facil vs dificil: se nota en las decisiones, no solo en un numero', ()
     const jugador = e.jugadores.find((j) => j.id === 'bot');
     jugador.recursos = { food: 500, gold: 0, wood: 500, stone: 500, science: 0, culture: 0 };
 
-    // Dos candidatas SIN dueño (fundarCiudad rechaza cualquier tile con
-    // dueño, incluso el propio) pero YA descubiertas: una llanura (bono
-    // bajo) y una montaña (bono alto).
+    // Dos candidatas DENTRO del territorio de 'bot' (fundarCiudad exige
+    // territorio propio) pero sin ciudad: una llanura (bono bajo) y una
+    // montaña (bono alto).
     const capital = e.mapa.find((t) => t.ciudad && t.dueno === 'bot');
     const a = tileEn(e, capital.x + 1, capital.y);
     const b = tileEn(e, capital.x - 1, capital.y);
-    [a, b].forEach((t) => { t.dueno = null; t.ciudad = null; t.descubiertoPor = ['bot']; });
+    [a, b].forEach((t) => { t.dueno = 'bot'; t.ciudad = null; t.descubiertoPor = ['bot']; });
     a.terreno = 'plains';
     b.terreno = 'mountains';
 

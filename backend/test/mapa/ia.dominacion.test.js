@@ -6,6 +6,7 @@ import { terminarTurno } from '../../src/domain/mapa/reglas/turnos.js';
 import { controlTerritorial } from '../../src/domain/mapa/reglas/dominacion.js';
 import { jugarTurnoIA, PERFILES_DIFICULTAD } from '../../src/domain/mapa/ia.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
+import { esNaval } from '../../src/domain/mapa/constantes.js';
 
 const RICO = { food: 10000, gold: 10000, wood: 10000, stone: 10000, science: 0, culture: 0 };
 
@@ -79,7 +80,10 @@ describe('la IA juega por dominacion territorial', () => {
   it('la dificil gana antes que la facil con la misma semilla', () => {
     const turnosParaGanar = (dificultad) => {
       const e = partidaConBot('territorio-3', dificultad);
-      jugarRondas(e, 400, 'comparar');
+      // 600 en vez de 400: fundar ahora exige territorio propio (reclamado
+      // caminando o con un buque, no solo descubierto), asi que cruzar agua
+      // para llegar al 60% de dominacion lleva mas pasos que antes.
+      jugarRondas(e, 600, 'comparar');
       return e.estado === 'terminado' ? e.turno : Infinity;
     };
 
@@ -94,9 +98,15 @@ describe('la IA juega por dominacion territorial', () => {
 
     jugarRondas(e, 10, 'tope');
 
-    const ejercitos = e.mapa.filter(t => t.ejercito && t.ejercito.dueno === 'bot').length;
+    // La tropa de tierra y los buques de guerra tienen topes separados (ver
+    // decidirReclutamientoNaval): un buque no le come el lugar a un colono,
+    // asi que se cuentan aparte en vez de contra el mismo tope.
+    const ejercitos = e.mapa.filter(t => t.ejercito && t.ejercito.dueno === 'bot');
+    const terrestres = ejercitos.filter(t => !esNaval(t.ejercito.tipo)).length;
+    const buques = ejercitos.filter(t => esNaval(t.ejercito.tipo)).length;
     const ciudades = e.mapa.filter(t => t.ciudad && t.dueno === 'bot').length;
-    expect(ejercitos).toBeLessThanOrEqual(ciudades + PERFILES_DIFICULTAD.normal.topeEjercitosExtra);
+    expect(terrestres).toBeLessThanOrEqual(ciudades + PERFILES_DIFICULTAD.normal.topeEjercitosExtra);
+    expect(buques).toBeLessThanOrEqual(PERFILES_DIFICULTAD.normal.topeBuques);
   });
 
   it('funda mas de una ciudad cuando le sobran recursos (fundar dejo de ser lo ultimo)', () => {

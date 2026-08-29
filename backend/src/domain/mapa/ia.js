@@ -569,6 +569,7 @@ function decidirReclutamiento(estado, jugadorId, perfil) {
   // MEJOR unidad que alguna ciudad pueda producir es lo que el perfil promete.
   for (const tipo of perfil.unidadesPrioridad) {
     const definicion = UNIDADES[tipo];
+    if (!tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) continue;
     if (!puedePagar(jugador, definicion.costo)) continue;
     const ciudad = libres.find((tile) =>
       !definicion.requiereBarracks || tile.ciudad.edificios.includes('barracks'));
@@ -838,13 +839,10 @@ function decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) 
   const jugador = jugadorPorId(estado, jugadorId);
   if (!puedePagar(jugador, COSTO_CIUDAD)) return null;
 
-  // fundarCiudad (ver reglas/ciudades.js) rechaza CUALQUIER tile con dueño,
-  // incluso el propio: solo se puede fundar en tierra sin reclamar. Filtrar
-  // por "es mia" (t.dueno === jugadorId) es el error que tenia esta funcion
-  // antes: nunca hay una casilla asi que pase la regla real, asi que la IA
-  // jamas lograba fundar una segunda ciudad.
+  // fundarCiudad (ver reglas/ciudades.js) solo permite fundar dentro del
+  // propio territorio (t.dueno === jugadorId) y en una casilla sin ciudad.
   const candidatas = estado.mapa.filter((t) =>
-    !t.dueno && !t.ciudad && t.terreno !== 'water' && t.descubiertoPor.includes(jugadorId));
+    t.dueno === jugadorId && !t.ciudad && t.terreno !== 'water');
   if (candidatas.length === 0) return null;
 
   let elegida;

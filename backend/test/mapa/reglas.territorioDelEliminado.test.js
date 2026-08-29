@@ -68,9 +68,14 @@ describe('el territorio de un jugador eliminado', () => {
       aplicar(e, terminarTurno(e, e.jugadores[e.indiceJugadorActual].id));
     }
 
-    expect(() => moverEjercito(e, 'p1', {
+    // Se aplica el movimiento (no solo se verifica que no tire error): fundar
+    // ahora exige territorio propio, y la casilla recien se vuelve de p1 al
+    // aplicar el TerritorioReclamado que emite moverEjercito.
+    const movs = moverEjercito(e, 'p1', {
       desde: { x: vecina.x, y: vecina.y }, hasta: { x: suelta.x, y: suelta.y },
-    })).not.toThrow();
+    });
+    expect(movs.some(ev => ev.tipo === 'TerritorioReclamado')).toBe(true);
+    aplicar(e, movs);
 
     const jugador = e.jugadores.find(j => j.id === 'p1');
     jugador.recursos = { food: 500, gold: 500, wood: 500, stone: 500, science: 0, culture: 0 };

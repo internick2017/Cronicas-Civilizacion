@@ -9,7 +9,8 @@ export function fundarCiudad(estado, jugadorId, { x, y, nombre }) {
 
   const tile = tileEn(estado, x, y);
   if (!tile || tile.terreno === 'water') throw new ReglaError('POSICION_INVALIDA', 'Posición inválida');
-  if (tile.ciudad || tile.dueno) throw new ReglaError('CASILLA_OCUPADA', 'La casilla ya está ocupada');
+  if (tile.ciudad) throw new ReglaError('CASILLA_OCUPADA', 'La casilla ya está ocupada');
+  if (tile.dueno !== jugadorId) throw new ReglaError('TERRITORIO_AJENO', 'Solo podés fundar dentro de tu propio territorio');
 
   const jugador = jugadorPorId(estado, jugadorId);
   if (!puedePagar(jugador, COSTO_CIUDAD)) {

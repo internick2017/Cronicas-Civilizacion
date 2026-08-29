@@ -62,6 +62,9 @@ describe('el rio es tierra vadeable', () => {
 
   it('se puede fundar una ciudad sobre un rio; sobre el mar no', () => {
     tileEn(e, ax, ay).terreno = 'river';
+    // Fundar exige territorio propio: se vadea el rio primero para reclamarlo
+    // (igual que cualquier tierra, ver test de arriba) y recien ahi se funda.
+    aplicar(e, moverEjercito(e, 'p1', { desde: { x: cx, y: cy }, hasta: { x: ax, y: ay } }));
     expect(() => fundarCiudad(e, 'p1', { x: ax, y: ay, nombre: 'Vado' })).not.toThrow();
 
     tileEn(e, ax, ay).terreno = 'water';

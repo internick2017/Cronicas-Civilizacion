@@ -29,7 +29,7 @@ Costo de fundar una ciudad nueva:
 | wood | 30 |
 | stone | 20 |
 
-No se puede fundar sobre agua ni sobre una casilla ya ocupada (con ciudad o con dueño).
+No se puede fundar sobre agua, sobre una casilla que ya tiene ciudad, ni fuera de tu propio territorio (la casilla debe tener tu civilización como dueño).
 
 ## Edificios
 

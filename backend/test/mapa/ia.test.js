@@ -4,6 +4,7 @@ import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { jugarTurnoIA, PERFILES_DIFICULTAD } from '../../src/domain/mapa/ia.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
+import { esNaval } from '../../src/domain/mapa/constantes.js';
 
 function partidaCon(semilla, cantidadHumanos = 1) {
   const e = crearEstado({ nombre: 'T', semilla });
@@ -84,9 +85,14 @@ describe('jugarTurnoIA', () => {
     const jugador = e.jugadores.find((j) => j.id === 'bot');
     jugador.recursos = { food: 10000, gold: 10000, wood: 10000, stone: 10000, science: 0, culture: 0 };
     jugarIA(e);
-    const ejercitos = e.mapa.filter((t) => t.ejercito && t.ejercito.dueno === 'bot').length;
+    // Tierra y buques tienen topes separados (ver decidirReclutamientoNaval):
+    // un buque no le come el lugar a un colono, asi que se cuentan aparte.
+    const ejercitos = e.mapa.filter((t) => t.ejercito && t.ejercito.dueno === 'bot');
+    const terrestres = ejercitos.filter((t) => !esNaval(t.ejercito.tipo)).length;
+    const buques = ejercitos.filter((t) => esNaval(t.ejercito.tipo)).length;
     const ciudades = e.mapa.filter((t) => t.ciudad && t.dueno === 'bot').length;
-    expect(ejercitos).toBeLessThanOrEqual(ciudades + PERFILES_DIFICULTAD.normal.topeEjercitosExtra);
+    expect(terrestres).toBeLessThanOrEqual(ciudades + PERFILES_DIFICULTAD.normal.topeEjercitosExtra);
+    expect(buques).toBeLessThanOrEqual(PERFILES_DIFICULTAD.normal.topeBuques);
   });
 
   it('descubre territorio nuevo al moverse (no da vueltas siempre sobre lo mismo)', () => {
