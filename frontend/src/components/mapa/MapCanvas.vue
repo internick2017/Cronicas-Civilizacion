@@ -2,7 +2,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Application, Container, Sprite, Graphics, Assets } from 'pixi.js'
-import { SPRITE_TERRENO, TINTE_TERRENO, SPRITE_CIUDAD, SPRITE_UNIDAD, colorDeJugador, cargarSprites } from '../../mapa/sprites.js'
+import { SPRITE_TERRENO, TINTE_TERRENO, ROTACION_TERRENO, SPRITE_CIUDAD, SPRITE_UNIDAD, colorDeJugador, cargarSprites } from '../../mapa/sprites.js'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -139,8 +139,16 @@ function actualizarTerreno() {
     const sprite = new Sprite(Assets.get(url))
     sprite.width = TILE
     sprite.height = TILE
-    sprite.x = tile.x * TILE
-    sprite.y = tile.y * TILE
+    // Anclado al CENTRO (y posicionado en el centro de la casilla) porque hay
+    // terrenos que se giran: con el ancla por defecto en la esquina, el giro
+    // saca el sprite de su casilla en vez de rotarlo en el lugar.
+    sprite.anchor.set(0.5)
+    sprite.x = (tile.x + 0.5) * TILE
+    sprite.y = (tile.y + 0.5) * TILE
+    // El rio se gira un cuarto de vuelta para que su corriente no corra igual
+    // que la del mar (ver ROTACION_TERRENO). Es la mitad no cromatica de
+    // separarlos: el color solo no alcanzaba.
+    sprite.rotation = ROTACION_TERRENO[tile.terreno] ?? 0
     // El tinte es lo que separa el mar de la montana y el rio del mar: los
     // sprites crudos son campos palidos casi indistinguibles (ver el comentario
     // de TINTE_TERRENO). Sin entrada en la tabla se dibuja tal cual viene.

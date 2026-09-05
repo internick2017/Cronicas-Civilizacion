@@ -32,8 +32,11 @@ export const TINTE_TERRENO = {
   // Azul profundo: el mar tiene que ser lo mas saturado del tablero, porque es
   // lo unico que hay que reconocer de un vistazo sin pensar.
   water: 0x2f6fb0,
-  // Mas claro y mas verde que el mar: agua dulce que se cruza, no que detiene.
-  river: 0x7fc8d8,
+  // Verde agua, no azul: el rio tiene que salirse de la familia del mar. Con
+  // un celeste (era 0x7fc8d8) compartia tinte Y dibujo con el mar, y a 48
+  // pixeles se leian igual; el dueno del juego lo confirmo mirandolo. La otra
+  // mitad del arreglo es ROTACION_TERRENO, aca abajo.
+  river: 0x7fd8b0,
   // Gris piedra tibio, sin nada de azul: es lo que deja de parecerse al agua.
   mountains: 0xb0a89c,
   // Marron calido, para separarla del desierto palido de al lado.
@@ -44,6 +47,19 @@ export const TINTE_TERRENO = {
   // cual esta (el tinte no puede aclarar, asi que se separa al reves).
   forest: 0x90c090,
   plains: 0xffffff
+}
+
+// Cuanto se GIRA el sprite de cada terreno al dibujarlo, en radianes.
+//
+// El rio reusa el arte del agua, asi que compartia con el mar hasta el dibujo
+// de las olas: mismo patron, mismo angulo, y solo un tinte de diferencia. Con
+// un cuarto de vuelta la corriente corre perpendicular al mar, que es una
+// diferencia que el ojo agarra antes de mirar el color.
+//
+// Se hace aca y no con arte nuevo porque no hay sprite de rio, y girar el que
+// hay cuesta una linea y se deshace en una linea.
+export const ROTACION_TERRENO = {
+  river: Math.PI / 2
 }
 
 export const SPRITE_CIUDAD = `${BASE}/ciudad.png`
