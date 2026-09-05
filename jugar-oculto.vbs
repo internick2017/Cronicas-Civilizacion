@@ -5,6 +5,13 @@
 ' a lanzar nada: te avisa y listo, para no dejar servidores duplicados peleando
 ' por el mismo puerto.
 '
+' "Ya esta corriendo" se decide preguntandole al SERVIDOR si contesta, no
+' mirando si existe una ventana con el titulo correcto. Cuando el backend
+' crashea, su cmd sobrevive vacio: mirando titulos, el icono quedaba inservible
+' (avisaba "ya esta corriendo", no levantaba nada, y no habia como enterarse
+' salvo abrir el navegador y ver que no cargaba). Si quedaron cascaras muertas,
+' ahora las limpia solo y arranca. Visto y arreglado el 2026-09-04.
+'
 ' Para pararlo: detener-cronicas.vbs (mata los 3 por titulo de ventana, aunque
 ' esten ocultos).
 '
@@ -19,25 +26,81 @@ projectDir = fso.GetParentFolderName(WScript.ScriptFullName)
 logDir = projectDir & "\logs"
 If Not fso.FolderExists(logDir) Then fso.CreateFolder(logDir)
 
-Function YaEstaCorriendo(tituloVentana)
+TITULOS = Array("CronicasBackend", "CronicasFrontend", "CronicasFrontendLan")
+
+' Hay una ventana (oculta) con ese titulo. Ojo: esto NO significa que el juego
+' funcione. El cmd es solo la cascara; si el node de adentro murio, la cascara
+' sigue viva igual. Sirve para saber que hay que limpiar, no para saber si anda.
+Function HayCascara(tituloVentana)
     Dim wmi, procesos, p
     Set wmi = GetObject("winmgmts:\\.\root\cimv2")
     Set procesos = wmi.ExecQuery("SELECT CommandLine FROM Win32_Process WHERE Name = 'cmd.exe'")
-    YaEstaCorriendo = False
+    HayCascara = False
     For Each p In procesos
         If Not IsNull(p.CommandLine) Then
             If InStr(p.CommandLine, "title " & tituloVentana) > 0 Then
-                YaEstaCorriendo = True
+                HayCascara = True
                 Exit Function
             End If
         End If
     Next
 End Function
 
-If YaEstaCorriendo("CronicasBackend") Then
+Function HayCascaras()
+    Dim t
+    HayCascaras = False
+    For Each t In TITULOS
+        If HayCascara(t) Then
+            HayCascaras = True
+            Exit Function
+        End If
+    Next
+End Function
+
+' Mismo taskkill que detener-cronicas.vbs. El /T es imprescindible: el cmd es
+' el padre, y quien ocupa el puerto es el node hijo.
+Sub LimpiarCascaras()
+    Dim wmi, procesos, p, t
+    Set wmi = GetObject("winmgmts:\\.\root\cimv2")
+    For Each t In TITULOS
+        Set procesos = wmi.ExecQuery("SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name = 'cmd.exe'")
+        For Each p In procesos
+            If Not IsNull(p.CommandLine) Then
+                If InStr(p.CommandLine, "title " & t) > 0 Then
+                    WshShell.Run "taskkill /F /T /PID " & p.ProcessId, 0, True
+                End If
+            End If
+        Next
+    Next
+End Sub
+
+' Caso 1: el juego contesta de verdad. No relanzar nada.
+If ServidorListo("https://localhost:5173") Then
     WshShell.Popup "Cronicas ya esta corriendo. No se lanzo nada nuevo." & vbCrLf & vbCrLf & _
                    "Abrilo en: https://localhost:5173", 6, "Cronicas de Civilizacion", 48
+    WshShell.Run "https://localhost:5173", 1, False
     WScript.Quit
+End If
+
+' Caso 2: hay cascaras pero nadie contesta. Puede ser un arranque EN CURSO (si
+' hiciste doble clic, la primera instancia todavia esta levantando) o restos de
+' una instancia muerta. Se distingue esperando: si en 45 segundos no contesta,
+' estaba muerta. Matarlas de una seria matar un arranque sano.
+If HayCascaras() Then
+    esperaRestos = 0
+    Do While Not ServidorListo("https://localhost:5173") And esperaRestos < 45
+        WScript.Sleep 1000
+        esperaRestos = esperaRestos + 1
+    Loop
+
+    If ServidorListo("https://localhost:5173") Then
+        WshShell.Popup "Cronicas ya estaba arrancando. Ya esta listo." & vbCrLf & vbCrLf & _
+                       "Abrilo en: https://localhost:5173", 6, "Cronicas de Civilizacion", 48
+        WshShell.Run "https://localhost:5173", 1, False
+        WScript.Quit
+    End If
+
+    LimpiarCascaras
 End If
 
 ' 0 = ventana oculta, False = no esperar a que termine (los 3 en paralelo).
