@@ -98,3 +98,6 @@ build/
 # Local TLS certificates (mkcert) — never commit the private key
 .certs/
 *.pem 
+# Configuracion local del entorno, no se versiona
+.claude/
+docs/superpowers/

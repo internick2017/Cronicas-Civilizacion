@@ -12,7 +12,7 @@ import { UNIDADES } from '../../src/domain/mapa/constantes.js';
 import { ReglaError } from '../../src/domain/mapa/errores.js';
 
 // El transporte: la unica unidad que no ataca, y la unica forma de que la
-// tropa cruce el mar. Ver docs/superpowers/specs/2026-08-28-mar-rio-y-armada-design.md
+// tropa cruce el mar.
 //
 // Escenario: capital de p1 en tierra, con una franja de mar a su izquierda y
 // otra franja de tierra del otro lado. Es el mapa mas chico donde una invasion

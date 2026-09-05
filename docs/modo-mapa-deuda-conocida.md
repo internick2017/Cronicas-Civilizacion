@@ -1,7 +1,6 @@
 # Modo mapa: deuda conocida y próximos pasos
 
-Estado al 2026-08-08, tras completar la nueva capa de dominio
-(`docs/superpowers/plans/2026-08-08-capa-dominio-mapa.md`).
+Estado al 2026-08-08, tras completar la nueva capa de dominio.
 
 El modo mapa está completo a nivel backend: dominio puro, persistencia, servicio, API REST y
 sockets. 235 tests en verde. Esta página lista lo que quedó afuera a propósito, para que no se
@@ -27,8 +26,7 @@ verificaron cerrados con un probe real contra base de datos, no solo con tests:
 
 `map:join` acepta un tercer argumento con el token de sesión del jugador (emitido una
 única vez por `unirse`); `POST /:id/accion` y `GET /:id` exigen el header
-`X-Jugador-Token`. Diseño en
-`docs/superpowers/specs/2026-08-08-autorizacion-sockets-mapa-design.md`.
+`X-Jugador-Token`.
 
 ### 2. Los dos lockfiles se contradicen
 
