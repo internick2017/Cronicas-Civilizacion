@@ -32,11 +32,25 @@ export const TINTE_TERRENO = {
   // Azul profundo: el mar tiene que ser lo mas saturado del tablero, porque es
   // lo unico que hay que reconocer de un vistazo sin pensar.
   water: 0x2f6fb0,
-  // Verde agua, no azul: el rio tiene que salirse de la familia del mar. Con
-  // un celeste (era 0x7fc8d8) compartia tinte Y dibujo con el mar, y a 48
-  // pixeles se leian igual; el dueno del juego lo confirmo mirandolo. La otra
-  // mitad del arreglo es ROTACION_TERRENO, aca abajo.
-  river: 0x7fd8b0,
+  // Cyan claro, elegido por estar LEJOS DE LOS DOS vecinos peligrosos, no por
+  // ser bonito. Con el celeste original (0x7fc8d8) el rio compartia tinte Y
+  // dibujo con el mar y se leian igual, confirmado mirandolo jugar. El primer
+  // arreglo lo mando al verde (0x7fd8b0), que lo alejaba del mar pero lo
+  // acercaba a la llanura, que tambien es verde: se canjeaba un vecino por
+  // otro. Medido en distancia perceptual (dE) contra el color final de cada
+  // terreno:
+  //
+  //   verde 0x7fd8b0 -> llanura 33.7 | mar 69.6   (vecino mas cercano: 33.7)
+  //   cyan  0x7fd0c8 -> llanura 50.8 | mar 53.6   (vecino mas cercano: 50.8)
+  //
+  // Lo que decide si algo se confunde es el vecino MAS CERCANO, no la suma, y
+  // por eso gana este. Referencia util: llanura contra bosque estan a 26.6 y
+  // conviven bien, porque tienen texturas distintas.
+  //
+  // Y la otra mitad del arreglo no es cromatica: ver ROTACION_TERRENO abajo.
+  // El rio viejo estaba a 41.9 del mar (MAS lejos que estos 33.7) y aun asi se
+  // confundia, porque compartia el sprite. La forma pesa mas que el color.
+  river: 0x7fd0c8,
   // Gris piedra tibio, sin nada de azul: es lo que deja de parecerse al agua.
   mountains: 0xb0a89c,
   // Marron calido, para separarla del desierto palido de al lado.
