@@ -35,6 +35,15 @@ resolvió con el **saqueo**, que le roba oro al dueño sin tomar la ciudad ni su
   robarle a alguien en cero. Contra un humano que acumula debería pesar mucho más, y eso hay que
   verificarlo jugando, no simulando. Si al jugarlo sigue siendo irrelevante, el arreglo no es
   subir el porcentaje: es que el saqueo cueste algo más que oro.
+- **Actualización 2026-10-10: el saqueo ahora cuesta algo más que oro.** Medido otra vez
+  (`simular.js --islas`): 4 saqueos y 100 de oro en 20 partidas con 367 combates navales. Se hizo lo
+  que este ADR anticipaba: la ciudad saqueada **no produce nada** durante
+  `SAQUEO.rondasSinProduccion` (2) rondas, así el golpe no depende de cuánto oro tenga la víctima.
+  Un nuevo saqueo renueva el plazo, no lo acumula. No se tocaron la fórmula del oro ni la IA. El
+  balance no se movió (26/30 partidas terminan con y sin el cerco). Lo que sigue sin saberse es si
+  se siente bien: falta jugarlo contra una persona. Si la frecuencia sigue siendo el problema, el
+  siguiente paso es el bloqueo de puerto sin combate, descartado hoy por tamaño. Diseño en
+  `docs/superpowers/specs/2026-10-10-saqueo-asedia-la-ciudad-design.md`.
 - **El puerto no se traba detrás de una tecnología**, aunque el juego ya tenga el patrón de
   desbloquear cosas así. Para tener un buque ya hacen falta dos condiciones (ciudad en la costa,
   más el puerto construido), y una tercera repetiría el error de la biblioteca, que costaba ciencia

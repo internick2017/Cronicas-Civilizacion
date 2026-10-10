@@ -104,7 +104,8 @@ Cruzar un río a pie, quedando peor defendido mientras se está dentro.
 _Avoid_: cruzar, atravesar
 
 **Saqueo**:
-Robarle oro a una ciudad venciéndola sin tomarla.
+Robarle oro a una ciudad venciéndola sin tomarla. Además, la ciudad saqueada no produce nada durante
+unas rondas (`SAQUEO.rondasSinProduccion`); un nuevo saqueo renueva ese plazo, no lo acumula.
 _Avoid_: pillaje, botín, raid
 
 **Crónica**:

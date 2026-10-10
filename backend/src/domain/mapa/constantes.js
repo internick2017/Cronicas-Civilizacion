@@ -240,10 +240,16 @@ export const PUERTO = {
 // Una cantidad fija seria irrelevante contra un jugador rico y brutal contra
 // uno pobre; un porcentaje puro convertiria a quien acumula oro en un premio
 // cada vez mas grande por no gastarlo.
+//
+// Ademas del oro, la ciudad saqueada deja de producir `rondasSinProduccion`
+// rondas. El oro depende de lo que la victima tenga en la mano (contra un bot
+// que gasta todo es cero), asi que el golpe que no depende de eso es este.
+// Ver docs/superpowers/specs/2026-10-10-saqueo-asedia-la-ciudad-design.md.
 export const SAQUEO = {
   fraccion: 0.10,
   minimo: 5,
-  maximo: 25
+  maximo: 25,
+  rondasSinProduccion: 2
 };
 
 export const BONO_TERRENO_PRODUCCION = {

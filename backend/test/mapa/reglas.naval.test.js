@@ -7,6 +7,7 @@ import { reclutar } from '../../src/domain/mapa/reglas/militar.js';
 import { moverEjercito } from '../../src/domain/mapa/reglas/movimiento.js';
 import { atacar } from '../../src/domain/mapa/reglas/combate.js';
 import { evento } from '../../src/domain/mapa/reglas/comun.js';
+import { producirParaJugador } from '../../src/domain/mapa/reglas/turnos.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
 import { SAQUEO, PUERTO, UNIDADES } from '../../src/domain/mapa/constantes.js';
 import { ReglaError } from '../../src/domain/mapa/errores.js';
@@ -200,6 +201,70 @@ describe('el saqueo', () => {
     const { vx, vy } = ciudadEnemigaCosteraIndefensa();
     const evs = atacar(e, 'p1', { desde: { x: mx, y: my }, hasta: { x: vx, y: vy } }, crearRng(SEMILLA_GANA_EL_BUQUE));
     expect(evs.find(ev => ev.tipo === 'CombateResuelto').datos.naval).toBe(true);
+  });
+});
+
+describe('la ciudad saqueada', () => {
+  // p2 tiene su capital y ademas el puerto rival, que es el que se saquea.
+  function saquear(oroVictima = 0) {
+    conPuerto();
+    aplicar(e, reclutar(e, 'p1', { x: cx, y: cy, unidad: 'warship' }));
+    const vx = mx, vy = my - 1;
+    if (vy < 0) throw new Error('supuesto roto: hace falta lugar arriba del mar');
+    aplicar(e, [evento('CiudadFundada', e, 'p2', { x: vx, y: vy, nombre: 'Puerto rival' })]);
+    jugadorPorId(e, 'p2').recursos.gold = oroVictima;
+    const evs = atacar(e, 'p1', { desde: { x: mx, y: my }, hasta: { x: vx, y: vy } }, crearRng(SEMILLA_GANA_EL_BUQUE));
+    aplicar(e, evs);
+    return { vx, vy, evs };
+  }
+
+  const produccionDe = (id) => producirParaJugador(e, id);
+
+  it('deja de producir hasta que pasa el cerco, aunque la victima no tenga oro', () => {
+    const { vx, vy } = saquear(0);
+    const otraCiudad = e.mapa.find(t => t.ciudad && t.dueno === 'p2' && !(t.x === vx && t.y === vy));
+    const hasta = tileEn(e, vx, vy).ciudad.saqueadaHasta;
+
+    expect(hasta).toBe(e.turno + SAQUEO.rondasSinProduccion);
+    // Durante el cerco rinde solo la otra ciudad; las demas no se tocan.
+    expect(otraCiudad.ciudad.saqueadaHasta).toBeUndefined();
+    const durante = produccionDe('p2').food;
+    e.turno = hasta;
+    expect(produccionDe('p2').food).toBeGreaterThan(durante);
+  });
+
+  it('vuelve a producir apenas vence el cerco', () => {
+    const { vx, vy } = saquear(0);
+    const hasta = tileEn(e, vx, vy).ciudad.saqueadaHasta;
+
+    e.turno = hasta - 1;
+    const durante = produccionDe('p2').food;
+    e.turno = hasta;
+    const despues = produccionDe('p2').food;
+
+    expect(despues).toBeGreaterThan(durante);
+  });
+
+  it('otro saqueo renueva el cerco, no lo acumula', () => {
+    const { vx, vy, evs } = saquear(0);
+    const primero = tileEn(e, vx, vy).ciudad.saqueadaHasta;
+
+    aplicar(e, evs); // el mismo evento otra vez, en el mismo turno
+    expect(tileEn(e, vx, vy).ciudad.saqueadaHasta).toBe(primero);
+
+    e.turno += 1;
+    const evsTarde = [{ ...evs.find(ev => ev.tipo === 'CiudadSaqueada') }];
+    evsTarde[0] = { ...evsTarde[0], datos: { ...evsTarde[0].datos, saqueadaHasta: e.turno + SAQUEO.rondasSinProduccion } };
+    aplicar(e, evsTarde);
+    expect(tileEn(e, vx, vy).ciudad.saqueadaHasta).toBe(primero + 1);
+  });
+
+  it('una partida guardada sin el campo produce como siempre', () => {
+    const { vx, vy } = saquear(0);
+    delete tileEn(e, vx, vy).ciudad.saqueadaHasta;
+    const sinCampo = produccionDe('p2').food;
+    e.turno = 999;
+    expect(produccionDe('p2').food).toBe(sinCampo);
   });
 });
 

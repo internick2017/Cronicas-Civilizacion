@@ -176,12 +176,16 @@ export function aplicar(estado, eventos) {
       // Un buque vencio a una ciudad costera indefensa y se llevo oro sin
       // tomarla (ver reglas/combate.js). El oro se TRANSFIERE: lo que pierde
       // uno lo gana el otro, que es lo que significa saquear. La ciudad, su
-      // dueño y su territorio no se tocan.
+      // dueño y su territorio no se tocan, pero la ciudad queda sin producir
+      // hasta `saqueadaHasta`. Se queda con el mayor para que reaplicar el
+      // evento, o una racha de saqueos, renueve el cerco sin alargarlo.
       case 'CiudadSaqueada': {
         const victima = jugadorPorId(estado, datos.victima);
         const asaltante = jugadorPorId(estado, jugadorId);
         if (victima) victima.recursos.gold -= datos.oro;
         if (asaltante) asaltante.recursos.gold += datos.oro;
+        const ciudad = tileEn(estado, datos.x, datos.y)?.ciudad;
+        if (ciudad) ciudad.saqueadaHasta = Math.max(ciudad.saqueadaHasta ?? 0, datos.saqueadaHasta);
         break;
       }
 

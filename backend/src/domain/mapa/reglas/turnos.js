@@ -5,6 +5,7 @@ import { produccionPorRasgos } from './cultura.js';
 import { aplicarBonosPorcentuales } from './tecnologia.js';
 import { controlTerritorial } from './dominacion.js';
 import { recuperarFronteras } from './fronteras.js';
+import { estaSaqueada } from './saqueo.js';
 
 export function siguienteIndiceActivo(estado, excluirIds = null) {
   const n = estado.jugadores.length;
@@ -33,6 +34,10 @@ export function producirParaJugador(estado, jugadorId) {
   // edificios: valen para las ciudades que ya tenias y para las que fundes.
   const porRasgos = produccionPorRasgos(estado.jugadores.find(j => j.id === jugadorId));
   for (const tile of ciudadesDe(estado, jugadorId)) {
+    // Una ciudad saqueada no produce nada hasta que se le pasa el cerco (ver
+    // reglas/saqueo.js). Sigue contando como ciudad: no se pierde ni deja de
+    // sostener al jugador en pie.
+    if (estaSaqueada(tile.ciudad, estado.turno)) continue;
     for (const [recurso, cantidad] of Object.entries(PRODUCCION_BASE_CIUDAD)) acumular(recurso, cantidad);
     for (const [recurso, cantidad] of Object.entries(porRasgos)) acumular(recurso, cantidad);
     const bono = BONO_TERRENO_PRODUCCION[tile.terreno] ?? {};

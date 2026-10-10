@@ -257,8 +257,8 @@ export function narrarRonda(eventos, jugadores = []) {
         const victima = nombreDe(jugadores, datos.victima);
         const oro = numeroSeguro(datos.oro);
         frases.push(oro
-          ? `La flota de ${quien} asalto un puerto de ${victima}${loc} y se llevo ${oro} de oro.`
-          : `La flota de ${quien} asalto un puerto de ${victima}${loc}, pero no habia nada que saquear.`);
+          ? `La flota de ${quien} asalto un puerto de ${victima}${loc} y se llevo ${oro} de oro. La ciudad quedo sin producir.`
+          : `La flota de ${quien} asalto un puerto de ${victima}${loc}. No habia oro que llevarse, pero la ciudad quedo sin producir.`);
         break;
       }
 

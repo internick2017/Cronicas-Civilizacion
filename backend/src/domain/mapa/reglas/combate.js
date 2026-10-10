@@ -1,10 +1,11 @@
 import { tileEn } from '../MapGame.js';
 import {
   UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, CUARTEL,
-  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, SAQUEO, esNaval, puedeAtacar
+  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, esNaval, puedeAtacar
 } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
+import { botinDe, saqueadaHasta } from './saqueo.js';
 import { validarTurno, evento, radio1 } from './comun.js';
 import { bonoDefensaPorRasgos } from './cultura.js';
 import { bonoAtaquePorTecnologias, bonoDefensaUnidadPorTecnologias } from './tecnologia.js';
@@ -133,17 +134,12 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
     // que le da sentido a "hostiga" contra una costa desguarnecida (ver
     // docs/adr/0003).
     if (esNaval(tileDesde.ejercito.tipo)) {
-      const oroVictima = defensor?.recursos?.gold ?? 0;
-      // Proporcional con piso y techo, y ademas acotado a lo que la victima
-      // realmente tiene: si no tiene oro el saqueo no da nada, pero el combate
-      // ocurrio igual y el buque pudo haberse llevado dano. Hostigar nunca es
-      // gratis.
-      const oro = Math.min(
-        oroVictima,
-        Math.min(SAQUEO.maximo, Math.max(SAQUEO.minimo, Math.round(oroVictima * SAQUEO.fraccion)))
-      );
+      // Si la victima no tiene oro el saqueo no da oro, pero el combate ocurrio
+      // igual y el buque pudo haberse llevado dano. Hostigar nunca es gratis.
       eventos.push(evento('CiudadSaqueada', estado, jugadorId, {
-        x: hasta.x, y: hasta.y, oro, victima: tileHasta.dueno,
+        x: hasta.x, y: hasta.y, victima: tileHasta.dueno,
+        oro: botinDe(defensor?.recursos?.gold ?? 0),
+        saqueadaHasta: saqueadaHasta(estado.turno),
       }));
       return eventos;
     }
