@@ -151,9 +151,32 @@ End If
 
 WshShell.Run "https://localhost:5173", 1, False
 
+' La IP de esta PC en la red de casa la calcula ip-lan.js (ahi esta el porque).
+' Se corre oculto y volcando a un archivo: WshShell.Exec devolveria la salida
+' directo, pero hace parpadear una ventana negra, que es lo que este lanzador
+' existe para evitar.
+Function IpLan()
+    Dim archivo, f
+    IpLan = ""
+    archivo = logDir & "\ip-lan.txt"
+    WshShell.Run "cmd /c node """ & projectDir & "\ip-lan.js"" > """ & archivo & """ 2>nul", 0, True
+    If fso.FileExists(archivo) Then
+        Set f = fso.OpenTextFile(archivo, 1)
+        If Not f.AtEndOfStream Then IpLan = Trim(f.ReadLine)
+        f.Close
+    End If
+End Function
+
+ip = IpLan()
+If ip <> "" Then
+    lineaLan = "En tablet o celular:   http://" & ip & ":5174"
+Else
+    lineaLan = "En tablet o celular:   no se pudo detectar la IP de esta PC." & vbCrLf & _
+               "(abri una ventana negra, escribi ipconfig y usa http://ESA-IP:5174)"
+End If
+
 WshShell.Popup "Cronicas de Civilizacion iniciado." & vbCrLf & vbCrLf & _
                "En esta PC:            https://localhost:5173" & vbCrLf & _
-               "En tablet o celular:   http://192.168.3.6:5174" & vbCrLf & _
-               "(si esa IP no anda, cambio: abri una ventana negra y escribi ipconfig)" & vbCrLf & vbCrLf & _
+               lineaLan & vbCrLf & vbCrLf & _
                "Para cerrarlo: el acceso directo 'Detener Cronicas'.", _
                8, "Cronicas de Civilizacion", 64

@@ -24,14 +24,21 @@ timeout /t 10 /nobreak >nul
 
 start https://localhost:5173
 
+set "IP_LAN="
+for /f "usebackq delims=" %%i in (`node "%PROYECTO%ip-lan.js"`) do set "IP_LAN=%%i"
+
 echo.
 echo ================================================
 echo Listo. El juego deberia haberse abierto en el navegador.
 echo.
 echo   - En ESTA PC entra solo:     https://localhost:5173
-echo   - En tablet o celular (misma WiFi):  http://192.168.3.6:5174
-echo     (si esa direccion no funciona, la IP de la PC cambio; para verla
-echo      de nuevo abri una ventana negra de Windows y escribi: ipconfig)
+if defined IP_LAN (
+    echo   - En tablet o celular ^(misma WiFi^):  http://%IP_LAN%:5174
+) else (
+    echo   - En tablet o celular: no se pudo detectar la IP de esta PC.
+    echo     Abri una ventana negra de Windows, escribi ipconfig y usa
+    echo     http://LA-IP-QUE-APAREZCA:5174
+)
 echo.
 echo Para CERRAR el juego: cerra las 3 ventanas negras de los servidores.
 echo Esta ventana se puede cerrar apenas quieras.
