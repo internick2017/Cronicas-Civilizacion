@@ -20,7 +20,7 @@ const props = defineProps({
 const emit = defineEmits(['salir', 'error'])
 
 const { accion, vista: pedirVista, obtenerConstantes, iniciar: iniciarPartidaApi } = useMapApi()
-const { conectar, desconectar, unirseAPartida, onEstado, onNarrativa } = useMapSocket()
+const { seguirPartida, desconectar } = useMapSocket()
 
 const id = props.partidaInicial.id
 const jugadorId = props.partidaInicial.jugadorId
@@ -490,21 +490,22 @@ onMounted(async () => {
 
   vigilarInicio()
 
-  try {
-    await conectar()
-    await unirseAPartida(id, jugadorId, token)
-    onEstado((payload) => {
+  // El socket es solo para actualizaciones en vivo; si no conecta, la partida
+  // sigue jugable por REST (ver spec seccion 6) y socket.io sigue reintentando.
+  seguirPartida(id, jugadorId, token, {
+    alEstado: (payload) => {
       vista.value = payload
       if (payload.narrativas) narrativas.value = fusionarNarrativas(narrativas.value, payload.narrativas)
       detenerVigilancia()
-    })
-    onNarrativa((entrada) => {
+    },
+    alNarrativa: (entrada) => {
       narrativas.value = fusionarNarrativas(narrativas.value, [entrada])
-    })
-  } catch {
-    // El socket es solo para actualizaciones en vivo; si falla la conexion,
-    // la partida sigue jugable por REST (ver spec seccion 6).
-  }
+    },
+    alUnirse: () => {
+      // error transitorio: la proxima jugada o reconexion trae la vista
+      refrescarVista().catch(() => {})
+    }
+  })
 })
 
 onUnmounted(() => {
