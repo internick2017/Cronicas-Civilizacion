@@ -177,13 +177,21 @@ const alcanzables = computed(() => {
       if (capacidad > 0 && llevaCarga && tile.terreno !== 'water' &&
         !tile.ejercito && !(tile.ciudad && tile.dueno !== jugadorId)) return true
 
-      if (esNaval ? tile.terreno !== 'water' : tile.terreno === 'water') return false
+      const ejercitoEnemigo = tile.ejercito && tile.ejercito.dueno !== jugadorId
+      const ciudadEnemiga = tile.ciudad && tile.dueno !== jugadorId
+      // Un buque NAVEGA solo por el mar, pero ATACA la costa desde ahi: una
+      // ciudad o un ejercito enemigo pegado al mar es un objetivo valido (es
+      // exactamente el saqueo, ver docs/adr/0003). Sin esta excepcion el
+      // filtro de "solo agua" dejaba la armada sin poder tocar tierra, y el
+      // saqueo era inalcanzable para un humano. El transporte no ataca (ataque
+      // 0), asi que no entra aca.
+      const puedeAtacarTierra = esNaval && (defDe(origen.ejercito.tipo)?.ataque ?? 0) > 0 &&
+        Boolean(ejercitoEnemigo || ciudadEnemiga)
+      if (!puedeAtacarTierra && (esNaval ? tile.terreno !== 'water' : tile.terreno === 'water')) return false
       // Un ejercito propio ya ocupando el destino: movimiento.js lo rechaza
       // con CASILLA_OCUPADA (y no es ataque, asi que tampoco es un objetivo
       // valido). No se ofrece como alcanzable.
       if (tile.ejercito && tile.ejercito.dueno === jugadorId) return false
-      const ejercitoEnemigo = tile.ejercito && tile.ejercito.dueno !== jugadorId
-      const ciudadEnemiga = tile.ciudad && tile.dueno !== jugadorId
       // Territorio enemigo (dueno de otro jugador) sin ejercito ni ciudad ahi:
       // movimiento.js lo rechaza con OBJETIVO_INVALIDO ("usa atacar"), pero
       // combate.js tambien lo rechaza (no hay objetivo real que atacar). No
