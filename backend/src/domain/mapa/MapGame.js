@@ -21,6 +21,8 @@ const CONFIG_DEFAULT = {
   // entusiasmo. Si la semilla no da dos masas de tierra jugables, la partida
   // arranca como siempre (ver generarMapa.js#posicionesIniciales).
   islas: false,
+  // Cada cuantas rondas hay elecciones en las republicas (ver reglas/gobierno.js).
+  rondasEntreElecciones: 8,
 };
 
 // Limites duros de la config. Viven en el DOMINIO (no solo en el borde HTTP)
@@ -37,6 +39,7 @@ const LIMITES_CONFIG = {
   // El limite es opcional (null), pero si se fija tiene que dar para una
   // partida de verdad: 5 rondas no alcanzan ni para fundar la segunda ciudad.
   limiteRondas: { min: 10, max: 500 },
+  rondasEntreElecciones: { min: 2, max: 50 },
 };
 const MODOS_TURNO = ['secuencial']; // unico modo implementado
 
@@ -55,6 +58,7 @@ export function validarConfig(cfg) {
   validarEntero(cfg, 'tamanoMapa');
   validarEntero(cfg, 'maxJugadores');
   validarEntero(cfg, 'porcentajeVictoria');
+  validarEntero(cfg, 'rondasEntreElecciones');
   // null es un valor valido y significa "sin limite"; cualquier otra cosa se
   // valida como entero en rango.
   if (cfg.limiteRondas !== null && cfg.limiteRondas !== undefined) {

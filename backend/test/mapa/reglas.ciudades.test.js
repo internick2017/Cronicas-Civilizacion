@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { crearEstado, tileEn, jugadorPorId } from '../../src/domain/mapa/MapGame.js';
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
-import { fundarCiudad, construir } from '../../src/domain/mapa/reglas/ciudades.js';
+import { fundarCiudad, construir, renombrarCiudad } from '../../src/domain/mapa/reglas/ciudades.js';
 import { reclutar } from '../../src/domain/mapa/reglas/militar.js';
 import { moverEjercito } from '../../src/domain/mapa/reglas/movimiento.js';
 
@@ -116,5 +116,51 @@ describe('construir', () => {
     jugadorPorId(e, 'p1').recursos = { food: 0, gold: 0, wood: 0, stone: 0, science: 0, culture: 0 };
     expect(() => construir(e, 'p1', { x: propia.x, y: propia.y, edificio: 'granary' }))
       .toThrowError(expect.objectContaining({ codigo: 'RECURSOS_INSUFICIENTES' }));
+  });
+});
+
+describe('renombrarCiudad', () => {
+  const propia = () => e.mapa.find(t => t.ciudad && t.dueno === 'p1');
+
+  it('renombra la ciudad propia, sin gastar recursos, y recorta espacios', () => {
+    const { x, y } = propia();
+    const antes = { ...jugadorPorId(e, 'p1').recursos };
+    const evs = renombrarCiudad(e, 'p1', { x, y, nombre: '  Machu Picchu ' });
+    expect(evs.map(ev => ev.tipo)).toEqual(['CiudadRenombrada']);
+    aplicar(e, evs);
+    expect(tileEn(e, x, y).ciudad.nombre).toBe('Machu Picchu');
+    expect(jugadorPorId(e, 'p1').recursos).toEqual(antes);
+  });
+
+  it('no toca el resto de la ciudad', () => {
+    const { x, y } = propia();
+    const { nivel, poblacion, edificios } = tileEn(e, x, y).ciudad;
+    aplicar(e, renombrarCiudad(e, 'p1', { x, y, nombre: 'Nueva' }));
+    expect(tileEn(e, x, y).ciudad).toMatchObject({ nombre: 'Nueva', nivel, poblacion, edificios });
+  });
+
+  it('rechaza una ciudad ajena', () => {
+    const ajena = e.mapa.find(t => t.ciudad && t.dueno === 'p2');
+    expect(() => renombrarCiudad(e, 'p1', { x: ajena.x, y: ajena.y, nombre: 'X' }))
+      .toThrowError(expect.objectContaining({ codigo: 'CIUDAD_AJENA' }));
+  });
+
+  it('rechaza una casilla sin ciudad', () => {
+    expect(() => renombrarCiudad(e, 'p1', { x: tierraLibre.x, y: tierraLibre.y, nombre: 'X' }))
+      .toThrowError(expect.objectContaining({ codigo: 'SIN_CIUDAD' }));
+  });
+
+  it('rechaza nombre vacío, solo espacios, no texto o demasiado largo', () => {
+    const { x, y } = propia();
+    for (const nombre of ['', '   ', undefined, 42, 'a'.repeat(31)]) {
+      expect(() => renombrarCiudad(e, 'p1', { x, y, nombre }))
+        .toThrowError(expect.objectContaining({ codigo: 'NOMBRE_INVALIDO' }));
+    }
+  });
+
+  it('solo en tu turno', () => {
+    const { x, y } = propia();
+    expect(() => renombrarCiudad(e, 'p2', { x, y, nombre: 'X' }))
+      .toThrowError(expect.objectContaining({ codigo: 'NO_ES_TU_TURNO' }));
   });
 });

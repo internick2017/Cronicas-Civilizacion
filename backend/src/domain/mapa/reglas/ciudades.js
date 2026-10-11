@@ -24,6 +24,26 @@ export function fundarCiudad(estado, jugadorId, { x, y, nombre }) {
   ];
 }
 
+export const LARGO_MAXIMO_NOMBRE_CIUDAD = 30;
+
+// Renombrar es gratis (no gasta recursos) pero, como toda accion de
+// jugador, solo en tu turno. Solo el dueño de la ciudad puede hacerlo.
+export function renombrarCiudad(estado, jugadorId, { x, y, nombre }) {
+  validarTurno(estado, jugadorId);
+
+  const tile = tileEn(estado, x, y);
+  if (!tile?.ciudad) throw new ReglaError('SIN_CIUDAD', 'No hay una ciudad ahí');
+  if (tile.dueno !== jugadorId) throw new ReglaError('CIUDAD_AJENA', 'Solo podés renombrar tus propias ciudades');
+
+  const limpio = typeof nombre === 'string' ? nombre.trim() : '';
+  if (!limpio) throw new ReglaError('NOMBRE_INVALIDO', 'El nombre no puede estar vacío');
+  if (limpio.length > LARGO_MAXIMO_NOMBRE_CIUDAD) {
+    throw new ReglaError('NOMBRE_INVALIDO', `El nombre admite hasta ${LARGO_MAXIMO_NOMBRE_CIUDAD} caracteres`);
+  }
+
+  return [evento('CiudadRenombrada', estado, jugadorId, { x, y, nombre: limpio })];
+}
+
 export function construir(estado, jugadorId, { x, y, edificio }) {
   validarTurno(estado, jugadorId);
 

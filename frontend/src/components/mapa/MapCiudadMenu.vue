@@ -1,6 +1,6 @@
 <!-- frontend/src/components/mapa/MapCiudadMenu.vue -->
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -8,7 +8,7 @@ const props = defineProps({
   posicion: { type: Object, required: true },
   constantes: { type: Object, required: true } // {edificios: [...], unidades: [...], tecnologias: [...]}
 })
-defineEmits(['construir', 'reclutar', 'mejorar', 'cerrar'])
+const emit = defineEmits(['construir', 'reclutar', 'mejorar', 'renombrar', 'cerrar'])
 
 // Los costos NO se copian del backend: llegan por prop desde MapSession, que
 // los pide a GET /api/map/constantes. Una sola fuente de verdad.
@@ -103,10 +103,38 @@ const costoMejora = computed(() => {
   return Object.fromEntries(Object.entries(base).map(([r, m]) => [r, m * nivelActual.value]))
 })
 const motivoMejora = computed(() => (puedePagar(costoMejora.value) ? null : 'sin recursos'))
+
+// Renombrar es gratis. El limite de largo es el del backend
+// (LARGO_MAXIMO_NOMBRE_CIUDAD en reglas/ciudades.js): aca solo evita que el
+// input deje escribir de mas, el backend vuelve a validar.
+const LARGO_MAXIMO_NOMBRE = 30
+const nombreNuevo = ref(tile.value?.ciudad?.nombre ?? '')
+const nombreLimpio = computed(() => nombreNuevo.value.trim())
+const puedeRenombrar = computed(() =>
+  nombreLimpio.value !== '' && nombreLimpio.value !== tile.value?.ciudad?.nombre)
+const renombrar = () => {
+  if (puedeRenombrar.value) emit('renombrar', nombreLimpio.value)
+}
 </script>
 
 <template>
   <div class="ciudad-menu">
+    <section>
+      <h4>Nombre</h4>
+      <div class="fila-nombre">
+        <input
+          v-model="nombreNuevo"
+          class="entrada-nombre"
+          :maxlength="LARGO_MAXIMO_NOMBRE"
+          placeholder="Nombre de la ciudad"
+          @keyup.enter="renombrar"
+        >
+        <button class="btn-secundario" :disabled="!puedeRenombrar" @click="renombrar">
+          <strong>Renombrar</strong>
+        </button>
+      </div>
+    </section>
+
     <section>
       <h4>Nivel de la ciudad</h4>
       <button
@@ -169,5 +197,10 @@ section { display: flex; flex-direction: column; gap: 0.35rem; }
 .btn-secundario:disabled { opacity: 0.45; cursor: not-allowed; }
 small { opacity: 0.7; font-size: 0.75rem; }
 em { color: #e67e22; font-size: 0.72rem; font-style: normal; }
+.fila-nombre { display: flex; gap: 0.4rem; }
+.entrada-nombre {
+  flex: 1; min-width: 0; padding: 0.4rem 0.6rem; border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.25); color: #ecf0f1;
+}
 .bono-cuartel { color: #2ecc71; }
 </style>

@@ -13,6 +13,7 @@ import MapCiudadMenu from './MapCiudadMenu.vue'
 import MapAyuda from './MapAyuda.vue'
 import MapCultura from './MapCultura.vue'
 import MapCiencia from './MapCiencia.vue'
+import MapGobiernoPanel from './MapGobiernoPanel.vue'
 
 const props = defineProps({
   partidaInicial: { type: Object, required: true }
@@ -51,6 +52,7 @@ const nombreCiudad = ref('')
 const canvasRef = ref(null)
 const ciudadesAbierto = ref(false)
 const ayudaAbierta = ref(false)
+const gobiernoAbierto = ref(false)
 
 // La cronica se puede ocultar y la eleccion se recuerda: a quien no le interesa
 // la narrativa no tiene que cerrarla en cada partida, y a quien si le interesa
@@ -127,7 +129,7 @@ const puedeIniciar = computed(() => jugadoresFaltantes.value === 0)
 // Adyacentes ortogonales (Manhattan 1) que el backend va a aceptar. Replica
 // las validaciones de `reglas/movimiento.js` y `reglas/combate.js` (distancia
 // Manhattan === 1, movimientoRestante > 0, destino no acuatico, destino con
-// objetivo enemigo real o libre) para no ofrecer acciones que van a ser
+// objetivo enemigo real, tierra libre o tierra ajena sin defensor) para no ofrecer acciones que van a ser
 // rechazadas. La distincion entre mover y atacar NO se filtra aca: se
 // resuelve en onClickTile, porque ambas acciones comparten las mismas
 // casillas alcanzables (la unica diferencia es si hay un enemigo).
@@ -192,11 +194,11 @@ const alcanzables = computed(() => {
       // con CASILLA_OCUPADA (y no es ataque, asi que tampoco es un objetivo
       // valido). No se ofrece como alcanzable.
       if (tile.ejercito && tile.ejercito.dueno === jugadorId) return false
-      // Territorio enemigo (dueno de otro jugador) sin ejercito ni ciudad ahi:
-      // movimiento.js lo rechaza con OBJETIVO_INVALIDO ("usa atacar"), pero
-      // combate.js tambien lo rechaza (no hay objetivo real que atacar). No
-      // hay ninguna accion que el backend acepte sobre esta casilla.
-      if (tile.dueno && tile.dueno !== jugadorId && !ejercitoEnemigo && !ciudadEnemiga) return false
+      // Territorio ajeno SIN defensor (sin ejercito ni ciudad) SI es alcanzable:
+      // movimiento.js deja entrar y tomarlo (la frontera es permeable, ver el
+      // comentario de `estaDefendida` ahi). Este filtro lo rechazaba creyendo
+      // que el backend pedia atacar, y por eso la maquina podia invadirte
+      // (ella llama al dominio directo) y vos no podias invadirla a ella.
       return true
     })
 })
@@ -432,6 +434,32 @@ const mejorarCiudad = () => {
   ejecutarAccion({ tipo: 'mejorarCiudad', x, y })
 }
 
+const renombrarCiudad = (nombre) => {
+  if (!edificioMenuAbierto.value) return
+  const { x, y } = edificioMenuAbierto.value
+  edificioMenuAbierto.value = null
+  ejecutarAccion({ tipo: 'renombrarCiudad', x, y, nombre })
+}
+
+// Las acciones de gobierno cierran el panel igual que las de ciudad: el
+// resultado (aprobada o rechazada la votacion) se lee en la vista nueva.
+const proponerGobierno = (gobierno, oro) => {
+  gobiernoAbierto.value = false
+  ejecutarAccion({ tipo: 'proponerGobierno', gobierno, oro })
+}
+const darVentajas = (grupo, oro) => {
+  gobiernoAbierto.value = false
+  ejecutarAccion({ tipo: 'darVentajas', grupo, oro })
+}
+const cambiarFormaEstado = (formaEstado) => {
+  gobiernoAbierto.value = false
+  ejecutarAccion({ tipo: 'cambiarFormaEstado', formaEstado })
+}
+
+// Estas dos NO cierran el panel: se suelen crear varias seguidas.
+const crearSubdivision = (datos) => ejecutarAccion({ tipo: 'crearSubdivision', ...datos })
+const quitarSubdivision = (id) => ejecutarAccion({ tipo: 'quitarSubdivision', id })
+
 const cerrarMenuEdificio = () => {
   edificioMenuAbierto.value = null
 }
@@ -570,8 +598,11 @@ onUnmounted(() => {
         <button class="btn-panel" title="Tecnologías" @click="cienciaAbierta = true">
           🔬 Ciencia
         </button>
-        <button class="btn-panel" title="Reglas del juego" @click="ayudaAbierta = true">
-          ℹ️ Reglas
+        <button class="btn-panel" title="Gobierno" @click="gobiernoAbierto = true">
+          🏛️ Gobierno
+        </button>
+        <button class="btn-panel" title="Manual de Instrucciones" @click="ayudaAbierta = true">
+          ℹ️ Manual de Instrucciones
         </button>
         <button class="btn-panel btn-salir" title="Salir de la partida" @click="salidaAbierta = true">
           🚪 Salir
@@ -639,7 +670,22 @@ onUnmounted(() => {
       />
     </MapDialogo>
 
-    <MapDialogo :abierto="ayudaAbierta" titulo="Reglas del juego" @cerrar="ayudaAbierta = false">
+    <MapDialogo :abierto="gobiernoAbierto" titulo="Gobierno" @cerrar="gobiernoAbierto = false">
+      <MapGobiernoPanel
+        v-if="gobiernoAbierto"
+        :vista="vista"
+        :jugador-id="jugadorId"
+        :constantes="constantes"
+        @proponer="proponerGobierno"
+        @ventajas="darVentajas"
+        @forma="cambiarFormaEstado"
+        @subdivision="crearSubdivision"
+        @quitar-subdivision="quitarSubdivision"
+        @cerrar="gobiernoAbierto = false"
+      />
+    </MapDialogo>
+
+    <MapDialogo :abierto="ayudaAbierta" titulo="Manual de Instrucciones" @cerrar="ayudaAbierta = false">
       <MapAyuda :constantes="constantes" :config="vista?.config" />
     </MapDialogo>
 
@@ -653,6 +699,7 @@ onUnmounted(() => {
         @construir="construir"
         @reclutar="reclutar"
         @mejorar="mejorarCiudad"
+        @renombrar="renombrarCiudad"
         @cerrar="cerrarMenuEdificio"
       />
     </MapDialogo>

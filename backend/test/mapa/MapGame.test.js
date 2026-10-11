@@ -20,6 +20,7 @@ describe('crearEstado', () => {
     expect(e.config).toEqual({
       tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial',
       porcentajeVictoria: 60, limiteRondas: null, islas: false,
+      rondasEntreElecciones: 8, // se sumó con el gobierno: solo lo usan las repúblicas
     });
     expect(e.ganador).toBeNull();
   });

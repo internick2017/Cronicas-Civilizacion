@@ -11,12 +11,24 @@ const emit = defineEmits(['terminar-turno'])
 const esMiTurno = computed(() =>
   props.vista.jugadores[props.vista.indiceJugadorActual]?.id === props.jugadorId
 )
+
+// Quien perdio el poder no juega sus turnos: los juega la maquina. El boton se
+// vuelve "Esperar" y SIEMPRE esta habilitado, aunque el turno este parado en
+// otro: es lo que hace seguir la partida (el backend lo trata como pasar).
+const sinPoder = computed(() =>
+  props.vista.jugadores.find(j => j.id === props.jugadorId)?.enPoder === false
+)
+const habilitado = computed(() => sinPoder.value || esMiTurno.value)
+const texto = computed(() => {
+  if (sinPoder.value) return 'Esperar (la máquina juega por vos)'
+  return esMiTurno.value ? 'Terminar turno' : 'No es tu turno'
+})
 </script>
 
 <template>
   <div class="action-bar">
-    <button class="btn-primary" :disabled="!esMiTurno" @click="emit('terminar-turno')">
-      {{ esMiTurno ? 'Terminar turno' : 'No es tu turno' }}
+    <button class="btn-primary" :disabled="!habilitado" @click="emit('terminar-turno')">
+      {{ texto }}
     </button>
   </div>
 </template>

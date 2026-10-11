@@ -60,6 +60,18 @@ const porcentajeDominacion = computed(() =>
 
 const limiteRondas = computed(() => props.config?.limiteRondas ?? null)
 
+// --- Gobierno -----------------------------------------------------------
+// Los NUMEROS salen de las constantes; solo la explicacion esta escrita aca.
+const pct = (fraccion) => `${Math.round(fraccion * 100)}%`
+const rondasElecciones = computed(() => props.config?.rondasEntreElecciones ?? 8)
+const bonosGobierno = computed(() => props.constantes?.bonosProduccionGobierno || {})
+const listaBono = (obj) =>
+  Object.entries(obj || {}).map(([r, f]) => `+${pct(f)} de ${NOMBRE_RECURSO[r] || r}`).join(' y ')
+const probSucesion = computed(() => {
+  const esperanza = props.constantes?.esperanzaDeVidaTurnos
+  return esperanza ? `${(100 / esperanza).toFixed(2).replace('.', ',')}%` : ''
+})
+
 const umbralAviso = computed(() =>
   Math.round((props.constantes?.umbralAvisoDominacion ?? 0) * 100)
 )
@@ -221,6 +233,86 @@ const umbralAviso = computed(() =>
           </tr>
         </tbody>
       </table>
+    </section>
+
+    <section v-if="constantes.gobiernos?.length">
+      <h4>Gobierno y forma de Estado</h4>
+      <p>
+        Con el botón <strong>🏛️ Gobierno</strong> elegís <strong>quién decide</strong> en tu civilización.
+        Empezás en despotismo (mandás vos). Cambiar de gobierno no cuesta nada, pero hay que
+        <strong>ganar la votación</strong> del gobierno en el que estás.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Gobierno</th><th>Quién aprueba un cambio</th><th>Qué te da</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Despotismo</td>
+            <td>Vos</td>
+            <td>Nada extra, pero tampoco perdés nunca el poder.</td>
+          </tr>
+          <tr>
+            <td>Monarquía</td>
+            <td>Vos, si sos el líder</td>
+            <td>
+              {{ listaBono(bonosGobierno.monarquia) }} y más respeto de pueblo y líderes. Cada turno hay
+              {{ probSucesion }} de probabilidad de que un bot asuma el poder (y la misma de que vuelvas).
+            </td>
+          </tr>
+          <tr>
+            <td>Estratocracia</td>
+            <td>Los militares</td>
+            <td>{{ listaBono(bonosGobierno.estratocracia) }} y más respeto del ejército. Para volver al poder necesitás apoyo militar de {{ constantes.umbralesGobierno?.regresoMilitar }}.</td>
+          </tr>
+          <tr>
+            <td>República representativa</td>
+            <td>La mitad de los líderes</td>
+            <td>+{{ pct(constantes.bonoProduccionRepublica) }} de producción en todo: los líderes elegidos mejoran el país.</td>
+          </tr>
+          <tr>
+            <td>República semidirecta</td>
+            <td>Pueblo (50%) y líderes (50%)</td>
+            <td>El mismo bono; las decisiones pesan por mitades.</td>
+          </tr>
+          <tr>
+            <td>República directa</td>
+            <td>La mitad del pueblo</td>
+            <td>El mismo bono; decide la población.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        <strong>El apoyo</strong> de pueblo, líderes y militares (barras del panel) es tu moneda política.
+        Sube {{ constantes.variacionApoyo?.sube }} por ronda si controlás más territorio que los demás y baja
+        {{ constantes.variacionApoyo?.baja }} si controlás menos (nunca por debajo de {{ constantes.variacionApoyo?.piso }}
+        por eso solo). Quien no manda recupera {{ constantes.variacionApoyo?.recuperacion }} por ronda hacia 50.
+      </p>
+      <p>
+        Para ganar una votación hay <strong>dos caminos</strong>: <strong>comprar votos con oro</strong>
+        (el oro se pierde aunque la votación falle, y tras un rechazo esperás
+        {{ constantes.enfriamientoVoto }} turnos para volver a proponer) o
+        <strong>conquistarlos</strong> dando ventajas: cada {{ constantes.oroPorPuntoApoyo }} de oro suben 1 punto
+        el apoyo de un grupo, y se queda. A la hora de votar pesa más si prefieren el gobierno nuevo al actual
+        que cuánto te apoyan.
+      </p>
+      <p class="aviso">
+        <strong>Podés perder el poder</strong> (nunca la partida): por una crisis, por una expulsión si el apoyo de
+        los líderes (o de los militares, en estratocracia) cae por debajo de {{ constantes.umbralesGobierno?.expulsion }},
+        por sucesión en la monarquía, o en las elecciones de las repúblicas, que son cada {{ rondasElecciones }} rondas.
+        Sin poder, <strong>la máquina juega tus turnos</strong> y el botón pasa a "Esperar". Mientras tanto
+        solo podés dar ventajas para volver a ganar apoyo.
+      </p>
+      <p>
+        <strong>Forma de Estado.</strong> En el Estado <strong>unitario</strong> mandás vos en cada ciudad. En el
+        <strong>federal</strong>, todas tus ciudades se administran solas al terminar tu turno: construyen según su
+        prioridad (economía por defecto) y después se mejoran, hasta el nivel {{ constantes.nivelMaximoAdministrado }}.
+        Creando <strong>subdivisiones</strong> agrupás ciudades y les elegís otra prioridad
+        ({{ (constantes.prioridadesSubdivision || []).join(', ') }}). Pasar de uno a otro es gratis.
+      </p>
+      <p>
+        Además, en el menú de cada ciudad propia podés <strong>renombrarla</strong> cuando quieras.
+      </p>
     </section>
 
     <section>

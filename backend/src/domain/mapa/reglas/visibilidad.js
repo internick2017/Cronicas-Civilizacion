@@ -2,7 +2,9 @@ import { jugadorPorId } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
 import { producirParaJugador } from './turnos.js';
 import { controlTerritorial, rivalesDominantes } from './dominacion.js';
-import { DIFICULTAD_IA_DEFAULT } from '../constantes.js';
+import { DIFICULTAD_IA_DEFAULT, GRUPOS_DE_APOYO } from '../constantes.js';
+import { subdivisionesDe } from './subdivisiones.js';
+import { gobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo } from './gobierno.js';
 
 function vistaTile(tile, jugadorId) {
   if (!tile.descubiertoPor.includes(jugadorId)) {
@@ -50,6 +52,14 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       // mismo motivo que los recursos: el porcentaje ajeno dejaria deducir cuanto
       // mapa oculto tiene tomado el rival.
       dominacion: dominacionParaLaVista(estado, jugador.id),
+      gobierno: gobiernoDe(jugador),
+      formaEstado: formaEstadoDe(jugador),
+      enPoder: estaEnPoder(jugador),
+      // Apoyo EFECTIVO (con el respeto del gobierno ya sumado): es lo que
+      // cuenta en una votacion. Privado, como los recursos.
+      apoyo: Object.fromEntries(GRUPOS_DE_APOYO.map(g => [g, apoyoEfectivo(jugador, g)])),
+      cambioBloqueadoHasta: jugador.cambioBloqueadoHasta ?? 0,
+      subdivisiones: subdivisionesDe(jugador).map(s => structuredClone(s)),
     };
   }
   // esBot y dificultadIA no son informacion sensible (a diferencia de
@@ -57,6 +67,9 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
   // "🤖" al rival y con que dificultad esta jugando.
   return {
     id, nombre, civilizacion, activo, esBot: Boolean(esBot),
+    gobierno: gobiernoDe(jugador),
+    formaEstado: formaEstadoDe(jugador),
+    enPoder: estaEnPoder(jugador),
     ...(esBot ? { dificultadIA: jugador.dificultadIA ?? DIFICULTAD_IA_DEFAULT } : {}),
   };
 }

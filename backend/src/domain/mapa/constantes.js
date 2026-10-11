@@ -462,3 +462,69 @@ export const defensaCiudad = (nivel) => 8 + 2 * nivel;
 // existia de antes sin usarse — defensaCiudad(nivel) escala con esto desde
 // el principio, solo que nada permitia subir `nivel` mas alla de 1.
 export const COSTO_MEJORA_CIUDAD = (nivel) => ({ science: 15 * nivel, gold: 10 * nivel });
+
+// --- Gobierno ------------------------------------------------------------
+// El gobierno es POR JUGADOR y cambia QUIEN DECIDE, no las reglas del mapa
+// (ver docs/superpowers/specs/2026-10-11-gobierno-design.md). `electorado` es
+// quien tiene que aprobar un cambio de gobierno estando en ese gobierno:
+// `jugador` = nadie mas, `mixto` = pueblo y lideres al 50% cada uno.
+export const GOBIERNOS = {
+  despotismo: { nombre: 'Despotismo', electorado: 'jugador' },
+  monarquia: { nombre: 'Monarquía', electorado: 'jugador' },
+  estratocracia: { nombre: 'Estratocracia', electorado: 'militares' },
+  republica_indirecta: { nombre: 'República representativa', electorado: 'lideres' },
+  republica_semidirecta: { nombre: 'República semidirecta', electorado: 'mixto' },
+  republica_directa: { nombre: 'República directa', electorado: 'pueblo' },
+};
+export const FORMAS_ESTADO = ['unitario', 'federal'];
+export const GRUPOS_DE_APOYO = ['pueblo', 'lideres', 'militares'];
+
+// Un turno son 6 meses: 159 turnos son ~80 años de vida, y 1/159 es el 0,63%
+// por turno que dio el usuario para la sucesion.
+export const ESPERANZA_DE_VIDA_TURNOS = 159;
+
+// Todo lo que sigue es AJUSTABLE: lo fijo el redactor del plan, no el usuario,
+// y la tarea de balance lo mide contra partidas simuladas.
+export const APOYO_INICIAL = 50;
+// Respeto extra por gobierno (monarquia: te respeta la gente; estratocracia: el
+// ejercito). Se SUMA al leer el apoyo, no se guarda, asi que cambiar de
+// gobierno lo da o lo quita sin tocar el estado.
+export const RESPETO = {
+  monarquia: { pueblo: 10, lideres: 10 },
+  estratocracia: { militares: 10 },
+};
+// Que tanto prefiere cada grupo cada gobierno (0 a 100). En una votacion pesa
+// la DIFERENCIA entre el propuesto y el actual.
+export const PREFERENCIAS = {
+  pueblo: { despotismo: 20, monarquia: 30, estratocracia: 25, republica_indirecta: 60, republica_semidirecta: 70, republica_directa: 80 },
+  lideres: { despotismo: 40, monarquia: 70, estratocracia: 30, republica_indirecta: 75, republica_semidirecta: 65, republica_directa: 25 },
+  militares: { despotismo: 50, monarquia: 55, estratocracia: 90, republica_indirecta: 30, republica_semidirecta: 30, republica_directa: 30 },
+};
+export const PESO_PREFERENCIA = 0.6; // "principalmente" lo que prefieren
+export const PESO_APOYO = 0.4;
+export const ORO_A_VOTOS = 0.5;      // puntos de voto por oro ofrecido
+export const UMBRAL_APROBACION = 50;
+export const ENFRIAMIENTO_VOTO = 3;  // turnos sin volver a proponer tras perder
+export const PROBABILIDAD_CRISIS = 0.02;
+export const UMBRAL_EXPULSION = 25;
+export const UMBRAL_REGRESO_MILITAR = 70;
+export const UMBRAL_ELECCION = 50;
+export const BONO_PRODUCCION_REPUBLICA = 0.1; // a TODOS los recursos
+// Bonos concretos de los otros gobiernos (ademas del respeto de RESPETO), para
+// que no sean peores que el despotismo sin pagar nada: la monarquia cobra
+// tributos y la estratocracia arma sus arsenales con madera y piedra.
+export const BONO_PRODUCCION_GOBIERNO = {
+  monarquia: { gold: 0.2 },
+  estratocracia: { wood: 0.2, stone: 0.2 },
+};
+// Hasta que nivel mejora ciudades SOLA el Estado federal (el jugador puede
+// seguir subiendolas a mano): sin tope vaciaba la ciencia y el oro.
+export const NIVEL_MAXIMO_ADMINISTRADO = 3;
+export const ORO_POR_PUNTO_APOYO = 5;
+export const VARIACION_APOYO_POR_RONDA = 2; // sube 2 por ronda por encima del promedio
+// Bajar es MAS LENTO que subir y tiene piso: medido en una partida real, con -2 por
+// ronda el apoyo caia a 4-6 en 40 rondas y perder el poder era casi permanente.
+export const BAJADA_APOYO_POR_RONDA = 1;
+export const PISO_APOYO_POR_TERRITORIO = 20;
+// Quien no manda recupera un poco por ronda hacia el punto de partida: la gente olvida.
+export const RECUPERACION_APOYO_SIN_PODER = 1;

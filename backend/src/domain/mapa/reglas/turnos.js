@@ -6,6 +6,9 @@ import { aplicarBonosPorcentuales } from './tecnologia.js';
 import { controlTerritorial } from './dominacion.js';
 import { recuperarFronteras } from './fronteras.js';
 import { estaSaqueada } from './saqueo.js';
+import { crearRng } from '../rng.js';
+import { cerrarRondaGobierno, multiplicadorProduccion } from './gobierno.js';
+import { administrarSubdivisiones } from './subdivisiones.js';
 
 export function siguienteIndiceActivo(estado, excluirIds = null) {
   const n = estado.jugadores.length;
@@ -25,7 +28,7 @@ function ciudadesDe(estado, jugadorId) {
 // Exportada para que la vista pueda MOSTRAR el rendimiento por turno sin
 // duplicar la formula: el numero que ve el jugador sale del mismo calculo que
 // despues le suma los recursos (ver visibilidad.js#vistaJugadorPublica).
-export function producirParaJugador(estado, jugadorId) {
+function produccionBruta(estado, jugadorId) {
   const produccion = {};
   const acumular = (recurso, cantidad) => {
     produccion[recurso] = (produccion[recurso] ?? 0) + cantidad;
@@ -50,8 +53,38 @@ export function producirParaJugador(estado, jugadorId) {
   // Los bonos porcentuales de tecnologia (irrigacion, mineria) se aplican AL
   // FINAL, sobre el total ya sumado: un 20% de "toda tu comida" tiene que
   // contar el terreno, los edificios Y los rasgos, no solo la base.
-  return aplicarBonosPorcentuales(produccion, estado.jugadores.find(j => j.id === jugadorId));
+  const jugador = estado.jugadores.find(j => j.id === jugadorId);
+  const total = aplicarBonosPorcentuales(produccion, jugador);
+  return total;
 }
+
+// Lo que rinde de verdad cada ronda: la produccion bruta por el multiplicador
+// del gobierno, con el DECIMAL que sobra llevado a la ronda siguiente
+// (`jugador.restoProduccion`). Sin ese resto, 3 de oro x 1,1 = 3,3 se redondeaba
+// a 3 todos los turnos y el bono desaparecia con valores chicos.
+// Devuelve `resto` (lo que queda despues de este turno) para que viaje EN el
+// evento RecursosProducidos y aplicar.js lo guarde. Puro: no toca el estado.
+export function produccionConResto(estado, jugadorId) {
+  const jugador = estado.jugadores.find(j => j.id === jugadorId);
+  const bruta = produccionBruta(estado, jugadorId);
+  const previo = jugador?.restoProduccion ?? {};
+  const produccion = {};
+  const resto = {};
+  for (const [recurso, valor] of Object.entries(bruta)) {
+    const factor = multiplicadorProduccion(jugador, recurso);
+    if (factor === 1) { produccion[recurso] = valor; continue; }
+    const exacto = valor * factor + (previo[recurso] ?? 0);
+    const entero = Math.floor(exacto + 1e-9);
+    produccion[recurso] = entero;
+    resto[recurso] = Math.max(0, exacto - entero);
+  }
+  return { produccion, resto };
+}
+
+// Exportada para que la vista pueda MOSTRAR el rendimiento por turno sin
+// duplicar la formula: el numero que ve el jugador sale del mismo calculo que
+// despues le suma los recursos (ver visibilidad.js#vistaJugadorPublica).
+export const producirParaJugador = (estado, jugadorId) => produccionConResto(estado, jugadorId).produccion;
 
 // Exportada para que abandonar() use la MISMA evaluacion: si el que se va deja
 // a un solo jugador en pie, la partida tiene que terminar igual que si lo
@@ -131,9 +164,12 @@ export function terminarTurno(estado, jugadorId) {
     const activos = estado.jugadores.filter(j => j.activo);
 
     for (const jugador of activos) {
+      const { produccion, resto } = produccionConResto(estado, jugador.id);
       eventos.push(evento('RecursosProducidos', estado, jugadorId, {
         jugadorId: jugador.id,
-        produccion: producirParaJugador(estado, jugador.id),
+        produccion,
+        // Solo si hay decimales que llevar: para el despotismo el evento no cambia.
+        ...(Object.keys(resto).length > 0 ? { resto } : {}),
       }));
     }
 
@@ -154,6 +190,9 @@ export function terminarTurno(estado, jugadorId) {
       aplicarRecuperacion(estado, ev);
     }
 
+    // Semilla determinista: misma partida + mismo turno = mismo resultado.
+    eventos.push(...cerrarRondaGobierno(estado, crearRng(`gobierno:${estado.semilla}:${estado.turno}`)));
+
     eventos.push(evento('RondaCompletada', estado, jugadorId, {}));
 
     const activosPostEliminacion = activos.filter(j => !eliminados.includes(j.id));
@@ -169,6 +208,12 @@ export function terminarTurno(estado, jugadorId) {
     const eventoVictoria = evaluarVictoria(estado, jugadorId, activosPostEliminacion, turnoCierre);
     if (eventoVictoria) eventos.push(eventoVictoria);
   }
+
+  // El Estado federal administra sus subdivisiones al terminar el turno del
+  // propio jugador (asi las reglas de ciudades, que exigen turno, pasan). Va
+  // antes de TurnoAvanzado. La produccion de la ronda se calculo sobre el
+  // estado SIN estos edificios: rinden desde la ronda siguiente.
+  eventos.unshift(...administrarSubdivisiones(estado, jugadorId));
 
   eventos.unshift(evento('TurnoAvanzado', estado, jugadorId, { indiceJugadorActual: nuevoIndice, turno: nuevoTurno }));
 

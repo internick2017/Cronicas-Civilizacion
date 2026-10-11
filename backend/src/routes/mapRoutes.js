@@ -1,6 +1,12 @@
 import express from 'express';
 import { ReglaError } from '../domain/mapa/errores.js';
+import { PRIORIDADES } from '../domain/mapa/reglas/subdivisiones.js';
 import {
+  GOBIERNOS, GRUPOS_DE_APOYO, ENFRIAMIENTO_VOTO, ESPERANZA_DE_VIDA_TURNOS, ORO_POR_PUNTO_APOYO,
+  BONO_PRODUCCION_REPUBLICA, BONO_PRODUCCION_GOBIERNO, NIVEL_MAXIMO_ADMINISTRADO, RESPETO,
+  UMBRAL_EXPULSION, UMBRAL_ELECCION, UMBRAL_REGRESO_MILITAR, UMBRAL_APROBACION,
+  VARIACION_APOYO_POR_RONDA, BAJADA_APOYO_POR_RONDA, PISO_APOYO_POR_TERRITORIO,
+  RECUPERACION_APOYO_SIN_PODER,
   EDIFICIOS, UNIDADES, COSTO_CIUDAD, MIN_JUGADORES,
   PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, BONO_TERRENO_DEFENSA,
   BONO_DEFENSA_CIUDAD, PORCENTAJE_VICTORIA_DOMINACION, UMBRAL_AVISO_DOMINACION, RASGOS_CULTURALES,
@@ -144,6 +150,27 @@ export function crearMapRoutes(servicio) {
         descripcion: DIFICULTAD_IA_INFO[tipo]?.descripcion || '',
         porDefecto: tipo === DIFICULTAD_IA_DEFAULT,
       })),
+      // Gobierno: el panel lista las opciones y explica quien aprueba cada
+      // cambio leyendolo de aca, no copiandolo.
+      gobiernos: Object.entries(GOBIERNOS).map(([tipo, datos]) => ({ tipo, ...datos })),
+      gruposDeApoyo: GRUPOS_DE_APOYO,
+      enfriamientoVoto: ENFRIAMIENTO_VOTO,
+      esperanzaDeVidaTurnos: ESPERANZA_DE_VIDA_TURNOS,
+      oroPorPuntoApoyo: ORO_POR_PUNTO_APOYO,
+      prioridadesSubdivision: Object.keys(PRIORIDADES),
+      // Numeros del manual de instrucciones (MapAyuda): el texto los lee de aca.
+      bonoProduccionRepublica: BONO_PRODUCCION_REPUBLICA,
+      bonosProduccionGobierno: BONO_PRODUCCION_GOBIERNO,
+      respetoGobierno: RESPETO,
+      nivelMaximoAdministrado: NIVEL_MAXIMO_ADMINISTRADO,
+      umbralesGobierno: {
+        expulsion: UMBRAL_EXPULSION, eleccion: UMBRAL_ELECCION,
+        regresoMilitar: UMBRAL_REGRESO_MILITAR, aprobacion: UMBRAL_APROBACION,
+      },
+      variacionApoyo: {
+        sube: VARIACION_APOYO_POR_RONDA, baja: BAJADA_APOYO_POR_RONDA,
+        piso: PISO_APOYO_POR_TERRITORIO, recuperacion: RECUPERACION_APOYO_SIN_PODER,
+      },
       bonoDefensaCiudad: BONO_DEFENSA_CIUDAD,
       porcentajeVictoriaDominacion: PORCENTAJE_VICTORIA_DOMINACION,
       umbralAvisoDominacion: UMBRAL_AVISO_DOMINACION

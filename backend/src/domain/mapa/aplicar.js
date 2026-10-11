@@ -34,6 +34,48 @@ export function aplicar(estado, eventos) {
         break;
       }
 
+      case 'CiudadRenombrada': {
+        tileEn(estado, datos.x, datos.y).ciudad.nombre = datos.nombre;
+        break;
+      }
+
+      case 'GobiernoCambiado':
+        jugadorPorId(estado, jugadorId).gobierno = datos.gobierno;
+        break;
+
+      case 'VotacionFallida':
+        jugadorPorId(estado, jugadorId).cambioBloqueadoHasta = datos.hastaTurno;
+        break;
+
+      case 'FormaEstadoCambiada':
+        jugadorPorId(estado, jugadorId).formaEstado = datos.formaEstado;
+        break;
+
+      case 'ApoyoActualizado':
+        jugadorPorId(estado, jugadorId).apoyo = { ...datos.apoyo };
+        break;
+
+      case 'SubdivisionCreada': {
+        const j = jugadorPorId(estado, jugadorId);
+        if (!j.subdivisiones) j.subdivisiones = [];
+        j.subdivisiones.push({ id: datos.id, nombre: datos.nombre, prioridad: datos.prioridad, ciudades: datos.ciudades });
+        break;
+      }
+
+      case 'SubdivisionQuitada': {
+        const j = jugadorPorId(estado, jugadorId);
+        j.subdivisiones = (j.subdivisiones ?? []).filter(s => s.id !== datos.id);
+        break;
+      }
+
+      case 'PoderPerdido':
+        jugadorPorId(estado, jugadorId).enPoder = false;
+        break;
+
+      case 'PoderRecuperado':
+        jugadorPorId(estado, jugadorId).enPoder = true;
+        break;
+
       case 'EdificioConstruido': {
         const t = tileEn(estado, datos.x, datos.y);
         t.ciudad.edificios.push(datos.edificio);
@@ -72,6 +114,7 @@ export function aplicar(estado, eventos) {
       case 'RecursosProducidos': {
         const j = jugadorPorId(estado, datos.jugadorId);
         for (const [r, c] of Object.entries(datos.produccion)) j.recursos[r] += c;
+        if (datos.resto) j.restoProduccion = { ...datos.resto };
         break;
       }
 

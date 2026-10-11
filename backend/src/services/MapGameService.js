@@ -4,7 +4,9 @@ import { aplicar } from '../domain/mapa/aplicar.js';
 import { crearRng } from '../domain/mapa/rng.js';
 import { ReglaError } from '../domain/mapa/errores.js';
 import { unirse as unirseRegla, iniciar as iniciarRegla } from '../domain/mapa/reglas/partida.js';
-import { fundarCiudad, construir, mejorarCiudad } from '../domain/mapa/reglas/ciudades.js';
+import { proponerGobierno, cambiarFormaEstado, darVentajas, estaEnPoder } from '../domain/mapa/reglas/gobierno.js';
+import { crearSubdivision, quitarSubdivision } from '../domain/mapa/reglas/subdivisiones.js';
+import { fundarCiudad, construir, mejorarCiudad, renombrarCiudad } from '../domain/mapa/reglas/ciudades.js';
 import { reclutar } from '../domain/mapa/reglas/militar.js';
 import { adoptarRasgo } from '../domain/mapa/reglas/cultura.js';
 import { investigar } from '../domain/mapa/reglas/tecnologia.js';
@@ -35,6 +37,18 @@ const CIVILIZACIONES_BOT = ['Autómatas', 'El Enjambre', 'La Colmena', 'Los Engr
 // hacia un jugador NO bot, que colgaria el request para siempre.
 const VUELTAS_IA_MAXIMAS = 10;
 
+// Quien perdio el poder (ver reglas/gobierno.js) solo puede dar ventajas para
+// recuperar apoyo, pasar el turno o abandonar: el resto de las acciones del
+// mapa las juega por el la maquina.
+const ACCIONES_SIN_PODER = new Set(['darVentajas', 'terminarTurno', 'abandonar']);
+
+// El apoyo y la administracion de subdivisiones de un jugador son privados,
+// igual que sus recursos (ver visibilidad.js): un humano no los recibe dentro de
+// la lista de eventos de la accion de otro.
+const EVENTOS_PRIVADOS_DE_GOBIERNO = new Set(['ApoyoActualizado', 'SubdivisionCreada', 'SubdivisionQuitada']);
+const eventosVisiblesPara = (eventos, jugadorId) =>
+  eventos.filter(e => !EVENTOS_PRIVADOS_DE_GOBIERNO.has(e.tipo) || e.jugadorId === jugadorId);
+
 function generarCodigo() {
   let codigo = '';
   for (let i = 0; i < 6; i++) codigo += ALFABETO_CODIGO[crypto.randomInt(ALFABETO_CODIGO.length)];
@@ -51,6 +65,12 @@ const REGLAS_POR_TIPO = {
   adoptarRasgo: (estado, jugadorId, accion) => adoptarRasgo(estado, jugadorId, accion),
   investigar: (estado, jugadorId, accion) => investigar(estado, jugadorId, accion),
   mejorarCiudad: (estado, jugadorId, accion) => mejorarCiudad(estado, jugadorId, accion),
+  renombrarCiudad: (estado, jugadorId, accion) => renombrarCiudad(estado, jugadorId, accion),
+  proponerGobierno: (estado, jugadorId, accion) => proponerGobierno(estado, jugadorId, accion),
+  cambiarFormaEstado: (estado, jugadorId, accion) => cambiarFormaEstado(estado, jugadorId, accion),
+  darVentajas: (estado, jugadorId, accion) => darVentajas(estado, jugadorId, accion),
+  crearSubdivision: (estado, jugadorId, accion) => crearSubdivision(estado, jugadorId, accion),
+  quitarSubdivision: (estado, jugadorId, accion) => quitarSubdivision(estado, jugadorId, accion),
   abandonar: (estado, jugadorId) => abandonar(estado, jugadorId),
   terminarTurno: (estado, jugadorId) => terminarTurno(estado, jugadorId),
 };
@@ -181,7 +201,8 @@ export class MapGameService {
     for (let vuelta = 0; vuelta < VUELTAS_IA_MAXIMAS; vuelta++) {
       if (estado.estado !== 'jugando') break;
       const actual = estado.jugadores[estado.indiceJugadorActual];
-      if (!actual?.esBot) break;
+      // La maquina juega por el bot Y por el humano que perdio el poder.
+      if (!actual || !(actual.esBot || !estaEnPoder(actual))) break;
 
       // Semilla determinista: misma partida + mismo turno + misma vuelta =
       // mismas decisiones, igual que el resto del dominio (combate, mapa).
@@ -269,8 +290,20 @@ export class MapGameService {
 
     const estado = structuredClone(original);
 
+    // Antes de cualquier regla, incluido atacar: quien perdio el poder no manda.
+    const actor = estado.jugadores.find(j => j.id === jugadorId);
+    if (actor && !estaEnPoder(actor) && !ACCIONES_SIN_PODER.has(accion.tipo)) {
+      throw new ReglaError('SIN_PODER', 'Perdiste el poder: no podés dar órdenes hasta recuperarlo');
+    }
+
     let eventos;
-    if (accion.tipo === 'atacar') {
+    if (actor && !estaEnPoder(actor) && accion.tipo === 'terminarTurno') {
+      // "Terminar turno" de quien no manda es PASAR: no se ejecuta la regla (no
+      // le toca decidir) y la maquina juega su turno y los siguientes, abajo.
+      // Sin esto, el tope de vueltas de _resolverTurnosIA podia dejar el turno
+      // parado en un bot o en el propio jugador sin forma de seguir.
+      eventos = [];
+    } else if (accion.tipo === 'atacar') {
       // Contar, no traer: esta semilla solo necesita CUANTOS eventos hubo, y
       // leer el log completo en cada ataque escala con la duracion de la
       // partida (ver MapGameRepo#contarEventos).
@@ -294,9 +327,12 @@ export class MapGameService {
     eventos.push(...this._resolverTurnosIA(estado));
     await this._persistir(estado, eventos);
 
-    const cerroRonda = eventos.some(e => e.tipo === 'RondaCompletada');
-    if (cerroRonda && this.narrador) {
-      const turnoRonda = eventos.find(e => e.tipo === 'RondaCompletada').turno;
+    // UNA narracion por cada ronda cerrada en esta llamada: ahora una sola
+    // peticion puede cerrar varias (la maquina juega por quien perdio el poder).
+    const rondasCerradas = this.narrador
+      ? eventos.filter(e => e.tipo === 'RondaCompletada').map(e => e.turno)
+      : [];
+    for (const turnoRonda of rondasCerradas) {
       // Se narra la RONDA completa, no solo la ultima accion: esta ultima siempre
       // es terminarTurno (eventos de contabilidad, que el narrador no narra), y
       // todo lo interesante (fundaciones, construcciones, combates) ocurrio en
@@ -344,7 +380,7 @@ export class MapGameService {
       }
     }
 
-    return { vista: { ...vistaJugador(estado, jugadorId), narrativas }, eventos };
+    return { vista: { ...vistaJugador(estado, jugadorId), narrativas }, eventos: eventosVisiblesPara(eventos, jugadorId) };
   }
 
   async vista(id, jugadorId, token) {
