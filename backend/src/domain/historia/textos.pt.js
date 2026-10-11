@@ -1,0 +1,104 @@
+// Frases do narrador local em portugues. Mesmos buracos que textos.es.js.
+export const TEXTOS_PT = {
+  conectores: ['Enquanto isso,', 'Ao mesmo tempo,', 'Logo depois,'],
+  intencion: ['{n} decide: «{frase}».', '{n} se atreve: «{frase}».', '{n} propõe: «{frase}».'],
+  consecuencias: {
+    atacar: [
+      'O movimento de {n} é rápido e certeiro, e a cena se enche de tensão.',
+      '{n} não hesita: o impacto ressoa com força e obriga todos a reagir.',
+      'A investida de {n} abre uma brecha e muda o ritmo de tudo o que acontece.',
+    ],
+    hablar: [
+      'As palavras de {n} soam com clareza e alguém por perto baixa a guarda.',
+      'Depois que {n} fala, o silêncio fica pesado, até que chega uma resposta inesperada.',
+      'A voz de {n} desperta curiosidade e todos os olhares se voltam para lá.',
+    ],
+    explorar: [
+      'Entre as sombras, {n} descobre {hallazgo}.',
+      'Com passo atento, {n} encontra {hallazgo}.',
+      'A busca de {n} dá frutos: diante de todos aparece {hallazgo}.',
+    ],
+    huir: [
+      'Com um movimento ágil, {n} ganha distância e deixa o pior para trás.',
+      '{n} escapa na hora certa, mas o eco da perseguição continua perto.',
+      'O plano de {n} funciona, mas deixa uma pista que alguém pode seguir.',
+    ],
+    usar: [
+      'Com mãos firmes, {n} consegue o que buscava e algo muda ao redor.',
+      '{n} consegue, e logo aparece {hallazgo}.',
+      'O gesto de {n} ativa algo que ninguém tinha previsto.',
+    ],
+    ayudar: [
+      'O gesto de {n} dá ânimo ao grupo, que recupera as forças.',
+      '{n} cuida dos outros, e a confiança entre todos cresce.',
+      'Graças a {n}, o grupo respira aliviado e segue em frente.',
+    ],
+    otro: [
+      'A decisão de {n} deixa marcas, e o mundo parece responder.',
+      'O que {n} faz muda o rumo da cena, embora ainda não se saiba até onde.',
+      'O caminho de {n} se cruza com um detalhe inquietante que ninguém esperava.',
+    ],
+  },
+  recuerdo: [
+    'O que {n} tentou antes («{frase}») ainda se sente no ar.',
+    'Ninguém esquece que {n} tinha dito antes: «{frase}».',
+  ],
+  cierre: [
+    'O fim se aproxima, e cada decisão pesa mais do que nunca.',
+    'Tudo aponta para um desfecho próximo: é hora de fechar o que ficou em aberto.',
+  ],
+  ultimaRonda: 'É a última rodada: o desfecho está ao alcance de todos.',
+  invitacion: [
+    'O que cada um fará a seguir?',
+    'A história fica em aberto: a próxima jogada é de vocês.',
+    'O caminho continua aberto, o que vocês decidirão agora?',
+  ],
+  ganchoGlobal: [
+    'De repente, {peligro}. Ninguém pode ficar parado.',
+    'De repente, {peligro}, e todos sentem que o tempo está acabando.',
+  ],
+  ganchoDirigido: [
+    'De repente, {peligro}, e todos os olhares se voltam para {n}: o que fará?',
+    'De repente, {peligro}. {n} é quem está mais perto, como vai reagir?',
+  ],
+  apertura: 'Tudo começa em {lugar}. Ali se reúnem {nombres}, sem suspeitar que algo está para mudar.',
+  aperturaColaborativa: 'A história é de vocês: quem dá o primeiro passo?',
+  aperturaGancho: 'De repente, {peligro}. É hora de agir.',
+  epilogoInicio: 'Assim chega o fim desta história.',
+  epilogoRecuerdo: ['Será lembrado que {n} disse: «{frase}».', 'Ninguém esquecerá quando {n} propôs: «{frase}».'],
+  epilogoCierre: 'E assim, {final}.',
+  sinAcciones: 'Ninguém se atreve a se mover ainda, e o mundo espera em silêncio.',
+  union: ' e ',
+  generos: {
+    fantasy: {
+      lugar: ['um vale entre montanhas onde a névoa cheira a magia antiga', 'as ruínas de uma torre élfica cobertas de trepadeiras luminosas', 'uma aldeia junto à floresta onde os lampiões se acendem sozinhos'],
+      hallazgo: ['uma runa antiga que pulsa com luz tênue', 'um baú de pedra gravado com símbolos esquecidos', 'uma trilha escondida que brilha sob as raízes'],
+      peligro: ['um rugido sacode as montanhas', 'uma sombra com asas cobre o céu', 'um grupo de encapuzados bloqueia o caminho'],
+      final: ['o reino respira em paz por fim e os bardos já cantam o que aconteceu', 'as runas se apagam uma a uma e o vale fica em calma', 'a névoa se dissipa e revela um novo amanhecer para todos'],
+    },
+    historical: {
+      lugar: ['uma cidade murada às vésperas de uma grande feira', 'um porto movimentado onde atracam navios de terras distantes', 'um acampamento junto a um rio, com tendas e estandartes ao vento'],
+      hallazgo: ['um pergaminho selado com cera vermelha', 'um mapa antigo com uma rota marcada à mão', 'uma carta esquecida que muda o que eles achavam saber'],
+      peligro: ['ouve-se o rufar de tambores de um exército que se aproxima', 'correm boatos de traição no conselho', 'uma tempestade ameaça arruinar as colheitas'],
+      final: ['a história escreve seus nomes entre os de quem mudou seu tempo', 'os cronistas anotam o que aconteceu e o povo repetirá por gerações', 'a paz chega por fim e os sinos anunciam uma nova era'],
+    },
+    'sci-fi': {
+      lugar: ['uma estação espacial em órbita, com luzes tênues e corredores metálicos', 'uma nave à deriva perto de uma nebulosa violeta', 'uma colônia num planeta distante sob duas luas'],
+      hallazgo: ['um sinal cifrado no console principal', 'um módulo de dados que ninguém tinha registrado', 'uma porta selada que se abre ao reconhecer suas vozes'],
+      peligro: ['um alarme de proximidade acende em vermelho', 'uma falha no reator apaga as luzes aos poucos', 'uma frota desconhecida sai do hiperespaço'],
+      final: ['os sistemas voltam ao normal e as estrelas parecem mais próximas', 'o último relatório da missão fica a salvo no arquivo central', 'a nave segue rumo a casa com a missão cumprida'],
+    },
+    mystery: {
+      lugar: ['uma mansão antiga onde um relógio parou à meia-noite', 'uma vila costeira envolta em névoa, com as janelas fechadas', 'um teatro vazio onde ainda resta uma luz acesa'],
+      hallazgo: ['uma pegada de lama que não combina com ninguém', 'um bilhete escrito com tinta ainda fresca', 'uma gaveta com fundo falso e um nome riscado'],
+      peligro: ['passos param bem atrás deles', 'uma luz se apaga e deixa a sala no escuro', 'uma testemunha muda a versão na última hora'],
+      final: ['a última peça se encaixa e o mistério fica enfim resolvido', 'a verdade vem à tona e ninguém volta a olhar a mansão do mesmo jeito', 'o culpado é descoberto e a vila respira aliviada'],
+    },
+    'sports-sim': {
+      lugar: ['um estádio lotado antes da partida decisiva', 'um vestiário onde o time se concentra antes de entrar em campo', 'um torneio de verão com as arquibancadas cheias de bandeiras'],
+      hallazgo: ['uma jogada ensaiada que surpreende os rivais', 'uma brecha na defesa que ninguém tinha visto', 'um aliado inesperado que levanta a energia do time'],
+      peligro: ['um rival aumenta o ritmo nos minutos finais', 'uma lesão obriga a mudar o plano', 'uma decisão polêmica do árbitro muda o rumo'],
+      final: ['o apito final soa e o estádio inteiro se põe de pé', 'o troféu brilha no alto enquanto o time comemora junto', 'a temporada termina entre aplausos e uma lembrança que ninguém vai esquecer'],
+    },
+  },
+};

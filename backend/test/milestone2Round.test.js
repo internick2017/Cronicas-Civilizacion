@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NarrativeService } from '../src/services/NarrativeService.js';
 
 async function makeSession(svc, settings = {}) {
-  const session = await svc.createSession({ title: 'T', settings: { language: 'es', ...settings } });
+  const session = await svc.createSession({ title: 'T', settings: { language: 'es', narrador: 'gemini', ...settings } });
   const { player: ana } = await svc.joinSession(session.id, { name: 'Ana' });
   const { player: beto } = await svc.joinSession(session.id, { name: 'Beto' });
   session.isActive = true;

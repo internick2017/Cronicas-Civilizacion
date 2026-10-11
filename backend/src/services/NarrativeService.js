@@ -1,10 +1,11 @@
-import { StorySession } from '../models/StorySession.js';
+import { StorySession, narradorValido } from '../models/StorySession.js';
 import AIService from './AIService.js';
 import { normalizeLanguage, getClosingArcsInstruction } from './narrativePrompts.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getDatabaseConnection } from '../config/index.js';
 import logger from '../utils/logger.js';
 import { generateRoomCode } from '../utils/roomCode.js';
+import { apertura, narrarRonda, epilogo } from '../domain/historia/narradorHistoria.js';
 
 export class NarrativeService {
   constructor(options = {}) {
@@ -444,12 +445,18 @@ export class NarrativeService {
     if (session.isActive) throw new Error('La sesión ya está en curso');
     if (session.players.length < 2) throw new Error('Se necesitan al menos 2 jugadores');
 
-    const aiOpening = await this.aiService.generateOpening({
+    const aiOpening = await this.intentarGemini(session, () => this.aiService.generateOpening({
       language: session.settings.language,
       genre: session.settings.genre,
       mode: session.settings.mode,
+    }));
+    const opening = aiOpening ?? apertura({
+      idioma: session.settings.language,
+      genero: session.settings.genre,
+      modo: session.settings.mode,
+      personajes: session.players.map(p => p.characterName),
+      semilla: session.id,
     });
-    const opening = aiOpening ?? this.getFallbackNarrative({ characterName: 'los héroes' });
 
     session.isActive = true;
     session.currentPlayerIndex = 0;
@@ -471,35 +478,39 @@ export class NarrativeService {
     const roundActions = session.storyHistory.filter(
       e => e.type === 'player_action' && e.turnNumber === session.turnNumber
     );
-    const prompt = this.buildRoundPrompt(session, roundActions);
     const language = (session.settings && session.settings.language) || 'es';
     const genre = (session.settings && session.settings.genre) || 'fantasy';
     const mode = (session.settings && session.settings.mode) || 'colaborativo';
 
-    // Una falla de la IA NO puede trabar la partida. Antes esto relanzaba con
-    // AI_NARRATION_FAILED y la ronda no cerraba: el turno no avanzaba y los
-    // jugadores quedaban esperando una narracion que, si la cuota estaba
-    // agotada, no iba a llegar nunca. Ahora es el mismo camino que cuando no
-    // hay clave configurada: se narra con el texto local y la partida sigue.
-    let aiText = null;
-    try {
-      aiText = await this.aiService.generateStoryNarrative(prompt, { language, genre, mode });
-    } catch (err) {
-      logger.warn(`La IA no pudo narrar la ronda; se usa el narrador local: ${err.message}`);
-    }
-
-    // null = sin clave, sin presupuesto o la IA fallo: siempre hay narrativa.
-    const narrative = aiText ?? this.getFallbackNarrative({ characterName: 'los héroes' });
+    // El narrador local es el principal. Si la sesion eligio Gemini y este no responde (sin
+    // clave, sin presupuesto o con error), narra el local igual: una falla de la IA NO puede
+    // trabar la partida (la ronda siempre cierra).
+    const aiText = await this.intentarGemini(session, () =>
+      this.aiService.generateStoryNarrative(this.buildRoundPrompt(session, roundActions), { language, genre, mode }));
+    const remaining = session.settings.maxRounds
+      ? Math.max(0, session.settings.maxRounds - session.turnNumber + 1) : null;
+    const narrative = aiText ?? narrarRonda({
+      idioma: language,
+      genero: genre,
+      modo: mode,
+      acciones: this.accionesDeRonda(session, session.turnNumber),
+      anteriores: this.accionesDeRonda(session, session.turnNumber - 1),
+      ronda: session.turnNumber,
+      rondasRestantes: remaining,
+      semilla: session.id,
+    });
 
     const aiEntry = session.addAINarrative(narrative);
     if (!this.skipDatabase) await this.saveStoryEntryToDatabase(session.id, aiEntry);
 
-    // Resumen acumulativo — NUNCA bloquea la ronda
-    try {
-      const updated = await this.aiService.generateSummary(session.summary, narrative, { language });
-      if (updated) session.summary = updated;
-    } catch (err) {
-      logger.warn('No se pudo actualizar el resumen; se conserva el anterior:', err.message);
+    // Resumen acumulativo (solo lo usa el prompt de Gemini) — NUNCA bloquea la ronda
+    if (this.usaGemini(session)) {
+      try {
+        const updated = await this.aiService.generateSummary(session.summary, narrative, { language });
+        if (updated) session.summary = updated;
+      } catch (err) {
+        logger.warn('No se pudo actualizar el resumen; se conserva el anterior:', err.message);
+      }
     }
 
     session.turnNumber += 1;
@@ -736,19 +747,30 @@ export class NarrativeService {
     return prompt;
   }
 
+  /** true cuando la sesion eligio a Gemini como narrador (por defecto narra el local). */
+  usaGemini(session) {
+    return session.settings.narrador === 'gemini';
+  }
+
   /**
-   * Get fallback narrative when AI is not available
+   * Corre una llamada a Gemini solo si la sesion lo eligio. Devuelve null cuando no se debe o
+   * no se pudo llamar (sin clave, sin presupuesto, error): el llamador entonces narra el local.
    */
-  getFallbackNarrative(storyEntry) {
-    const fallbacks = [
-      `Las palabras de ${storyEntry.characterName} resuenan en el aire, creando ondas de cambio en el mundo que les rodea.`,
-      `La acción de ${storyEntry.characterName} desencadena una serie de eventos que alterarán el curso de la historia.`,
-      `Con determinación, ${storyEntry.characterName} toma el control de su destino, y el mundo responde a su voluntad.`,
-      `El momento es crucial, y ${storyEntry.characterName} actúa con precisión, marcando un punto de inflexión en la narrativa.`,
-      `La decisión de ${storyEntry.characterName} se convierte en el catalizador de una nueva era en esta historia épica.`
-    ];
-    
-    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+  async intentarGemini(session, llamada) {
+    if (!this.usaGemini(session)) return null;
+    try {
+      return await llamada();
+    } catch (err) {
+      logger.warn(`Gemini no pudo narrar; se usa el narrador local: ${err.message}`);
+      return null;
+    }
+  }
+
+  /** Las acciones de jugador de una ronda, en el formato que lee el narrador local. */
+  accionesDeRonda(session, ronda) {
+    return session.storyHistory
+      .filter(e => e.type === 'player_action' && e.turnNumber === ronda)
+      .map(e => ({ personaje: e.characterName ?? e.playerName, texto: e.action }));
   }
 
   /**
@@ -773,6 +795,7 @@ export class NarrativeService {
     }
 
     session.settings = { ...session.settings, ...newSettings };
+    session.settings.narrador = narradorValido(session.settings.narrador);
     session.updatedAt = new Date();
     
     return session.settings;
@@ -805,11 +828,18 @@ export class NarrativeService {
       .map(e => e.narrative)
       .join('\n');
 
-    const aiEpilogue = await this.aiService.generateEpilogue(summary, {
+    const aiEpilogue = await this.intentarGemini(session, () => this.aiService.generateEpilogue(summary, {
       language: session.settings.language,
       genre: session.settings.genre,
+    }));
+    const epilogue = aiEpilogue ?? epilogo({
+      idioma: session.settings.language,
+      genero: session.settings.genre,
+      acciones: session.storyHistory
+        .filter(e => e.type === 'player_action')
+        .map(e => ({ personaje: e.characterName ?? e.playerName, texto: e.action })),
+      semilla: session.id,
     });
-    const epilogue = aiEpilogue ?? this.getFallbackNarrative({ characterName: 'los héroes' });
 
     const entry = session.addAINarrative(epilogue);
     entry.type = 'ai_epilogue';

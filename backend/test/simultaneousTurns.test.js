@@ -11,7 +11,7 @@ function mockAi(svc) {
 }
 
 async function makeSession(svc, settings = {}) {
-  const session = await svc.createSession({ title: 'T', settings: { language: 'es', ...settings } });
+  const session = await svc.createSession({ title: 'T', settings: { language: 'es', narrador: 'gemini', ...settings } });
   const { player: ana } = await svc.joinSession(session.id, { name: 'Ana' });
   const { player: beto } = await svc.joinSession(session.id, { name: 'Beto' });
   const { player: cris } = await svc.joinSession(session.id, { name: 'Cris' });

@@ -1,5 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 
+// Quien narra la historia: el narrador local (por defecto, sin IA externa) o Gemini. Las
+// sesiones guardadas antes de este ajuste no lo traen y se leen como locales.
+export const NARRADORES = ['local', 'gemini'];
+export const narradorValido = (valor) => (NARRADORES.includes(valor) ? valor : 'local');
+
 export class StorySession {
   constructor(data = {}) {
     this.id = data.id || uuidv4();
@@ -30,6 +35,7 @@ export class StorySession {
       mode: data.settings?.mode ?? 'narrador-activo',
       maxRounds: data.settings?.maxRounds ?? null,
       turnMode: data.settings?.turnMode ?? 'sequential',
+      narrador: narradorValido(data.settings?.narrador),
     };
     this.code = data.code !== undefined ? data.code : null;
     this.summary = data.summary ?? '';

@@ -10,7 +10,7 @@ describe('apertura y epílogo', () => {
       generateOpening: vi.fn().mockResolvedValue('Había una vez...'),
       generateEpilogue: vi.fn().mockResolvedValue('Y colorín colorado...'),
     };
-    session = await svc.createSession({ title: 'T', settings: { language: 'es', genre: 'fantasy' } });
+    session = await svc.createSession({ title: 'T', settings: { language: 'es', genre: 'fantasy', narrador: 'gemini' } });
     await svc.joinSession(session.id, { name: 'Ana' });
     await svc.joinSession(session.id, { name: 'Beto' });
   });

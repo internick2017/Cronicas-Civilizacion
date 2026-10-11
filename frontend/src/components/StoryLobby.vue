@@ -196,6 +196,13 @@
               </select>
             </div>
             <div class="form-group">
+              <label for="narrador">Narrador</label>
+              <select id="narrador" v-model="newSession.settings.narrador">
+                <option value="local">📖 Local — escribe con lo que ustedes escriben, sin internet ni IA</option>
+                <option value="gemini">✨ Gemini — IA externa (si no responde, narra el local)</option>
+              </select>
+            </div>
+            <div class="form-group">
               <label for="duration">Duración</label>
               <select id="duration" v-model="newSession.settings.maxRounds">
                 <option :value="null">Libre — el anfitrión decide cuándo terminar</option>
@@ -340,7 +347,8 @@ const newSession = ref({
     language: 'es',
     mode: 'narrador-activo',
     maxRounds: null,
-    turnMode: 'sequential'
+    turnMode: 'sequential',
+    narrador: 'local'
   }
 })
 
@@ -445,7 +453,8 @@ const createSession = async () => {
           language: newSession.value.settings.language,
           mode: newSession.value.settings.mode,
           maxRounds: newSession.value.settings.maxRounds,
-          turnMode: newSession.value.settings.turnMode
+          turnMode: newSession.value.settings.turnMode,
+          narrador: newSession.value.settings.narrador
         }
       })
     })
@@ -485,7 +494,7 @@ const createSession = async () => {
       title: '',
       description: '',
       maxPlayers: 4,
-      settings: { genre: 'fantasy', language: 'es', mode: 'narrador-activo', maxRounds: null }
+      settings: { genre: 'fantasy', language: 'es', mode: 'narrador-activo', maxRounds: null, narrador: 'local' }
     }
 
     lobbyView.value = 'waiting'
