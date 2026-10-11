@@ -1,21 +1,16 @@
 import { crearRng, entero } from '../mapa/rng.js';
 import { clasificarAccion } from './clasificarAccion.js';
-import { TEXTOS_ES } from './textos.es.js';
-import { TEXTOS_PT } from './textos.pt.js';
+import { textosDe, vocabularioDe, rellenar, elegir } from './textos.js';
 
 // Narrador local del modo historia: arma el texto con lo que escribieron los jugadores, sin
 // llamar a ninguna IA. Son funciones puras: la misma entrada da siempre el mismo texto (la
 // semilla se arma con la sesion y la ronda), asi se prueban y no cuestan nada.
 // No entiende el significado de las frases: las cita, deduce de que tipo de accion se trata
 // (clasificarAccion) y le agrega una consecuencia con el vocabulario del genero.
-const TEXTOS_POR_IDIOMA = { es: TEXTOS_ES, pt: TEXTOS_PT };
-const GENERO_POR_DEFECTO = 'fantasy';
 const LARGO_MAXIMO_FRASE = 90;
 const RONDAS_DE_CIERRE = 2;
 const MAXIMO_EN_EPILOGO = 6;
 
-const textosDe = (idioma) => TEXTOS_POR_IDIOMA[idioma] ?? TEXTOS_ES;
-const vocabularioDe = (textos, genero) => textos.generos[genero] ?? textos.generos[GENERO_POR_DEFECTO];
 const esActivo = (modo) => modo !== 'colaborativo';
 
 // Una frase de jugador lista para citarla: sin comillas ni saltos de linea, sin el punto final
@@ -28,9 +23,6 @@ function limpiar(texto) {
   return `${corte.slice(0, ultimoEspacio > 20 ? ultimoEspacio : LARGO_MAXIMO_FRASE)}…`;
 }
 
-const mayuscula = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1);
-const rellenar = (plantilla, datos) => mayuscula(plantilla.replace(/\{(\w+)\}/g, (_, clave) => datos[clave] ?? ''));
-const elegir = (lista, rng) => lista[entero(rng, lista.length)];
 // Parte de una frase al azar y sigue por orden: dos usos seguidos de la misma lista no repiten.
 const ciclo = (lista, rng) => { let i = entero(rng, lista.length); return () => lista[i++ % lista.length]; };
 const unir = (nombres, y) => (nombres.length <= 1 ? nombres.join('') : `${nombres.slice(0, -1).join(', ')}${y}${nombres.at(-1)}`);

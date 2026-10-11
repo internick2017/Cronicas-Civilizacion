@@ -6,6 +6,7 @@ import { getDatabaseConnection } from '../config/index.js';
 import logger from '../utils/logger.js';
 import { generateRoomCode } from '../utils/roomCode.js';
 import { apertura, narrarRonda, epilogo } from '../domain/historia/narradorHistoria.js';
+import { accionDelCompanero, nombreDelCompanero } from '../domain/historia/companero.js';
 
 export class NarrativeService {
   constructor(options = {}) {
@@ -196,6 +197,13 @@ export class NarrativeService {
       ? sessionData.settings.turnMode : 'sequential';
 
     const session = new StorySession(sessionData);
+    if (session.settings.companeroIA) {
+      // Entra como un jugador mas; su id queda en los ajustes (que se guardan), asi se lo reconoce
+      // despues de un reinicio sin tocar la tabla de jugadores.
+      const { nombre, personaje } = nombreDelCompanero({ idioma: session.settings.language, semilla: session.id });
+      const companero = session.addPlayer({ name: nombre, characterName: personaje, characterClass: 'Alborotador' });
+      session.settings.companeroId = companero.id;
+    }
     session.code = generateRoomCode(c =>
       [...this.sessions.values()].some(s => s.code === c)
     );
@@ -405,8 +413,8 @@ export class NarrativeService {
     session.removePlayer(playerId);
     console.log(`👋 ${player.name} left session ${session.title}`);
 
-    // If no players left, close session
-    if (session.players.length === 0) {
+    // Sin humanos (solo queda, si lo hay, el companero automatico) la sesion se cierra
+    if (session.players.every(p => this.esCompanero(session, p))) {
       session.isActive = false;
       console.log(`🔚 Session ${session.title} closed (no players)`);
     }
@@ -458,6 +466,11 @@ export class NarrativeService {
       semilla: session.id,
     });
 
+    // El companero automatico juega siempre al final de la ronda: asi su accion cierra la ronda
+    // justo despues de la del ultimo humano.
+    session.players.sort((a, b) => this.esCompanero(session, a) - this.esCompanero(session, b));
+    session.players.forEach((p, i) => { p.turnOrder = i; });
+
     session.isActive = true;
     session.currentPlayerIndex = 0;
     const entry = session.addAINarrative(opening);
@@ -467,6 +480,7 @@ export class NarrativeService {
       await this.saveSessionToDatabase(session);
     }
 
+    await this.dejarJugarAlCompanero(session);
     return { session: session.toJSON(), opening };
   }
 
@@ -519,11 +533,20 @@ export class NarrativeService {
   }
 
   /**
-   * Submit a player action.
+   * Submit a player action y, despues, deja jugar al companero automatico si le toca.
+   * Si la accion del companero cierra la ronda, la respuesta trae esa narracion.
+   */
+  async submitAction(sessionId, playerId, actionText) {
+    const resultado = await this.registrarAccion(sessionId, playerId, actionText);
+    return this.dejarJugarAlCompanero(await this.getSession(sessionId), resultado);
+  }
+
+  /**
+   * Registra una accion (de un humano o del companero).
    * Saves the action and advances turn order. Only when the LAST player of the round
    * submits does the service call the AI ONCE with ALL the round's actions.
    */
-  async submitAction(sessionId, playerId, actionText) {
+  async registrarAccion(sessionId, playerId, actionText) {
     const session = await this.getSession(sessionId);
     if (!session || !session.isActive) throw new Error('Sesión no activa');
 
@@ -625,7 +648,7 @@ export class NarrativeService {
 
     const narrative = await this.closeRound(session);
     const sessionEnded = (await this.maybeAutoEpilogue(session)) || undefined;
-    return { narrative, turnNumber: session.turnNumber, ...(sessionEnded && { sessionEnded }) };
+    return this.dejarJugarAlCompanero(session, { narrative, turnNumber: session.turnNumber, ...(sessionEnded && { sessionEnded }) });
   }
 
   /**
@@ -661,13 +684,13 @@ export class NarrativeService {
       }
     }
 
-    return {
+    return this.dejarJugarAlCompanero(session, {
       roundComplete,
       narrative,
       nextPlayer: session.players[session.currentPlayerIndex],
       turnNumber: session.turnNumber,
       ...(sessionEnded && { sessionEnded }),
-    };
+    });
   }
 
   /**
@@ -697,12 +720,12 @@ export class NarrativeService {
       sessionEnded = (await this.maybeAutoEpilogue(session)) || undefined;
     }
 
-    return {
+    return this.dejarJugarAlCompanero(session, {
       roundComplete: true,
       narrative,
       turnNumber: session.turnNumber,
       ...(sessionEnded && { sessionEnded }),
-    };
+    });
   }
 
   /**
@@ -745,6 +768,51 @@ export class NarrativeService {
     }
 
     return prompt;
+  }
+
+  /** true si ese jugador es el companero automatico de la sesion. */
+  esCompanero(session, player) {
+    return session.settings.companeroId !== undefined && player.id === session.settings.companeroId;
+  }
+
+  /** El companero, si le toca jugar ahora y todavia no jugo en esta ronda. */
+  companeroPendiente(session) {
+    if (!session.isActive) return null;
+    const jugo = (p) => session.storyHistory.some(
+      e => e.type === 'player_action' && e.turnNumber === session.turnNumber && e.playerId === p.id);
+    const candidatos = session.settings.turnMode === 'simultaneous'
+      ? session.players
+      : [session.players[session.currentPlayerIndex]];
+    return candidatos.find(p => p && this.esCompanero(session, p) && !jugo(p)) ?? null;
+  }
+
+  /**
+   * Deja jugar al companero automatico mientras le toque. Devuelve `resultado` con lo que
+   * produjeron sus acciones (la narracion si cerro la ronda, el siguiente jugador, el fin).
+   */
+  async dejarJugarAlCompanero(session, resultado = {}) {
+    let final = resultado;
+    for (let vuelta = 0; vuelta < session.players.length * 2; vuelta++) {
+      const companero = this.companeroPendiente(session);
+      if (!companero) break;
+      const accion = accionDelCompanero({
+        idioma: session.settings.language,
+        genero: session.settings.genre,
+        ronda: session.turnNumber,
+        otros: session.players.filter(p => p.id !== companero.id).map(p => p.characterName),
+        semilla: session.id,
+      });
+      const r = await this.registrarAccion(session.id, companero.id, accion);
+      final = {
+        ...final,
+        narrative: r.narrative ?? final.narrative,
+        nextPlayer: r.nextPlayer,
+        turnNumber: r.turnNumber,
+        roundComplete: Boolean(final.roundComplete || r.roundComplete),
+        ...(r.sessionEnded && { sessionEnded: r.sessionEnded }),
+      };
+    }
+    return final;
   }
 
   /** true cuando la sesion eligio a Gemini como narrador (por defecto narra el local). */

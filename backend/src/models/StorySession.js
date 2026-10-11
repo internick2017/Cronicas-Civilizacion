@@ -36,6 +36,8 @@ export class StorySession {
       maxRounds: data.settings?.maxRounds ?? null,
       turnMode: data.settings?.turnMode ?? 'sequential',
       narrador: narradorValido(data.settings?.narrador),
+      // Companero automatico: su jugador se identifica con settings.companeroId (ver NarrativeService).
+      companeroIA: data.settings?.companeroIA === true,
     };
     this.code = data.code !== undefined ? data.code : null;
     this.summary = data.summary ?? '';

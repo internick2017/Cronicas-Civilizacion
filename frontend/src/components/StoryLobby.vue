@@ -26,10 +26,11 @@
               v-for="(player, idx) in hostedSession?.players"
               :key="player.id"
               class="waiting-player-card"
-              :class="{ 'is-host': idx === 0 }"
+              :class="{ 'is-host': player.id === hostedPlayer?.id }"
             >
               <span class="player-name-item">{{ player.name }}</span>
-              <span v-if="idx === 0" class="host-badge">Anfitrión</span>
+              <span v-if="player.id === hostedPlayer?.id" class="host-badge">Anfitrión</span>
+              <span v-else-if="player.id === hostedSession?.settings?.companeroId" class="host-badge">🤖 Compañero</span>
             </div>
             <!-- Empty slots -->
             <div
@@ -203,6 +204,12 @@
               </select>
             </div>
             <div class="form-group">
+              <label for="companeroIA" class="check-label">
+                <input id="companeroIA" type="checkbox" v-model="newSession.settings.companeroIA" />
+                Jugar con la máquina: un compañero atrevido que mete líos
+              </label>
+            </div>
+            <div class="form-group">
               <label for="duration">Duración</label>
               <select id="duration" v-model="newSession.settings.maxRounds">
                 <option :value="null">Libre — el anfitrión decide cuándo terminar</option>
@@ -348,7 +355,8 @@ const newSession = ref({
     mode: 'narrador-activo',
     maxRounds: null,
     turnMode: 'sequential',
-    narrador: 'local'
+    narrador: 'local',
+    companeroIA: false
   }
 })
 
@@ -454,7 +462,8 @@ const createSession = async () => {
           mode: newSession.value.settings.mode,
           maxRounds: newSession.value.settings.maxRounds,
           turnMode: newSession.value.settings.turnMode,
-          narrador: newSession.value.settings.narrador
+          narrador: newSession.value.settings.narrador,
+          companeroIA: newSession.value.settings.companeroIA
         }
       })
     })
@@ -494,7 +503,7 @@ const createSession = async () => {
       title: '',
       description: '',
       maxPlayers: 4,
-      settings: { genre: 'fantasy', language: 'es', mode: 'narrador-activo', maxRounds: null, narrador: 'local' }
+      settings: { genre: 'fantasy', language: 'es', mode: 'narrador-activo', maxRounds: null, narrador: 'local', companeroIA: false }
     }
 
     lobbyView.value = 'waiting'
@@ -822,6 +831,18 @@ onUnmounted(() => {
   color: #ecf0f1;
   font-weight: bold;
   font-size: 0.95em;
+}
+
+.form-group .check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.form-group .check-label input {
+  width: auto;
+  margin: 0;
 }
 
 .form-group input,

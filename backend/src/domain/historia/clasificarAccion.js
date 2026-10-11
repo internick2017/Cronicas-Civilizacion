@@ -6,8 +6,8 @@ const CATEGORIAS = [
   ['atacar', ['atac', 'golp', 'luch', 'lut', 'pelea', 'peleo', 'dispar', 'espad', 'apunal', 'embest', 'derrot', 'combat', 'matar', 'mato']],
   ['huir', ['huyo', 'huir', 'escapo', 'escapar', 'corro', 'correr', 'escond', 'retroced', 'fujo', 'fugir', 'fuga', 'salgo', 'salir', 'escabull', 'esquiv']],
   ['ayudar', ['curo', 'curar', 'ayud', 'proteg', 'salvo', 'salvar', 'defiend', 'defend', 'sano', 'sanar', 'cuido', 'rezo', 'rezar', 'consuel', 'consol', 'abrazo', 'abraco', 'auxili', 'socorr']],
-  ['hablar', ['hablo', 'hablar', 'digo', 'dizer', 'pregunt', 'pergunt', 'interrog', 'negoci', 'convenc', 'salud', 'cumprimento', 'grito', 'gritar', 'canto', 'cantar', 'respond', 'explico', 'falo', 'falar', 'pido', 'pedir', 'ordeno', 'ordenar']],
-  ['usar', ['abro', 'abrir', 'abre', 'uso', 'usar', 'tomo', 'tomar', 'agarr', 'enciend', 'encender', 'acend', 'activ', 'empuj', 'levant', 'coloc', 'pongo', 'poner', 'lanz', 'lanc', 'arroj', 'construy', 'constru']],
+  ['hablar', ['hablo', 'hablar', 'digo', 'dizer', 'pregunt', 'pergunt', 'interrog', 'negoci', 'convenc', 'salud', 'cumprimento', 'grito', 'gritar', 'canto', 'cantar', 'respond', 'explico', 'falo', 'falar', 'pido', 'pedir', 'peco', 'ordeno', 'ordenar']],
+  ['usar', ['abro', 'abrir', 'abre', 'uso', 'usar', 'tomo', 'tomar', 'agarr', 'enciend', 'encender', 'acend', 'activ', 'ativ', 'empurr', 'empuj', 'levant', 'coloc', 'pongo', 'poner', 'lanz', 'lanc', 'arroj', 'construy', 'constru']],
   ['explorar', ['explor', 'busc', 'investig', 'miro', 'mirar', 'examin', 'avanz', 'camin', 'entro', 'entrar', 'sigo', 'seguir', 'rastre', 'revis', 'observ', 'procur', 'olho', 'olhar', 'vasculh', 'inspec']],
 ];
 
