@@ -1,4 +1,4 @@
-import { jugadorPorId, puedePagar } from '../MapGame.js';
+import { jugadorPorId, puedePagar, esGuerraPura } from '../MapGame.js';
 import { RASGOS_CULTURALES } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento } from './comun.js';
@@ -7,6 +7,7 @@ import { validarTurno, evento } from './comun.js';
 // valen para todo lo que tengas y para todo lo que fundes despues.
 export function adoptarRasgo(estado, jugadorId, { rasgo }) {
   validarTurno(estado, jugadorId);
+  if (esGuerraPura(estado)) throw new ReglaError('GUERRA_PURA', 'En guerra pura no hay rasgos culturales');
 
   const definicion = RASGOS_CULTURALES[rasgo];
   if (!definicion) throw new ReglaError('RASGO_DESCONOCIDO', `Rasgo desconocido: ${rasgo}`);

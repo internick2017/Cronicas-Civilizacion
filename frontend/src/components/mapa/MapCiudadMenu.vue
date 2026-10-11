@@ -13,7 +13,9 @@ const emit = defineEmits(['construir', 'reclutar', 'mejorar', 'renombrar', 'cerr
 // Los costos NO se copian del backend: llegan por prop desde MapSession, que
 // los pide a GET /api/map/constantes. Una sola fuente de verdad.
 // Sirven solo para DESHABILITAR botones; el backend vuelve a validar todo.
-const EDIFICIOS = computed(() => props.constantes.edificios || [])
+const guerraPura = computed(() => props.vista.config.guerraPura === true)
+// Guerra pura: no hay edificios de ciencia ni de cultura, ni mejoras de ciudad.
+const EDIFICIOS = computed(() => (props.constantes.edificios || []).filter(e => !(guerraPura.value && e.civil)))
 const UNIDADES = computed(() => props.constantes.unidades || [])
 
 const tile = computed(() =>
@@ -96,7 +98,7 @@ const motivoUnidad = (u) => {
   if (u.requiereBarracks && !tieneBarracks.value) return 'requiere cuartel'
   if (u.requierePuerto && !tienePuerto.value) return 'requiere puerto'
   if (u.naval && !marAdyacente.value.some(m => !m.ejercito)) return 'sin mar libre donde botarlo'
-  if (u.requiereTecnologia && !misTecnologias.value.includes(u.requiereTecnologia)) {
+  if (!guerraPura.value && u.requiereTecnologia && !misTecnologias.value.includes(u.requiereTecnologia)) {
     return `requiere ${nombreTecnologia(u.requiereTecnologia)}`
   }
   if (!puedePagar(costoReal(u.costo, u))) return 'sin recursos'
@@ -145,7 +147,7 @@ const renombrar = () => {
       </div>
     </section>
 
-    <section>
+    <section v-if="!guerraPura">
       <h4>Nivel de la ciudad</h4>
       <button
         class="btn-secundario"

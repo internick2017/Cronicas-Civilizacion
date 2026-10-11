@@ -34,12 +34,15 @@ const limiteRondas = ref(null)
 // Apagado por defecto: un mapa de islas es otro juego (mitad del mundo es mar y
 // hay que cruzarlo en transporte), asi que se elige, no se hereda.
 const islas = ref(false)
+// Apagado por defecto: sin ciencia ni cultura es otro juego, asi que se elige.
+const guerraPura = ref(false)
 
 const configElegida = () => ({
   porcentajeVictoria: porcentajeVictoria.value,
   tamanoMapa: tamanoMapa.value,
   limiteRondas: limiteRondas.value,
   islas: islas.value,
+  guerraPura: guerraPura.value,
 })
 const nombreJugador = ref('')
 const codigoUnirse = ref('')
@@ -264,6 +267,14 @@ onMounted(() => {
           La mitad del mundo es mar y cada uno empieza en una isla distinta. Para
           tocar al rival hay que construir un puerto y cruzar en transporte. Si la
           semilla no da dos islas grandes, la partida arranca como una normal.
+        </p>
+        <label class="field field-check">
+          <input v-model="guerraPura" type="checkbox" />
+          <span>Guerra pura</span>
+        </label>
+        <p class="ayuda-config">
+          Sin ciencia ni cultura: no hay tecnologías, rasgos ni mejoras de ciudad.
+          Todo es territorio y ejércitos, con comida, oro, madera y piedra.
         </p>
         <button class="btn-primary" :disabled="cargando" @click="crear">Crear</button>
       </section>

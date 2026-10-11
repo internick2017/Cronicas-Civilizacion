@@ -1,4 +1,4 @@
-import { jugadorPorId, puedePagar } from '../MapGame.js';
+import { jugadorPorId, puedePagar, esGuerraPura } from '../MapGame.js';
 import { TECNOLOGIAS } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento } from './comun.js';
@@ -9,6 +9,7 @@ import { validarTurno, evento } from './comun.js';
 // unidades o desbloquean cosas.
 export function investigar(estado, jugadorId, { tecnologia }) {
   validarTurno(estado, jugadorId);
+  if (esGuerraPura(estado)) throw new ReglaError('GUERRA_PURA', 'En guerra pura no hay tecnologías');
 
   const definicion = TECNOLOGIAS[tecnologia];
   if (!definicion) throw new ReglaError('TECNOLOGIA_DESCONOCIDA', `Tecnología desconocida: ${tecnologia}`);

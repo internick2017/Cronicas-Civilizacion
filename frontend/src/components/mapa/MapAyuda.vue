@@ -59,6 +59,7 @@ const porcentajeDominacion = computed(() =>
 )
 
 const limiteRondas = computed(() => props.config?.limiteRondas ?? null)
+const guerraPura = computed(() => props.config?.guerraPura === true)
 
 // --- Gobierno -----------------------------------------------------------
 // Los NUMEROS salen de las constantes; solo la explicacion esta escrita aca.
@@ -99,6 +100,16 @@ const umbralAviso = computed(() =>
 
 <template>
   <div v-if="constantes" class="ayuda">
+    <section v-if="guerraPura">
+      <h4>Guerra pura</h4>
+      <p>
+        Esta partida es de <strong>guerra pura</strong>: no existen la ciencia ni la cultura.
+        No se producen, no hay tecnologías, rasgos culturales, biblioteca ni universidad, y las
+        ciudades no suben de nivel. Todo se juega con comida, oro, madera y piedra. Las unidades
+        que pedían una tecnología (como el legionario) están disponibles desde el inicio.
+      </p>
+    </section>
+
     <section>
       <h4>Cómo se gana</h4>
       <p>
@@ -183,7 +194,7 @@ const umbralAviso = computed(() =>
       </p>
     </section>
 
-    <section v-if="constantes.rasgosCulturales?.length">
+    <section v-if="constantes.rasgosCulturales?.length && !guerraPura">
       <h4>Cultura</h4>
       <p>
         La cultura se gasta en <strong>rasgos</strong> que tu civilización adopta
@@ -234,7 +245,7 @@ const umbralAviso = computed(() =>
       </table>
     </section>
 
-    <section v-if="constantes.tecnologias?.length">
+    <section v-if="constantes.tecnologias?.length && !guerraPura">
       <h4>Ciencia</h4>
       <p>
         La ciencia se gasta en <strong>tecnologías</strong>: se investigan una

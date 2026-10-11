@@ -13,9 +13,9 @@
 // una regla del juego), y se repite hasta que no hay mas nada razonable que
 // hacer o se llega al tope de pasos. Al final siempre se termina el turno:
 // la IA nunca puede dejar la partida esperando a que ella actue.
-import { tileEn, jugadorPorId, puedePagar } from './MapGame.js';
+import { tileEn, jugadorPorId, puedePagar, esGuerraPura } from './MapGame.js';
 import {
-  EDIFICIOS, UNIDADES, COSTO_CIUDAD, BONO_TERRENO_PRODUCCION, TECNOLOGIAS, COSTO_MEJORA_CIUDAD,
+  EDIFICIOS, UNIDADES, COSTO_CIUDAD, esEdificioCivil, BONO_TERRENO_PRODUCCION, TECNOLOGIAS, COSTO_MEJORA_CIUDAD,
   bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, esNaval, esTransporte, CAPACIDAD_DE,
   DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT
 } from './constantes.js';
@@ -481,6 +481,7 @@ export function distanciaAEmbarque(estado, jugadorId) {
 
 function decidirConstruccion(estado, jugadorId, perfil) {
   const jugador = jugadorPorId(estado, jugadorId);
+  const guerraPura = esGuerraPura(estado);
   for (const tile of ciudadesDe(estado, jugadorId)) {
     // Se descartan los edificios que exigen una tecnologia que el jugador no
     // tiene, con la MISMA funcion que usa construir(): la IA todavia no
@@ -502,9 +503,11 @@ function decidirConstruccion(estado, jugadorId, perfil) {
     // `puertoUtil` es mas estricto que la regla a proposito (exige ademas un
     // mar de tamano razonable): un puerto sobre un charco es legal y es plata
     // tirada. Ver MAR_MINIMO_PARA_PUERTO.
+    // Guerra pura: la regla rechaza los edificios civiles (ciencia y cultura), asi que ni se proponen.
     const faltantes = perfil.ordenEdificios.filter((tipo) =>
       !tile.ciudad.edificios.includes(tipo) &&
-      tieneTecnologiaRequerida(jugador, EDIFICIOS[tipo].requiereTecnologia) &&
+      !(guerraPura && esEdificioCivil(EDIFICIOS[tipo])) &&
+      (guerraPura || tieneTecnologiaRequerida(jugador, EDIFICIOS[tipo].requiereTecnologia)) &&
       (!EDIFICIOS[tipo].requiereCosta || puertoUtil(estado, tile.x, tile.y)));
     for (const tipo of faltantes) {
       // Con inflacion el costo real es mayor: decidir con el de lista haria elegir algo que
@@ -523,6 +526,7 @@ function decidirConstruccion(estado, jugadorId, perfil) {
 // pagan solo con ciencia, y la unica otra decision que gasta ciencia (mejorar
 // una ciudad) se decide ultima justamente para no competir con esta.
 function decidirInvestigacion(estado, jugadorId, perfil) {
+  if (esGuerraPura(estado)) return null;
   const jugador = jugadorPorId(estado, jugadorId);
   const yaTiene = tecnologiasDe(jugador);
   for (const tecnologia of perfil.ordenTecnologias) {
@@ -540,7 +544,7 @@ function decidirInvestigacion(estado, jugadorId, perfil) {
 // Se elige la ciudad de menor nivel: el costo escala con el nivel, asi que es
 // tambien la mejora mas barata disponible.
 function decidirMejoraCiudad(estado, jugadorId, perfil) {
-  if (!perfil.mejoraCiudades) return null;
+  if (!perfil.mejoraCiudades || esGuerraPura(estado)) return null;
   const jugador = jugadorPorId(estado, jugadorId);
   const ciudades = [...ciudadesDe(estado, jugadorId)]
     .filter((t) => t.ciudad.nivel < Math.min(perfil.nivelMaximoCiudad, NIVEL_CIUDAD_INCAPTURABLE))
@@ -574,7 +578,7 @@ function decidirReclutamiento(estado, jugadorId, perfil) {
   // MEJOR unidad que alguna ciudad pueda producir es lo que el perfil promete.
   for (const tipo of perfil.unidadesPrioridad) {
     const definicion = UNIDADES[tipo];
-    if (!tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) continue;
+    if (!esGuerraPura(estado) && !tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) continue;
     if (!puedePagar(jugador, escalarCosto(definicion.costo, multiplicadorCostos(jugador)))) continue;
     const ciudad = libres.find((tile) =>
       !definicion.requiereBarracks || tile.ciudad.edificios.includes('barracks'));

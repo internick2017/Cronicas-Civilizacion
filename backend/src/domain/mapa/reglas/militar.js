@@ -1,5 +1,5 @@
 import { escalarCosto, multiplicadorCostos } from './efectosProblemas.js';
-import { tileEn, jugadorPorId, puedePagar } from '../MapGame.js';
+import { tileEn, jugadorPorId, puedePagar, esGuerraPura } from '../MapGame.js';
 import { UNIDADES, CUARTEL, esNaval } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento, marAdyacente } from './comun.js';
@@ -52,7 +52,8 @@ export function reclutar(estado, jugadorId, { x, y, unidad }) {
   }
 
   const jugador = jugadorPorId(estado, jugadorId);
-  if (!tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) {
+  // Sin tecnologias en guerra pura, lo que pedia una queda disponible desde el inicio.
+  if (!esGuerraPura(estado) && !tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) {
     throw new ReglaError('REQUIERE_TECNOLOGIA', `Esa unidad requiere la tecnología: ${definicion.requiereTecnologia}`);
   }
 

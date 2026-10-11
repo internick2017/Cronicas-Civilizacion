@@ -1,5 +1,5 @@
-import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_VICTORIA_DOMINACION } from '../constantes.js';
-import { tileEn } from '../MapGame.js';
+import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_VICTORIA_DOMINACION, RECURSOS_CIVILES } from '../constantes.js';
+import { tileEn, esGuerraPura } from '../MapGame.js';
 import { validarTurno, evento } from './comun.js';
 import { produccionPorRasgos } from './cultura.js';
 import { aplicarBonosPorcentuales } from './tecnologia.js';
@@ -65,6 +65,8 @@ function produccionBruta(estado, jugadorId) {
   // FINAL, sobre el total ya sumado: un 20% de "toda tu comida" tiene que
   // contar el terreno, los edificios Y los rasgos, no solo la base.
   const total = aplicarBonosPorcentuales(produccion, jugador);
+  // Guerra pura: ciencia y cultura no se producen (ni la base de cada ciudad).
+  if (esGuerraPura(estado)) for (const r of RECURSOS_CIVILES) delete total[r];
   return total;
 }
 

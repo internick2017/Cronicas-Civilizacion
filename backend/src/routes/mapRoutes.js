@@ -11,7 +11,7 @@ import {
   UMBRAL_EXPULSION, UMBRAL_ELECCION, UMBRAL_REGRESO_MILITAR, UMBRAL_APROBACION,
   VARIACION_APOYO_POR_RONDA, BAJADA_APOYO_POR_RONDA, PISO_APOYO_POR_TERRITORIO,
   RECUPERACION_APOYO_SIN_PODER,
-  EDIFICIOS, UNIDADES, COSTO_CIUDAD, MIN_JUGADORES,
+  EDIFICIOS, UNIDADES, COSTO_CIUDAD, MIN_JUGADORES, esEdificioCivil,
   PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, BONO_TERRENO_DEFENSA,
   BONO_DEFENSA_CIUDAD, PORCENTAJE_VICTORIA_DOMINACION, UMBRAL_AVISO_DOMINACION, RASGOS_CULTURALES,
   DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, TECNOLOGIAS, COSTO_MEJORA_CIUDAD, CUARTEL
@@ -87,6 +87,8 @@ export function crearMapRoutes(servicio) {
         costo: datos.costo,
         produccion: datos.produccion,
         requiereTecnologia: datos.requiereTecnologia ?? null,
+        // Solo rinde ciencia o cultura: en guerra pura no se ofrece.
+        civil: esEdificioCivil(datos),
         // El puerto es el unico edificio con una condicion de geografia. La
         // vista lo necesita para poder decir "requiere costa" en vez de
         // ofrecer un boton que el backend va a rechazar.

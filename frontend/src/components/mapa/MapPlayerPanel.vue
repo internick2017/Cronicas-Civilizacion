@@ -67,6 +67,11 @@ const avanceDominacion = computed(() => {
 // no filtrar el mapa que todavia no exploraste.
 const rivalesDominantes = computed(() => props.vista.dominacionRivales ?? [])
 
+// En guerra pura la ciencia y la cultura no existen: no se muestran en la barra.
+const recursosVisibles = computed(() =>
+  Object.entries(yo.value?.recursos ?? {}).filter(([recurso]) =>
+    !(props.vista?.config?.guerraPura && (recurso === 'science' || recurso === 'culture'))))
+
 const RECURSOS_ICONOS = {
   food: '🌾', gold: '💰', wood: '🌲', stone: '⛰️', science: '🔬', culture: '🎭'
 }
@@ -82,7 +87,7 @@ const RECURSOS_ICONOS = {
 
     <div v-if="yo?.recursos" class="recursos">
       <span
-        v-for="(cantidad, recurso) in yo.recursos"
+        v-for="[recurso, cantidad] in recursosVisibles"
         :key="recurso"
         class="recurso"
         :title="tituloRecurso(recurso)"

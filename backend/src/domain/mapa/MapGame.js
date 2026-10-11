@@ -23,6 +23,9 @@ const CONFIG_DEFAULT = {
   islas: false,
   // Cada cuantas rondas hay elecciones en las republicas (ver reglas/gobierno.js).
   rondasEntreElecciones: 8,
+  // Guerra pura: sin ciencia ni cultura (no se producen ni se gastan), sin
+  // tecnologias, rasgos ni mejoras de ciudad. Todo es territorio y ejercitos.
+  guerraPura: false,
 };
 
 // Limites duros de la config. Viven en el DOMINIO (no solo en el borde HTTP)
@@ -67,6 +70,9 @@ export function validarConfig(cfg) {
   if (typeof cfg.islas !== 'boolean') {
     throw new ReglaError('CONFIG_INVALIDA', `config.islas debe ser booleano (recibido: ${JSON.stringify(cfg.islas)})`);
   }
+  if (typeof cfg.guerraPura !== 'boolean') {
+    throw new ReglaError('CONFIG_INVALIDA', `config.guerraPura debe ser booleano (recibido: ${JSON.stringify(cfg.guerraPura)})`);
+  }
   if (!MODOS_TURNO.includes(cfg.modoTurno)) {
     throw new ReglaError(
       'CONFIG_INVALIDA',
@@ -103,6 +109,9 @@ export function tileEn(estado, x, y) {
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || x >= t || y < 0 || y >= t) return null;
   return estado.mapa[y * t + x];
 }
+
+// Las partidas guardadas antes del modo no traen el campo: se leen como "no".
+export const esGuerraPura = (estado) => estado?.config?.guerraPura === true;
 
 export const jugadorPorId = (estado, id) => estado.jugadores.find(j => j.id === id) ?? null;
 
