@@ -110,9 +110,6 @@ export function tileEn(estado, x, y) {
   return estado.mapa[y * t + x];
 }
 
-// Las partidas guardadas antes del modo no traen el campo: se leen como "no".
-export const esGuerraPura = (estado) => estado?.config?.guerraPura === true;
-
 export const jugadorPorId = (estado, id) => estado.jugadores.find(j => j.id === id) ?? null;
 
 export function puedePagar(jugador, costo) {

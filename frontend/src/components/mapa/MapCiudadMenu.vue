@@ -13,9 +13,12 @@ const emit = defineEmits(['construir', 'reclutar', 'mejorar', 'renombrar', 'cerr
 // Los costos NO se copian del backend: llegan por prop desde MapSession, que
 // los pide a GET /api/map/constantes. Una sola fuente de verdad.
 // Sirven solo para DESHABILITAR botones; el backend vuelve a validar todo.
-const guerraPura = computed(() => props.vista.config.guerraPura === true)
-// Guerra pura: no hay edificios de ciencia ni de cultura, ni mejoras de ciudad.
-const EDIFICIOS = computed(() => (props.constantes.edificios || []).filter(e => !(guerraPura.value && e.civil)))
+// Lo que existe en el modo de esta partida lo dice el backend (vista.reglas): un edificio que
+// produce algo que no existe (la biblioteca sin ciencia) no se ofrece.
+const reglas = computed(() => props.vista.reglas ?? { tecnologias: true, mejorasCiudad: true, recursosActivos: null })
+const existe = (recurso) => !reglas.value.recursosActivos || reglas.value.recursosActivos.includes(recurso)
+const EDIFICIOS = computed(() =>
+  (props.constantes.edificios || []).filter(e => Object.keys(e.produccion || {}).every(existe)))
 const UNIDADES = computed(() => props.constantes.unidades || [])
 
 const tile = computed(() =>
@@ -66,7 +69,7 @@ const textoCosto = (costo) =>
 const motivoEdificio = (ed) => {
   if (yaConstruido(ed.tipo)) return 'ya construido'
   if (ed.requiereCosta && !esCostera.value) return 'requiere mar al lado'
-  if (ed.requiereTecnologia && !misTecnologias.value.includes(ed.requiereTecnologia)) {
+  if (reglas.value.tecnologias && ed.requiereTecnologia && !misTecnologias.value.includes(ed.requiereTecnologia)) {
     return `requiere ${nombreTecnologia(ed.requiereTecnologia)}`
   }
   if (!puedePagar(escalar(ed.costo))) return 'sin recursos'
@@ -98,7 +101,7 @@ const motivoUnidad = (u) => {
   if (u.requiereBarracks && !tieneBarracks.value) return 'requiere cuartel'
   if (u.requierePuerto && !tienePuerto.value) return 'requiere puerto'
   if (u.naval && !marAdyacente.value.some(m => !m.ejercito)) return 'sin mar libre donde botarlo'
-  if (!guerraPura.value && u.requiereTecnologia && !misTecnologias.value.includes(u.requiereTecnologia)) {
+  if (reglas.value.tecnologias && u.requiereTecnologia && !misTecnologias.value.includes(u.requiereTecnologia)) {
     return `requiere ${nombreTecnologia(u.requiereTecnologia)}`
   }
   if (!puedePagar(costoReal(u.costo, u))) return 'sin recursos'
@@ -147,7 +150,7 @@ const renombrar = () => {
       </div>
     </section>
 
-    <section v-if="!guerraPura">
+    <section v-if="reglas.mejorasCiudad">
       <h4>Nivel de la ciudad</h4>
       <button
         class="btn-secundario"

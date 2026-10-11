@@ -67,10 +67,11 @@ const avanceDominacion = computed(() => {
 // no filtrar el mapa que todavia no exploraste.
 const rivalesDominantes = computed(() => props.vista.dominacionRivales ?? [])
 
-// En guerra pura la ciencia y la cultura no existen: no se muestran en la barra.
-const recursosVisibles = computed(() =>
-  Object.entries(yo.value?.recursos ?? {}).filter(([recurso]) =>
-    !(props.vista?.config?.guerraPura && (recurso === 'science' || recurso === 'culture'))))
+// Solo los recursos que existen en el modo de esta partida (los dice el backend en vista.reglas).
+const recursosVisibles = computed(() => {
+  const activos = props.vista.reglas?.recursosActivos
+  return Object.entries(yo.value?.recursos ?? {}).filter(([recurso]) => !activos || activos.includes(recurso))
+})
 
 const RECURSOS_ICONOS = {
   food: '🌾', gold: '💰', wood: '🌲', stone: '⛰️', science: '🔬', culture: '🎭'

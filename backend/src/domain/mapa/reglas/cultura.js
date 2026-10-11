@@ -1,13 +1,14 @@
-import { jugadorPorId, puedePagar, esGuerraPura } from '../MapGame.js';
+import { jugadorPorId, puedePagar } from '../MapGame.js';
 import { RASGOS_CULTURALES } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento } from './comun.js';
+import { exigirCivil } from './modo.js';
 
 // Los rasgos son de la CIVILIZACION, no de una ciudad: se adoptan una vez y
 // valen para todo lo que tengas y para todo lo que fundes despues.
 export function adoptarRasgo(estado, jugadorId, { rasgo }) {
   validarTurno(estado, jugadorId);
-  if (esGuerraPura(estado)) throw new ReglaError('GUERRA_PURA', 'En guerra pura no hay rasgos culturales');
+  exigirCivil(estado, 'rasgos culturales');
 
   const definicion = RASGOS_CULTURALES[rasgo];
   if (!definicion) throw new ReglaError('RASGO_DESCONOCIDO', `Rasgo desconocido: ${rasgo}`);

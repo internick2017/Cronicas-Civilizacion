@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { crearEstado, esGuerraPura } from '../../src/domain/mapa/MapGame.js';
+import { crearEstado } from '../../src/domain/mapa/MapGame.js';
+import { vistaJugador } from '../../src/domain/mapa/reglas/visibilidad.js';
+import { esGuerraPura, reglasDelModo } from '../../src/domain/mapa/reglas/modo.js';
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { investigar } from '../../src/domain/mapa/reglas/tecnologia.js';
@@ -71,6 +73,24 @@ describe('guerra pura: lo que se apaga', () => {
     expect(pura.culture ?? 0).toBe(0);
     expect(pura.food).toBeGreaterThan(0);
     expect(pura.gold).toBeGreaterThan(0);
+  });
+});
+
+describe('guerra pura: lo que le dice el modo a la interfaz', () => {
+  it('una partida normal tiene todo y una de guerra pura no tiene ciencia ni cultura', () => {
+    expect(reglasDelModo(partida())).toEqual({
+      tecnologias: true, rasgos: true, mejorasCiudad: true,
+      recursosActivos: ['food', 'gold', 'wood', 'stone', 'science', 'culture'],
+    });
+    expect(reglasDelModo(partida({ guerraPura: true }))).toEqual({
+      tecnologias: false, rasgos: false, mejorasCiudad: false,
+      recursosActivos: ['food', 'gold', 'wood', 'stone'],
+    });
+  });
+
+  it('la vista del jugador lo incluye', () => {
+    expect(vistaJugador(partida({ guerraPura: true }), 'a').reglas.tecnologias).toBe(false);
+    expect(vistaJugador(partida(), 'a').reglas.tecnologias).toBe(true);
   });
 });
 

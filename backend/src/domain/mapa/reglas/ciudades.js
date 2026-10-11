@@ -1,8 +1,9 @@
-import { tileEn, jugadorPorId, puedePagar, esGuerraPura } from '../MapGame.js';
-import { COSTO_CIUDAD, EDIFICIOS, COSTO_MEJORA_CIUDAD, esEdificioCivil } from '../constantes.js';
+import { tileEn, jugadorPorId, puedePagar } from '../MapGame.js';
+import { COSTO_CIUDAD, EDIFICIOS, COSTO_MEJORA_CIUDAD } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento, radio1, esCostera } from './comun.js';
 import { tieneTecnologiaRequerida } from './tecnologia.js';
+import { edificioApagado, exigirCivil } from './modo.js';
 import { escalarCosto, multiplicadorCostos } from './efectosProblemas.js';
 
 export function fundarCiudad(estado, jugadorId, { x, y, nombre }) {
@@ -66,13 +67,11 @@ export function construir(estado, jugadorId, { x, y, edificio }) {
     throw new ReglaError('REQUIERE_COSTA', 'Ese edificio requiere una ciudad con mar adyacente');
   }
 
-  const guerraPura = esGuerraPura(estado);
-  if (guerraPura && esEdificioCivil(definicion)) {
+  if (edificioApagado(estado, definicion)) {
     throw new ReglaError('GUERRA_PURA', 'En guerra pura no hay edificios de ciencia ni de cultura');
   }
   const jugador = jugadorPorId(estado, jugadorId);
-  // Sin tecnologias en guerra pura, lo que pedia una queda disponible desde el inicio.
-  if (!guerraPura && !tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) {
+  if (!tieneTecnologiaRequerida(estado, jugador, definicion.requiereTecnologia)) {
     throw new ReglaError('REQUIERE_TECNOLOGIA', `Ese edificio requiere la tecnología: ${definicion.requiereTecnologia}`);
   }
   // La inflacion (problema social) encarece todo: ver reglas/efectosProblemas.js.
@@ -93,7 +92,7 @@ export function construir(estado, jugadorId, { x, y, edificio }) {
 // nada permitia subir `nivel` mas alla de 1 hasta ahora).
 export function mejorarCiudad(estado, jugadorId, { x, y }) {
   validarTurno(estado, jugadorId);
-  if (esGuerraPura(estado)) throw new ReglaError('GUERRA_PURA', 'En guerra pura no hay mejoras de ciudad');
+  exigirCivil(estado, 'mejoras de ciudad');
 
   const tile = tileEn(estado, x, y);
   if (!tile) throw new ReglaError('POSICION_INVALIDA', 'Posición inválida');

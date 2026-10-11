@@ -1,7 +1,8 @@
-import { jugadorPorId, puedePagar, esGuerraPura } from '../MapGame.js';
+import { jugadorPorId, puedePagar } from '../MapGame.js';
 import { TECNOLOGIAS } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento } from './comun.js';
+import { reglasDelModo, exigirCivil } from './modo.js';
 
 // Las tecnologias son de la CIVILIZACION (como los rasgos culturales): se
 // investigan una vez y valen para siempre, sin requisitos entre ellas (nada
@@ -9,7 +10,7 @@ import { validarTurno, evento } from './comun.js';
 // unidades o desbloquean cosas.
 export function investigar(estado, jugadorId, { tecnologia }) {
   validarTurno(estado, jugadorId);
-  if (esGuerraPura(estado)) throw new ReglaError('GUERRA_PURA', 'En guerra pura no hay tecnologías');
+  exigirCivil(estado, 'tecnologías');
 
   const definicion = TECNOLOGIAS[tecnologia];
   if (!definicion) throw new ReglaError('TECNOLOGIA_DESCONOCIDA', `Tecnología desconocida: ${tecnologia}`);
@@ -69,7 +70,8 @@ export function aplicarBonosPorcentuales(produccion, jugador) {
 
 // true si el jugador puede reclutar/construir algo que pide una tecnologia
 // concreta (o si no pide ninguna: la mayoria de unidades/edificios no la
-// necesitan y no deberian bloquearse por esto).
-export function tieneTecnologiaRequerida(jugador, requiereTecnologia) {
-  return !requiereTecnologia || tecnologiasDe(jugador).includes(requiereTecnologia);
+// necesitan y no deberian bloquearse por esto). En guerra pura no hay
+// tecnologias, asi que lo que pedia una esta disponible desde el inicio.
+export function tieneTecnologiaRequerida(estado, jugador, requiereTecnologia) {
+  return !requiereTecnologia || !reglasDelModo(estado).tecnologias || tecnologiasDe(jugador).includes(requiereTecnologia);
 }

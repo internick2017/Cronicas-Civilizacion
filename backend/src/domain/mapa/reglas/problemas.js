@@ -6,6 +6,7 @@ import { evento } from './comun.js';
 import { formaEstadoDe } from './gobierno.js';
 import { subdivisionResolutora, nivelDe } from './subdivisiones.js';
 import { perdidaPoblacion } from './efectosProblemas.js';
+import { problemaApagado } from './modo.js';
 
 // Problemas sociales por zona (ver docs/superpowers/specs/2026-10-12-subdivisiones-problemas-design.md).
 // Solo existen en el Estado FEDERAL. Cada ciudad tiene un medidor por problema; al
@@ -82,7 +83,7 @@ function pasada(estado, jugador, rng) {
   const eventos = [];
   const propias = estado.mapa.filter(t => t.ciudad && t.dueno === jugador.id);
   const claves = new Set(propias.map(t => clave(t)));
-  const tipos = Object.keys(PROBLEMAS);
+  const tipos = Object.keys(PROBLEMAS).filter(tp => !problemaApagado(estado, tp));
 
   // 1. Un problema que nombra una ciudad perdida o capturada se descarta entero:
   // si los medidores siguen altos, vuelve a aparecer con las ciudades que quedan.

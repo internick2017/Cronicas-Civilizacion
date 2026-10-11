@@ -6,6 +6,7 @@ import { DIFICULTAD_IA_DEFAULT, GRUPOS_DE_APOYO } from '../constantes.js';
 import { subdivisionesDe, nivelDe } from './subdivisiones.js';
 import { problemasParaLaVista, senalesDe } from './problemas.js';
 import { multiplicadorCostos } from './efectosProblemas.js';
+import { reglasDelModo } from './modo.js';
 import { gobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo } from './gobierno.js';
 
 function vistaTile(tile, jugadorId) {
@@ -94,6 +95,8 @@ export function vistaJugador(estado, jugadorId) {
     turno: estado.turno,
     indiceJugadorActual: estado.indiceJugadorActual,
     config: structuredClone(estado.config),
+    // Que existe en este modo (tecnologias, rasgos, mejoras, recursos): la interfaz pregunta por esto, no por el nombre del modo.
+    reglas: reglasDelModo(estado),
     ganador: estado.ganador,
     jugadores: estado.jugadores.map(j => vistaJugadorPublica(j, jugadorId, estado)),
     mapa: estado.mapa.map(t => vistaTile(t, jugadorId)),

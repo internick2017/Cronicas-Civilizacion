@@ -75,7 +75,6 @@ const misCiudades = computed(() =>
     .map(t => ({ x: t.x, y: t.y, nombre: t.ciudad.nombre, nivel: t.ciudad.nivel }))
 )
 
-const guerraPura = computed(() => vista.value?.config?.guerraPura === true)
 const culturaAbierta = ref(false)
 
 const misRasgos = computed(() =>
@@ -602,10 +601,10 @@ onUnmounted(() => {
         <button class="btn-panel" @click="cronicaAbierta = !cronicaAbierta">
           {{ cronicaAbierta ? '📖 Ocultar crónica' : '📖 Ver crónica' }}
         </button>
-        <button v-if="!guerraPura" class="btn-panel" title="Rasgos culturales" @click="culturaAbierta = true">
+        <button v-if="vista.reglas?.rasgos !== false" class="btn-panel" title="Rasgos culturales" @click="culturaAbierta = true">
           🎭 Cultura
         </button>
-        <button v-if="!guerraPura" class="btn-panel" title="Tecnologías" @click="cienciaAbierta = true">
+        <button v-if="vista.reglas?.tecnologias !== false" class="btn-panel" title="Tecnologías" @click="cienciaAbierta = true">
           🔬 Ciencia
         </button>
         <button class="btn-panel" title="Gobierno" @click="gobiernoAbierto = true">

@@ -564,7 +564,8 @@ export const PROBLEMAS = {
   inflacion: { nombre: 'Inflación y crisis económica', global: true },
   pobreza: { nombre: 'Pobreza y desigualdad social' },
   salud: { nombre: 'Deficiencias en el sistema de salud' },
-  educacion: { nombre: 'Baja calidad educativa' },
+  // `recurso`: el unico que castiga. Si el modo de la partida lo apaga, el problema no existe.
+  educacion: { nombre: 'Baja calidad educativa', recurso: 'science' },
   infraestructura: { nombre: 'Falta de infraestructura y vivienda' },
   corrupcion: { nombre: 'Corrupción política' },
   clima: { nombre: 'Crisis climática y escasez de agua' },
