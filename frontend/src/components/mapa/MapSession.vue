@@ -53,6 +53,12 @@ const canvasRef = ref(null)
 const ciudadesAbierto = ref(false)
 const ayudaAbierta = ref(false)
 const gobiernoAbierto = ref(false)
+// Cuantos problemas activos o señales de aviso hay: el boton Gobierno lo muestra
+// para que no haga falta abrirlo a mirar.
+const avisosGobierno = computed(() => {
+  const yo = vista.value?.jugadores.find(j => j.id === jugadorId)
+  return (yo?.problemas?.length ?? 0) + (yo?.senales?.filter(s => s.estado === 'aviso').length ?? 0)
+})
 
 // La cronica se puede ocultar y la eleccion se recuerda: a quien no le interesa
 // la narrativa no tiene que cerrarla en cada partida, y a quien si le interesa
@@ -459,6 +465,9 @@ const cambiarFormaEstado = (formaEstado) => {
 // Estas dos NO cierran el panel: se suelen crear varias seguidas.
 const crearSubdivision = (datos) => ejecutarAccion({ tipo: 'crearSubdivision', ...datos })
 const quitarSubdivision = (id) => ejecutarAccion({ tipo: 'quitarSubdivision', id })
+const renombrarSubdivision = (id, nombre) => ejecutarAccion({ tipo: 'renombrarSubdivision', id, nombre })
+const asignarCiudades = (id, ciudades) => ejecutarAccion({ tipo: 'asignarCiudades', id, ciudades })
+const desasignarCiudades = (id, ciudades) => ejecutarAccion({ tipo: 'desasignarCiudades', id, ciudades })
 
 const cerrarMenuEdificio = () => {
   edificioMenuAbierto.value = null
@@ -599,7 +608,7 @@ onUnmounted(() => {
           🔬 Ciencia
         </button>
         <button class="btn-panel" title="Gobierno" @click="gobiernoAbierto = true">
-          🏛️ Gobierno
+          🏛️ Gobierno<span v-if="avisosGobierno" class="insignia-aviso">{{ avisosGobierno }}</span>
         </button>
         <button class="btn-panel" title="Manual de Instrucciones" @click="ayudaAbierta = true">
           ℹ️ Manual de Instrucciones
@@ -679,7 +688,10 @@ onUnmounted(() => {
         @proponer="proponerGobierno"
         @ventajas="darVentajas"
         @forma="cambiarFormaEstado"
-        @subdivision="crearSubdivision"
+        @crear-subdivision="crearSubdivision"
+        @renombrar-subdivision="renombrarSubdivision"
+        @asignar-ciudades="asignarCiudades"
+        @desasignar-ciudades="desasignarCiudades"
         @quitar-subdivision="quitarSubdivision"
         @cerrar="gobiernoAbierto = false"
       />
@@ -960,6 +972,10 @@ onUnmounted(() => {
   font-size: 0.85rem;
 }
 
+.insignia-aviso {
+  margin-left: 0.35rem; background: #e67e22; color: #fff; border-radius: 999px;
+  padding: 0 0.4rem; font-size: 0.7rem; font-weight: 700;
+}
 .entrada-nombre {
   background: rgba(0, 0, 0, 0.3); color: #ecf0f1;
   border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;

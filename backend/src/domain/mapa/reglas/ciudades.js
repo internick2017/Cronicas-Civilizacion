@@ -3,6 +3,7 @@ import { COSTO_CIUDAD, EDIFICIOS, COSTO_MEJORA_CIUDAD } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento, radio1, esCostera } from './comun.js';
 import { tieneTecnologiaRequerida } from './tecnologia.js';
+import { escalarCosto, multiplicadorCostos } from './efectosProblemas.js';
 
 export function fundarCiudad(estado, jugadorId, { x, y, nombre }) {
   validarTurno(estado, jugadorId);
@@ -69,12 +70,14 @@ export function construir(estado, jugadorId, { x, y, edificio }) {
   if (!tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) {
     throw new ReglaError('REQUIERE_TECNOLOGIA', `Ese edificio requiere la tecnología: ${definicion.requiereTecnologia}`);
   }
-  if (!puedePagar(jugador, definicion.costo)) {
+  // La inflacion (problema social) encarece todo: ver reglas/efectosProblemas.js.
+  const costo = escalarCosto(definicion.costo, multiplicadorCostos(jugador));
+  if (!puedePagar(jugador, costo)) {
     throw new ReglaError('RECURSOS_INSUFICIENTES', 'Recursos insuficientes');
   }
 
   return [
-    evento('RecursosGastados', estado, jugadorId, { costo: definicion.costo }),
+    evento('RecursosGastados', estado, jugadorId, { costo }),
     evento('EdificioConstruido', estado, jugadorId, { x, y, edificio }),
   ];
 }
@@ -91,7 +94,7 @@ export function mejorarCiudad(estado, jugadorId, { x, y }) {
   if (!tile.ciudad || tile.dueno !== jugadorId) throw new ReglaError('CIUDAD_AJENA', 'La ciudad no te pertenece');
 
   const jugador = jugadorPorId(estado, jugadorId);
-  const costo = COSTO_MEJORA_CIUDAD(tile.ciudad.nivel);
+  const costo = escalarCosto(COSTO_MEJORA_CIUDAD(tile.ciudad.nivel), multiplicadorCostos(jugador));
   if (!puedePagar(jugador, costo)) {
     throw new ReglaError('RECURSOS_INSUFICIENTES', 'Recursos insuficientes');
   }

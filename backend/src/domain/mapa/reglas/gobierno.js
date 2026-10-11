@@ -9,6 +9,7 @@ import { jugadorPorId, puedePagar } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
 import { evento } from './comun.js';
 import { controlTerritorial } from './dominacion.js';
+import { caidaApoyoPueblo } from './efectosProblemas.js';
 
 // Toda lectura de los campos de gobierno pasa por estos accesores: una partida
 // guardada antes de que existieran no los trae, y se cae al valor por defecto
@@ -187,6 +188,8 @@ export function cerrarRondaGobierno(estado, rng) {
         apoyo[g] = Math.min(APOYO_INICIAL, apoyo[g] + RECUPERACION_APOYO_SIN_PODER);
       }
     }
+    // Un problema de pobreza activo (Estado federal) erosiona el apoyo del pueblo.
+    apoyo.pueblo = acotar(apoyo.pueblo - caidaApoyoPueblo(jugador));
     if (GRUPOS_DE_APOYO.some(g => apoyo[g] !== apoyoAntes[g])) {
       eventos.push(evento('ApoyoActualizado', estado, jugador.id, { apoyo }));
     }

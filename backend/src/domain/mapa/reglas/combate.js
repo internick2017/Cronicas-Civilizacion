@@ -3,12 +3,22 @@ import {
   UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, CUARTEL,
   DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, esNaval, puedeAtacar
 } from '../constantes.js';
+import { penalizacionDefensa } from './efectosProblemas.js';
 import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
 import { botinDe, saqueadaHasta } from './saqueo.js';
 import { validarTurno, evento, radio1 } from './comun.js';
 import { bonoDefensaPorRasgos } from './cultura.js';
 import { bonoAtaquePorTecnologias, bonoDefensaUnidadPorTecnologias } from './tecnologia.js';
+
+// La defensa PLANA de una ciudad: su nivel, mas el cuartel, menos lo que le quitan los
+// problemas sociales activos de su dueño (inseguridad, infraestructura). Nunca baja de 1.
+// Exportada para poder probarla sin armar un combate entero.
+export function defensaDeCiudad(estado, tile) {
+  const bonoCuartel = tile.ciudad.edificios.includes('barracks') ? CUARTEL.bonoDefensaCiudad : 0;
+  const duenoJugador = estado.jugadores.find(j => j.id === tile.dueno);
+  return Math.max(1, defensaCiudad(tile.ciudad.nivel) + bonoCuartel - penalizacionDefensa(duenoJugador, tile.x, tile.y));
+}
 
 export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   validarTurno(estado, jugadorId);
@@ -48,11 +58,9 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   // los ejercitos: eso es fortificacion, la tecnologia). Se resuelve aca, no
   // en defensaCiudad(nivel), porque esa formula es pura y solo conoce el
   // nivel; el cuartel es un dato de ESE tile puntual, no de la ciudad en si.
-  const bonoCuartel = ciudadEnemiga && tileHasta.ciudad.edificios.includes('barracks')
-    ? CUARTEL.bonoDefensaCiudad : 0;
   const base = ejercitoEnemigo
     ? UNIDADES[ejercitoEnemigo.tipo].defensa
-    : defensaCiudad(ciudadEnemiga.nivel) + bonoCuartel;
+    : defensaDeCiudad(estado, tileHasta);
   const ciudadPropia = Boolean(tileHasta.ciudad);
 
   // Metalurgia y fortificacion (tecnologia) son bonos PLANOS a unidades, no

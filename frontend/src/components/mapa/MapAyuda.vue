@@ -72,6 +72,26 @@ const probSucesion = computed(() => {
   return esperanza ? `${(100 / esperanza).toFixed(2).replace('.', ',')}%` : ''
 })
 
+const tiposPorNivel = computed(() => {
+  const nombres = []
+  for (const t of props.constantes?.tiposSubdivision || []) {
+    const mismos = (props.constantes?.tiposSubdivision || []).filter(x => x.nivel === t.nivel).map(x => x.nombre)
+    const texto = mismos.join(' o ')
+    if (!nombres.includes(texto)) nombres.push(texto)
+  }
+  return ['País', ...nombres].join(', ')
+})
+
+const topes = computed(() => {
+  const cap = props.constantes?.capacidadCiudadesPorNivel || {}
+  return Object.entries(cap)
+    .sort((a, b) => Number(b[0]) - Number(a[0]))
+    .map(([nivel, max]) => {
+      const nombres = (props.constantes?.tiposSubdivision || []).filter(t => String(t.nivel) === nivel).map(t => t.nombre)
+      return `${nombres.join(' o ')} ${max}`
+    }).join(', ') + '; el resto no tiene tope'
+})
+
 const umbralAviso = computed(() =>
   Math.round((props.constantes?.umbralAvisoDominacion ?? 0) * 100)
 )
@@ -312,6 +332,51 @@ const umbralAviso = computed(() =>
       </p>
       <p>
         Además, en el menú de cada ciudad propia podés <strong>renombrarla</strong> cuando quieras.
+      </p>
+    </section>
+
+    <section v-if="constantes.tiposSubdivision?.length">
+      <h4>Subdivisiones y problemas sociales</h4>
+      <p>
+        En el Estado federal armás un <strong>árbol de subdivisiones</strong> dentro del País, de mayor a menor:
+        <strong>{{ tiposPorNivel }}</strong>. Cada una se puede renombrar, tener una prioridad propia (si no, hereda
+        la de la de arriba) y contener ciudades y otras subdivisiones más chicas. Una subdivisión solo puede estar
+        dentro de otra de nivel mayor. Si quitás una, sus hijas y sus ciudades pasan a la de arriba. Cada nivel abarca hasta un máximo de ciudades (contando las de sus hijas): {{ topes }}.
+      </p>
+      <p>
+        Cada ciudad acumula <strong>diez problemas sociales</strong>:
+        {{ (constantes.problemasSociales || []).map(p => p.nombre.toLowerCase()).join(', ') }}.
+        Los medidores suben o bajan según lo que tengas construido (un cuartel contiene la inseguridad, una
+        biblioteca la mala educación, un granero la pobreza y la mala salud, un aserradero o una cantera la falta
+        de infraestructura, un mercado la corrupción).
+      </p>
+      <p>
+        Primero aparecen <strong>señales de aviso</strong> (desde {{ constantes.limitesProblemas?.senal }} de 100):
+        da tiempo de prevenir. Al llegar a {{ constantes.limitesProblemas?.problema }} aparece el
+        <strong>problema</strong>, que abarca a la ciudad y a las vecinas que ya estaban en aviso.
+        Lo resuelve <strong>la subdivisión de menor nivel que cubra todas las ciudades afectadas</strong> (o el País
+        si ninguna las cubre), sola, pagando oro. Cuanto más chica la subdivisión, más rápido y barato:
+      </p>
+      <table>
+        <thead>
+          <tr><th>Resuelve</th><th>Tarda</th><th>Cuesta</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="(datos, nivel) in constantes.resolucionPorNivel" :key="nivel">
+            <td>{{ nivel === '1' ? 'País' : (constantes.tiposSubdivision.filter(t => String(t.nivel) === nivel).map(t => t.nombre).join(' / ')) }}</td>
+            <td>{{ datos.rondas }} ronda(s)</td>
+            <td>{{ datos.oro }} de oro</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="aviso">
+        Si no hay oro, el problema <strong>empeora</strong> (hasta gravedad {{ constantes.limitesProblemas?.gravedadMaxima }})
+        y su castigo crece. Un árbol bien repartido resuelve barato: muchas Freguesias chicas cuestan menos que mandar
+        todo al País. Mientras dura, cada problema castiga: desempleo baja la producción de la ciudad, mala
+        educación la ciencia, la crisis climática la comida, la corrupción se lleva oro, la inmigración consume
+        comida, la inseguridad y la falta de infraestructura bajan su defensa, la inflación encarece construir y
+        reclutar, la mala salud baja la población y la pobreza baja el apoyo del pueblo. El botón
+        <strong>🏛️ Gobierno</strong> muestra un número naranja cuando hay avisos o problemas.
       </p>
     </section>
 

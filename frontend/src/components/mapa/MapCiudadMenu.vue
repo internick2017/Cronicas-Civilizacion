@@ -45,6 +45,16 @@ const misTecnologias = computed(() =>
 const nombreTecnologia = (tipo) =>
   (props.constantes.tecnologias || []).find(t => t.tipo === tipo)?.nombre || tipo
 
+// La inflacion (problema social) encarece todo. El backend manda el multiplicador
+// del jugador y redondea HACIA ARRIBA, igual que escalarCosto en el dominio.
+const multiplicador = computed(() =>
+  props.vista.jugadores.find(j => j.id === props.jugadorId)?.multiplicadorCostos ?? 1
+)
+const escalar = (costo) =>
+  multiplicador.value === 1
+    ? costo
+    : Object.fromEntries(Object.entries(costo).map(([r, m]) => [r, Math.ceil(m * multiplicador.value - 1e-9)]))
+
 const puedePagar = (costo) =>
   Object.entries(costo).every(([recurso, monto]) => (recursos.value[recurso] || 0) >= monto)
 
@@ -57,7 +67,7 @@ const motivoEdificio = (ed) => {
   if (ed.requiereTecnologia && !misTecnologias.value.includes(ed.requiereTecnologia)) {
     return `requiere ${nombreTecnologia(ed.requiereTecnologia)}`
   }
-  if (!puedePagar(ed.costo)) return 'sin recursos'
+  if (!puedePagar(escalar(ed.costo))) return 'sin recursos'
   return null
 }
 
@@ -72,9 +82,9 @@ const cuartel = computed(() => props.constantes.cuartel || null)
 // mostraria un precio que el backend no va a cobrar.
 const conBonoCuartel = (u) => tieneBarracks.value && cuartel.value && !u.naval
 const costoReal = (costoBase, u) => {
-  if (!conBonoCuartel(u)) return costoBase
-  return Object.fromEntries(Object.entries(costoBase).map(
-    ([r, m]) => [r, Math.round(m * (1 - cuartel.value.descuentoReclutar))]))
+  if (!conBonoCuartel(u)) return escalar(costoBase)
+  return escalar(Object.fromEntries(Object.entries(costoBase).map(
+    ([r, m]) => [r, Math.round(m * (1 - cuartel.value.descuentoReclutar))])))
 }
 const movimientoReal = (u) =>
   u.movimiento + (conBonoCuartel(u) ? cuartel.value.bonoMovimiento : 0)
@@ -100,7 +110,7 @@ const motivoUnidad = (u) => {
 const nivelActual = computed(() => tile.value?.ciudad?.nivel ?? 1)
 const costoMejora = computed(() => {
   const base = props.constantes.costoMejoraCiudadPorNivel || {}
-  return Object.fromEntries(Object.entries(base).map(([r, m]) => [r, m * nivelActual.value]))
+  return escalar(Object.fromEntries(Object.entries(base).map(([r, m]) => [r, m * nivelActual.value])))
 })
 const motivoMejora = computed(() => (puedePagar(costoMejora.value) ? null : 'sin recursos'))
 
@@ -159,7 +169,7 @@ const renombrar = () => {
         @click="$emit('construir', ed.tipo)"
       >
         <strong>{{ ed.nombre }}</strong>
-        <small>{{ textoCosto(ed.costo) }}</small>
+        <small>{{ textoCosto(escalar(ed.costo)) }}</small>
         <em v-if="motivoEdificio(ed)">{{ motivoEdificio(ed) }}</em>
       </button>
     </section>

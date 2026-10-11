@@ -33,7 +33,7 @@ describe('crearSubdivision / quitarSubdivision', () => {
     expect(evs.map(x => x.tipo)).toEqual(['SubdivisionCreada']);
     aplicar(e, evs);
     expect(p1.subdivisiones).toEqual([
-      { id: 'sub1', nombre: 'Norte', prioridad: 'comida', ciudades: [{ x: capital.x, y: capital.y }] },
+      { id: 'sub1', nombre: 'Norte', tipo: 'municipio', padreId: null, prioridad: 'comida', ciudades: [{ x: capital.x, y: capital.y }] },
     ]);
   });
 
@@ -47,9 +47,11 @@ describe('crearSubdivision / quitarSubdivision', () => {
     }
     expect(codigo(() => nueva({ ciudades: [null] }))).toBe('CIUDAD_INVALIDA');
     expect(codigo(() => nueva({ ciudades: [{ x: 'a', y: 1 }] }))).toBe('CIUDAD_INVALIDA');
-    expect(codigo(() => nueva({ ciudades: [] }))).toBe('SIN_CIUDADES');
+    // Una ciudad ya asignada ya no es error: se MUEVE a la subdivision nueva.
     aplicar(e, nueva());
-    expect(codigo(() => nueva({ nombre: 'Otra' }))).toBe('CIUDAD_YA_ASIGNADA');
+    aplicar(e, nueva({ nombre: 'Otra' }));
+    expect(p1.subdivisiones[0].ciudades).toEqual([]);
+    expect(p1.subdivisiones[1].ciudades).toEqual([{ x: capital.x, y: capital.y }]);
     aplicar(e, cambiarFormaEstado(e, 'p1', { formaEstado: 'unitario' }));
     expect(codigo(() => nueva({ nombre: 'Otra', ciudades: [{ x: ajena.x, y: ajena.y }] }))).toBe('NO_ES_FEDERAL');
   });

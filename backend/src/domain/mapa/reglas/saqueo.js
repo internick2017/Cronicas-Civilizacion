@@ -3,6 +3,7 @@ import { SAQUEO } from '../constantes.js';
 // Proporcional con piso y techo, y acotado a lo que la victima realmente tiene:
 // si no tiene oro el saqueo no da nada, pero el combate ocurrio igual.
 export function botinDe(oroVictima) {
+  oroVictima = Math.max(0, oroVictima); // nunca se saquea un oro negativo
   const proporcional = Math.round(oroVictima * SAQUEO.fraccion);
   return Math.min(oroVictima, Math.min(SAQUEO.maximo, Math.max(SAQUEO.minimo, proporcional)));
 }

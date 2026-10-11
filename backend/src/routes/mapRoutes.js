@@ -2,6 +2,10 @@ import express from 'express';
 import { ReglaError } from '../domain/mapa/errores.js';
 import { PRIORIDADES } from '../domain/mapa/reglas/subdivisiones.js';
 import {
+  TIPOS_SUBDIVISION, PROBLEMAS, RESOLUCION_POR_NIVEL, LIMITE_SENAL, LIMITE_PROBLEMA, GRAVEDAD_MAXIMA,
+  EFECTOS_PROBLEMAS, ESCALA_GRAVEDAD, CAPACIDAD_CIUDADES_POR_NIVEL,
+} from '../domain/mapa/constantes.js';
+import {
   GOBIERNOS, GRUPOS_DE_APOYO, ENFRIAMIENTO_VOTO, ESPERANZA_DE_VIDA_TURNOS, ORO_POR_PUNTO_APOYO,
   BONO_PRODUCCION_REPUBLICA, BONO_PRODUCCION_GOBIERNO, NIVEL_MAXIMO_ADMINISTRADO, RESPETO,
   UMBRAL_EXPULSION, UMBRAL_ELECCION, UMBRAL_REGRESO_MILITAR, UMBRAL_APROBACION,
@@ -158,6 +162,15 @@ export function crearMapRoutes(servicio) {
       esperanzaDeVidaTurnos: ESPERANZA_DE_VIDA_TURNOS,
       oroPorPuntoApoyo: ORO_POR_PUNTO_APOYO,
       prioridadesSubdivision: Object.keys(PRIORIDADES),
+      problemasSociales: Object.entries(PROBLEMAS).map(([tipo, datos]) => ({ tipo, ...datos })),
+      resolucionPorNivel: RESOLUCION_POR_NIVEL,
+      capacidadCiudadesPorNivel: CAPACIDAD_CIUDADES_POR_NIVEL,
+      efectosProblemas: EFECTOS_PROBLEMAS,
+      limitesProblemas: { senal: LIMITE_SENAL, problema: LIMITE_PROBLEMA, gravedadMaxima: GRAVEDAD_MAXIMA, escalaGravedad: ESCALA_GRAVEDAD },
+      // Del mas grande al mas chico: el panel los ofrece en ese orden.
+      tiposSubdivision: Object.entries(TIPOS_SUBDIVISION)
+        .map(([tipo, datos]) => ({ tipo, ...datos }))
+        .sort((a, b) => a.nivel - b.nivel),
       // Numeros del manual de instrucciones (MapAyuda): el texto los lee de aca.
       bonoProduccionRepublica: BONO_PRODUCCION_REPUBLICA,
       bonosProduccionGobierno: BONO_PRODUCCION_GOBIERNO,

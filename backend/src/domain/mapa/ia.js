@@ -22,6 +22,9 @@ import {
 import { marAdyacente } from './reglas/comun.js';
 import { aplicar } from './aplicar.js';
 import { fundarCiudad, construir, mejorarCiudad } from './reglas/ciudades.js';
+import { organizarSubdivisionesIA } from './iaSubdivisiones.js';
+import { escalarCosto, multiplicadorCostos } from './reglas/efectosProblemas.js';
+import { IA_ORGANIZA_SUBDIVISIONES } from './constantes.js';
 import { reclutar } from './reglas/militar.js';
 import { moverEjercito } from './reglas/movimiento.js';
 import { atacar } from './reglas/combate.js';
@@ -504,7 +507,9 @@ function decidirConstruccion(estado, jugadorId, perfil) {
       tieneTecnologiaRequerida(jugador, EDIFICIOS[tipo].requiereTecnologia) &&
       (!EDIFICIOS[tipo].requiereCosta || puertoUtil(estado, tile.x, tile.y)));
     for (const tipo of faltantes) {
-      if (puedePagar(jugador, EDIFICIOS[tipo].costo)) {
+      // Con inflacion el costo real es mayor: decidir con el de lista haria elegir algo que
+      // la regla rechaza, 5 veces seguidas, y la maquina perdia el turno entero.
+      if (puedePagar(jugador, escalarCosto(EDIFICIOS[tipo].costo, multiplicadorCostos(jugador)))) {
         return { tipo: 'construir', x: tile.x, y: tile.y, edificio: tipo };
       }
     }
@@ -541,7 +546,7 @@ function decidirMejoraCiudad(estado, jugadorId, perfil) {
     .filter((t) => t.ciudad.nivel < Math.min(perfil.nivelMaximoCiudad, NIVEL_CIUDAD_INCAPTURABLE))
     .sort((a, b) => a.ciudad.nivel - b.ciudad.nivel);
   for (const tile of ciudades) {
-    if (puedePagar(jugador, COSTO_MEJORA_CIUDAD(tile.ciudad.nivel))) {
+    if (puedePagar(jugador, escalarCosto(COSTO_MEJORA_CIUDAD(tile.ciudad.nivel), multiplicadorCostos(jugador)))) {
       return { tipo: 'mejorarCiudad', x: tile.x, y: tile.y };
     }
   }
@@ -570,7 +575,7 @@ function decidirReclutamiento(estado, jugadorId, perfil) {
   for (const tipo of perfil.unidadesPrioridad) {
     const definicion = UNIDADES[tipo];
     if (!tieneTecnologiaRequerida(jugador, definicion.requiereTecnologia)) continue;
-    if (!puedePagar(jugador, definicion.costo)) continue;
+    if (!puedePagar(jugador, escalarCosto(definicion.costo, multiplicadorCostos(jugador)))) continue;
     const ciudad = libres.find((tile) =>
       !definicion.requiereBarracks || tile.ciudad.edificios.includes('barracks'));
     if (ciudad) {
@@ -966,6 +971,14 @@ export function jugarTurnoIA(estado, jugadorId, rng) {
       if (fallosSeguidos >= FALLOS_SEGUIDOS_MAXIMOS) break;
     }
   }
+
+  // Antes de cerrar el turno la maquina ordena su Estado federal (si esta prendido).
+  // Va ANTES de terminarTurno: ahi se administran las subdivisiones.
+  const organizacion = organizarSubdivisionesIA(estado, jugadorId, {
+    activa: estado.config?.iaOrganizaSubdivisiones ?? IA_ORGANIZA_SUBDIVISIONES,
+  });
+  aplicar(estado, organizacion);
+  eventos.push(...organizacion);
 
   const cierre = terminarTurno(estado, jugadorId);
   aplicar(estado, cierre);

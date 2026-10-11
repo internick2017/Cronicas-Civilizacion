@@ -1,3 +1,4 @@
+import { escalarCosto, multiplicadorCostos } from './efectosProblemas.js';
 import { tileEn, jugadorPorId, puedePagar } from '../MapGame.js';
 import { UNIDADES, CUARTEL, esNaval } from '../constantes.js';
 import { ReglaError } from '../errores.js';
@@ -62,10 +63,12 @@ export function reclutar(estado, jugadorId, { x, y, unidad }) {
   // entrena tropa, no marineros. El equivalente naval del cuartel es el
   // puerto, y lo que da es comercio y reparacion (ver PUERTO), no descuento.
   const tieneCuartel = tile.ciudad.edificios.includes('barracks') && !esNaval(unidad);
-  const costo = tieneCuartel
+  const costoConCuartel = tieneCuartel
     ? Object.fromEntries(Object.entries(definicion.costo).map(
       ([recurso, monto]) => [recurso, Math.round(monto * (1 - CUARTEL.descuentoReclutar))]))
     : definicion.costo;
+  // La inflacion (problema social) encarece lo reclutado, despues del descuento del cuartel.
+  const costo = escalarCosto(costoConCuartel, multiplicadorCostos(jugador));
 
   if (!puedePagar(jugador, costo)) {
     throw new ReglaError('RECURSOS_INSUFICIENTES', 'Recursos insuficientes');

@@ -528,3 +528,85 @@ export const BAJADA_APOYO_POR_RONDA = 1;
 export const PISO_APOYO_POR_TERRITORIO = 20;
 // Quien no manda recupera un poco por ronda hacia el punto de partida: la gente olvida.
 export const RECUPERACION_APOYO_SIN_PODER = 1;
+
+// --- Subdivisiones del Estado federal -----------------------------------------
+// Jerarquia dictada por el usuario, de mayor (2) a menor (6). El nivel 1 es el
+// Pais: es el Estado entero, un nodo VIRTUAL que no se guarda ni se renombra.
+// Departamento/Provincia y Municipio/Concejo son el mismo nivel con otro nombre.
+export const TIPOS_SUBDIVISION = {
+  departamento: { nombre: 'Departamento', nivel: 2 },
+  provincia: { nombre: 'Provincia', nivel: 2 },
+  distrito: { nombre: 'Distrito', nivel: 3 },
+  condado: { nombre: 'Condado', nivel: 4 },
+  municipio: { nombre: 'Municipio', nivel: 5 },
+  concejo: { nombre: 'Concejo', nivel: 5 },
+  freguesia: { nombre: 'Freguesia', nivel: 6 },
+};
+// Las subdivisiones guardadas antes de la jerarquia no traen tipo: se leen asi.
+export const TIPO_SUBDIVISION_LEGADO = 'municipio';
+
+// --- Problemas sociales (solo en el Estado federal) --------------------------
+// Los diez dictados por el usuario. El efecto de cada uno vive en
+// reglas/efectosProblemas.js; que mueve cada medidor, en reglas/problemas.js.
+export const PROBLEMAS = {
+  inseguridad: { nombre: 'Inseguridad y delincuencia' },
+  desempleo: { nombre: 'Desempleo' },
+  // `global`: es una crisis NACIONAL, no se limita a las ciudades cercanas.
+  inflacion: { nombre: 'Inflación y crisis económica', global: true },
+  pobreza: { nombre: 'Pobreza y desigualdad social' },
+  salud: { nombre: 'Deficiencias en el sistema de salud' },
+  educacion: { nombre: 'Baja calidad educativa' },
+  infraestructura: { nombre: 'Falta de infraestructura y vivienda' },
+  corrupcion: { nombre: 'Corrupción política' },
+  clima: { nombre: 'Crisis climática y escasez de agua' },
+  inmigracion: { nombre: 'Inmigración y control fronterizo' },
+};
+// Todo lo siguiente es AJUSTABLE: lo fijo el redactor del plan y se mide.
+export const MEDIDOR_NEUTRO = 30;
+// Cada ciudad nace con su medidor a +-JITTER_INICIAL del neutro (determinista): si todas
+// empezaran iguales cruzarian el limite en la misma ronda y explotarian diez problemas de golpe.
+export const JITTER_INICIAL = 10;
+// Tope de problemas NUEVOS por jugador y por ronda: el resto espera a la ronda siguiente.
+export const MAX_PROBLEMAS_NUEVOS_POR_RONDA = 2;
+export const LIMITE_SENAL = 60;     // desde aca la zona muestra una señal de aviso
+export const LIMITE_PROBLEMA = 80;  // al cruzarlo aparece el problema
+export const GRAVEDAD_MAXIMA = 3;   // sin oro el problema empeora hasta aca
+export const DISTANCIA_PROPAGACION = 3; // un problema abarca tambien a las ciudades en aviso a esta distancia
+export const RONDAS_RECUPERACION = 3;   // cuanto dura la señal de recuperacion
+// Quien lo resuelve (por nivel de la subdivision, 1 = Pais) cuanto tarda y cuanto cuesta:
+// las chicas resuelven rapido y barato, el Pais lento y caro.
+export const RESOLUCION_POR_NIVEL = {
+  1: { rondas: 3, oro: 60 },
+  2: { rondas: 3, oro: 50 },
+  3: { rondas: 2, oro: 40 },
+  4: { rondas: 2, oro: 30 },
+  5: { rondas: 1, oro: 20 },
+  6: { rondas: 1, oro: 10 },
+};
+
+// Cuanto castiga cada problema mientras esta activo (ver reglas/efectosProblemas.js).
+// El efecto se multiplica por 1 + ESCALA_GRAVEDAD * (gravedad - 1). AJUSTABLE.
+export const ESCALA_GRAVEDAD = 0.5;
+export const EFECTOS_PROBLEMAS = {
+  desempleo: 0.2,        // -20% de produccion de la ciudad
+  educacion: 0.5,        // -50% de la ciencia de la ciudad
+  clima: 0.4,            // -40% de la comida de la ciudad
+  corrupcion: 3,         // oro fijo perdido por ciudad y ronda
+  inmigracion: 2,        // comida extra consumida por ciudad y ronda
+  inseguridad: 2,        // defensa plana perdida por la ciudad
+  infraestructura: 2,    // defensa plana perdida (un nivel de ciudad)
+  inflacion: 0.25,       // +25% a los costos de construir, reclutar y mejorar
+  salud: 25,             // poblacion perdida por ronda
+  pobreza: 1,            // puntos de apoyo del pueblo perdidos por ronda
+};
+
+// Si la maquina arma sola su Estado federal con subdivisiones (ver iaSubdivisiones.js).
+// Prendido el 2026-10-12 tras MEDIR que no cambia la fuerza de la IA (24 partidas: 62,5% de victorias con y sin; criterio ±10 puntos
+// de victorias en 24 partidas). Una partida puede forzarlo con config.iaOrganizaSubdivisiones.
+export const IA_ORGANIZA_SUBDIVISIONES = true;
+
+// Cuantas ciudades puede abarcar (contando las de sus hijas) una subdivision segun su nivel.
+// Sin tope, UNA Freguesia con todas las ciudades resolveria cualquier problema barato y
+// rapido (cobertura total al menor nivel) y el arbol no importaria. El nivel 2 no tiene tope.
+// AJUSTABLE.
+export const CAPACIDAD_CIUDADES_POR_NIVEL = { 3: 81, 4: 27, 5: 9, 6: 3 };

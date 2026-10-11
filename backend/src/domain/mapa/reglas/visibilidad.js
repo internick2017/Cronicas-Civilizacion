@@ -3,7 +3,9 @@ import { ReglaError } from '../errores.js';
 import { producirParaJugador } from './turnos.js';
 import { controlTerritorial, rivalesDominantes } from './dominacion.js';
 import { DIFICULTAD_IA_DEFAULT, GRUPOS_DE_APOYO } from '../constantes.js';
-import { subdivisionesDe } from './subdivisiones.js';
+import { subdivisionesDe, nivelDe } from './subdivisiones.js';
+import { problemasParaLaVista, senalesDe } from './problemas.js';
+import { multiplicadorCostos } from './efectosProblemas.js';
 import { gobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo } from './gobierno.js';
 
 function vistaTile(tile, jugadorId) {
@@ -59,7 +61,13 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       // cuenta en una votacion. Privado, como los recursos.
       apoyo: Object.fromEntries(GRUPOS_DE_APOYO.map(g => [g, apoyoEfectivo(jugador, g)])),
       cambioBloqueadoHasta: jugador.cambioBloqueadoHasta ?? 0,
-      subdivisiones: subdivisionesDe(jugador).map(s => structuredClone(s)),
+      // Problemas sociales: privados, igual que el apoyo. Los medidores crudos no salen.
+      problemas: problemasParaLaVista(estado, jugador),
+      // La interfaz muestra los precios reales: la inflacion los sube.
+      multiplicadorCostos: multiplicadorCostos(jugador),
+      senales: senalesDe(estado, jugador),
+      // Cada una con su nivel (derivado del tipo) para que la interfaz arme el arbol.
+      subdivisiones: subdivisionesDe(jugador).map(s => ({ ...s, nivel: nivelDe(s) })),
     };
   }
   // esBot y dificultadIA no son informacion sensible (a diferencia de

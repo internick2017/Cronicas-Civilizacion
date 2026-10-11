@@ -1,13 +1,15 @@
 <!-- frontend/src/components/mapa/MapGobiernoPanel.vue -->
 <script setup>
 import { computed, ref } from 'vue'
+import MapSubdivisiones from './MapSubdivisiones.vue'
+import MapProblemas from './MapProblemas.vue'
 
 const props = defineProps({
   vista: { type: Object, required: true },
   jugadorId: { type: String, required: true },
   constantes: { type: Object, required: true } // {gobiernos, gruposDeApoyo, enfriamientoVoto, ...}
 })
-const emit = defineEmits(['proponer', 'ventajas', 'forma', 'subdivision', 'quitarSubdivision', 'cerrar'])
+const emit = defineEmits(['proponer', 'ventajas', 'forma', 'crearSubdivision', 'renombrarSubdivision', 'asignarCiudades', 'desasignarCiudades', 'quitarSubdivision', 'cerrar'])
 
 const NOMBRE_GRUPO = { pueblo: 'Pueblo', lideres: 'Líderes', militares: 'Militares' }
 const QUIEN_APRUEBA = {
@@ -17,9 +19,6 @@ const QUIEN_APRUEBA = {
   lideres: 'hay que convencer a la mitad de los líderes',
   mixto: 'pesan el pueblo (50%) y los líderes (50%)'
 }
-
-const NOMBRE_PRIORIDAD = { defensa: 'Defensa', comida: 'Comida', ciencia: 'Ciencia', economia: 'Economía' }
-const prioridades = computed(() => props.constantes.prioridadesSubdivision || [])
 
 const yo = computed(() => props.vista.jugadores.find(j => j.id === props.jugadorId))
 const gobiernos = computed(() => props.constantes.gobiernos || [])
@@ -42,33 +41,6 @@ const apoyoQueExpulsa = computed(() => yo.value?.apoyo?.[grupoQueExpulsa.value] 
 const enPeligro = computed(
   () => enPoder.value && yo.value?.gobierno !== 'despotismo' && apoyoQueExpulsa.value < 40
 )
-
-// Subdivisiones (solo en el Estado federal).
-const subdivisiones = computed(() => yo.value?.subdivisiones || [])
-const asignadas = computed(
-  () => new Set(subdivisiones.value.flatMap(s => s.ciudades.map(c => `${c.x},${c.y}`)))
-)
-const ciudadesLibres = computed(() => {
-  const t = props.vista.config.tamanoMapa
-  return props.vista.mapa
-    .filter(c => c.ciudad && c.dueno === props.jugadorId && !asignadas.value.has(`${c.x},${c.y}`))
-    .map(c => ({ x: c.x, y: c.y, nombre: c.ciudad.nombre, clave: `${c.x},${c.y}`, t }))
-})
-const nombreSub = ref('')
-const prioridadSub = ref('comida')
-const elegidas = ref([])
-const puedeCrearSub = computed(() => nombreSub.value.trim() !== '' && elegidas.value.length > 0)
-const crearSub = () => {
-  if (!puedeCrearSub.value) return
-  const ciudades = ciudadesLibres.value
-    .filter(c => elegidas.value.includes(c.clave))
-    .map(({ x, y }) => ({ x, y }))
-  emit('subdivision', { nombre: nombreSub.value.trim(), prioridad: prioridadSub.value, ciudades })
-  nombreSub.value = ''
-  elegidas.value = []
-}
-const nombreDeCiudad = (c) =>
-  props.vista.mapa.find(t => t.x === c.x && t.y === c.y)?.ciudad?.nombre || `(${c.x}, ${c.y})`
 
 const oroOfrecido = ref(0)
 const oroVentajas = ref(10)
@@ -179,28 +151,22 @@ const ventajas = (grupo) => {
     </section>
 
     <section v-if="yo.formaEstado === 'federal'">
+      <h4>Problemas sociales</h4>
+      <MapProblemas :vista="vista" :jugador-id="jugadorId" :constantes="constantes" />
+    </section>
+
+    <section v-if="yo.formaEstado === 'federal'">
       <h4>Subdivisiones</h4>
-      <small>En el Estado federal todas tus ciudades se administran solas al terminar tu turno (Economía por defecto). Creá una subdivisión para darles otra prioridad.</small>
-      <div v-for="s in subdivisiones" :key="s.id" class="subdivision">
-        <div>
-          <strong>{{ s.nombre }}</strong>
-          <small>{{ NOMBRE_PRIORIDAD[s.prioridad] || s.prioridad }} · {{ s.ciudades.map(nombreDeCiudad).join(', ') }}</small>
-        </div>
-        <button class="btn-secundario" @click="emit('quitarSubdivision', s.id)">Quitar</button>
-      </div>
-      <template v-if="ciudadesLibres.length > 0">
-        <input v-model="nombreSub" class="entrada-oro ancha" placeholder="Nombre de la subdivisión" maxlength="30">
-        <select v-model="prioridadSub" class="entrada-oro ancha">
-          <option v-for="p in prioridades" :key="p" :value="p">{{ NOMBRE_PRIORIDAD[p] || p }}</option>
-        </select>
-        <label v-for="c in ciudadesLibres" :key="c.clave" class="ciudad-check">
-          <input v-model="elegidas" type="checkbox" :value="c.clave"> {{ c.nombre }}
-        </label>
-        <button class="btn-secundario" :disabled="!puedeCrearSub" @click="crearSub">
-          <strong>Crear subdivisión</strong>
-        </button>
-      </template>
-      <em v-else-if="subdivisiones.length === 0">No tenés ciudades sin asignar.</em>
+      <MapSubdivisiones
+        :vista="vista"
+        :jugador-id="jugadorId"
+        :constantes="constantes"
+        @crear="(datos) => emit('crearSubdivision', datos)"
+        @renombrar="(id, nombre) => emit('renombrarSubdivision', id, nombre)"
+        @asignar="(id, ciudades) => emit('asignarCiudades', id, ciudades)"
+        @desasignar="(id, ciudades) => emit('desasignarCiudades', id, ciudades)"
+        @quitar="(id) => emit('quitarSubdivision', id)"
+      />
     </section>
   </div>
 </template>

@@ -7,8 +7,11 @@ import { controlTerritorial } from './dominacion.js';
 import { recuperarFronteras } from './fronteras.js';
 import { estaSaqueada } from './saqueo.js';
 import { crearRng } from '../rng.js';
+import { aplicar } from '../aplicar.js';
 import { cerrarRondaGobierno, multiplicadorProduccion } from './gobierno.js';
 import { administrarSubdivisiones } from './subdivisiones.js';
+import { cerrarRondaProblemas } from './problemas.js';
+import { factorProduccionCiudad, perdidaFijaOro, consumoExtraComida } from './efectosProblemas.js';
 
 export function siguienteIndiceActivo(estado, excluirIds = null) {
   const n = estado.jugadores.length;
@@ -35,25 +38,32 @@ function produccionBruta(estado, jugadorId) {
   };
   // Los rasgos culturales rinden POR ciudad, igual que el terreno y los
   // edificios: valen para las ciudades que ya tenias y para las que fundes.
-  const porRasgos = produccionPorRasgos(estado.jugadores.find(j => j.id === jugadorId));
+  const jugador = estado.jugadores.find(j => j.id === jugadorId);
+  const porRasgos = produccionPorRasgos(jugador);
   for (const tile of ciudadesDe(estado, jugadorId)) {
+    // Los problemas sociales activos (federal) bajan lo que rinde ESTA ciudad.
+    const acumularEn = (recurso, cantidad) =>
+      acumular(recurso, cantidad * factorProduccionCiudad(jugador, tile.x, tile.y, recurso));
     // Una ciudad saqueada no produce nada hasta que se le pasa el cerco (ver
     // reglas/saqueo.js). Sigue contando como ciudad: no se pierde ni deja de
     // sostener al jugador en pie.
     if (estaSaqueada(tile.ciudad, estado.turno)) continue;
-    for (const [recurso, cantidad] of Object.entries(PRODUCCION_BASE_CIUDAD)) acumular(recurso, cantidad);
-    for (const [recurso, cantidad] of Object.entries(porRasgos)) acumular(recurso, cantidad);
+    for (const [recurso, cantidad] of Object.entries(PRODUCCION_BASE_CIUDAD)) acumularEn(recurso, cantidad);
+    for (const [recurso, cantidad] of Object.entries(porRasgos)) acumularEn(recurso, cantidad);
     const bono = BONO_TERRENO_PRODUCCION[tile.terreno] ?? {};
-    for (const [recurso, cantidad] of Object.entries(bono)) acumular(recurso, cantidad);
+    for (const [recurso, cantidad] of Object.entries(bono)) acumularEn(recurso, cantidad);
     for (const edificio of tile.ciudad.edificios) {
       const produccionEdificio = EDIFICIOS[edificio]?.produccion ?? {};
-      for (const [recurso, cantidad] of Object.entries(produccionEdificio)) acumular(recurso, cantidad);
+      for (const [recurso, cantidad] of Object.entries(produccionEdificio)) acumularEn(recurso, cantidad);
     }
   }
+  // Corrupcion e inmigracion restan una cantidad FIJA (no un porcentaje).
+  if (perdidaFijaOro(jugador) > 0) acumular('gold', -perdidaFijaOro(jugador));
+  if (consumoExtraComida(jugador) > 0) acumular('food', -consumoExtraComida(jugador));
+
   // Los bonos porcentuales de tecnologia (irrigacion, mineria) se aplican AL
   // FINAL, sobre el total ya sumado: un 20% de "toda tu comida" tiene que
   // contar el terreno, los edificios Y los rasgos, no solo la base.
-  const jugador = estado.jugadores.find(j => j.id === jugadorId);
   const total = aplicarBonosPorcentuales(produccion, jugador);
   return total;
 }
@@ -72,7 +82,8 @@ export function produccionConResto(estado, jugadorId) {
   const resto = {};
   for (const [recurso, valor] of Object.entries(bruta)) {
     const factor = multiplicadorProduccion(jugador, recurso);
-    if (factor === 1) { produccion[recurso] = valor; continue; }
+    // Un valor fraccionario (por un problema social) tambien lleva su decimal al turno siguiente.
+    if (factor === 1 && Number.isInteger(valor)) { produccion[recurso] = valor; continue; }
     const exacto = valor * factor + (previo[recurso] ?? 0);
     const entero = Math.floor(exacto + 1e-9);
     produccion[recurso] = entero;
@@ -160,17 +171,24 @@ export function terminarTurno(estado, jugadorId) {
 
   let nuevoIndice = nuevoIndiceTentativo;
 
+  // La administracion del Estado federal se calcula UNA vez, al principio: la usan los
+  // eventos finales y tambien el calculo de los problemas del cierre de ronda.
+  const eventosAdmin = administrarSubdivisiones(estado, jugadorId);
+
   if (cierraRonda) {
     const activos = estado.jugadores.filter(j => j.activo);
 
+    const eventosProduccion = [];
     for (const jugador of activos) {
       const { produccion, resto } = produccionConResto(estado, jugador.id);
-      eventos.push(evento('RecursosProducidos', estado, jugadorId, {
+      const ev = evento('RecursosProducidos', estado, jugadorId, {
         jugadorId: jugador.id,
         produccion,
         // Solo si hay decimales que llevar: para el despotismo el evento no cambia.
         ...(Object.keys(resto).length > 0 ? { resto } : {}),
-      }));
+      });
+      eventos.push(ev);
+      eventosProduccion.push(ev);
     }
 
     const eliminados = [];
@@ -192,6 +210,13 @@ export function terminarTurno(estado, jugadorId) {
 
     // Semilla determinista: misma partida + mismo turno = mismo resultado.
     eventos.push(...cerrarRondaGobierno(estado, crearRng(`gobierno:${estado.semilla}:${estado.turno}`)));
+    // Problemas sociales de los Estados federales: por ronda cerrada, idempotente.
+    // Se calcula sobre el estado COMO VA A QUEDAR: con lo que gasta la administracion de este
+    // mismo turno y con la produccion ya sumada. Si no, el oro con el que se decide si alcanza
+    // para resolver un problema es el de ANTES de esos gastos y el oro podia quedar negativo.
+    const estadoDelCierre = structuredClone(estado);
+    aplicar(estadoDelCierre, [...eventosAdmin, ...eventosProduccion]);
+    eventos.push(...cerrarRondaProblemas(estadoDelCierre, crearRng(`problemas:${estado.semilla}:${estado.turno}`)));
 
     eventos.push(evento('RondaCompletada', estado, jugadorId, {}));
 
@@ -213,7 +238,7 @@ export function terminarTurno(estado, jugadorId) {
   // propio jugador (asi las reglas de ciudades, que exigen turno, pasan). Va
   // antes de TurnoAvanzado. La produccion de la ronda se calculo sobre el
   // estado SIN estos edificios: rinden desde la ronda siguiente.
-  eventos.unshift(...administrarSubdivisiones(estado, jugadorId));
+  eventos.unshift(...eventosAdmin);
 
   eventos.unshift(evento('TurnoAvanzado', estado, jugadorId, { indiceJugadorActual: nuevoIndice, turno: nuevoTurno }));
 

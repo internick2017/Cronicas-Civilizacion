@@ -5,7 +5,7 @@ import { crearRng } from '../domain/mapa/rng.js';
 import { ReglaError } from '../domain/mapa/errores.js';
 import { unirse as unirseRegla, iniciar as iniciarRegla } from '../domain/mapa/reglas/partida.js';
 import { proponerGobierno, cambiarFormaEstado, darVentajas, estaEnPoder } from '../domain/mapa/reglas/gobierno.js';
-import { crearSubdivision, quitarSubdivision } from '../domain/mapa/reglas/subdivisiones.js';
+import { crearSubdivision, quitarSubdivision, renombrarSubdivision, asignarCiudades, desasignarCiudades } from '../domain/mapa/reglas/subdivisiones.js';
 import { fundarCiudad, construir, mejorarCiudad, renombrarCiudad } from '../domain/mapa/reglas/ciudades.js';
 import { reclutar } from '../domain/mapa/reglas/militar.js';
 import { adoptarRasgo } from '../domain/mapa/reglas/cultura.js';
@@ -45,7 +45,8 @@ const ACCIONES_SIN_PODER = new Set(['darVentajas', 'terminarTurno', 'abandonar']
 // El apoyo y la administracion de subdivisiones de un jugador son privados,
 // igual que sus recursos (ver visibilidad.js): un humano no los recibe dentro de
 // la lista de eventos de la accion de otro.
-const EVENTOS_PRIVADOS_DE_GOBIERNO = new Set(['ApoyoActualizado', 'SubdivisionCreada', 'SubdivisionQuitada']);
+const EVENTOS_PRIVADOS_DE_GOBIERNO = new Set(['ApoyoActualizado', 'SubdivisionCreada', 'SubdivisionQuitada', 'SubdivisionRenombrada', 'CiudadesAsignadas', 'CiudadesDesasignadas',
+  'MedidoresActualizados', 'ProblemaSurgido', 'ProblemaAgravado', 'ProblemaResuelto', 'ProblemasDescartados', 'PoblacionAjustada']);
 const eventosVisiblesPara = (eventos, jugadorId) =>
   eventos.filter(e => !EVENTOS_PRIVADOS_DE_GOBIERNO.has(e.tipo) || e.jugadorId === jugadorId);
 
@@ -71,6 +72,9 @@ const REGLAS_POR_TIPO = {
   darVentajas: (estado, jugadorId, accion) => darVentajas(estado, jugadorId, accion),
   crearSubdivision: (estado, jugadorId, accion) => crearSubdivision(estado, jugadorId, accion),
   quitarSubdivision: (estado, jugadorId, accion) => quitarSubdivision(estado, jugadorId, accion),
+  renombrarSubdivision: (estado, jugadorId, accion) => renombrarSubdivision(estado, jugadorId, accion),
+  asignarCiudades: (estado, jugadorId, accion) => asignarCiudades(estado, jugadorId, accion),
+  desasignarCiudades: (estado, jugadorId, accion) => desasignarCiudades(estado, jugadorId, accion),
   abandonar: (estado, jugadorId) => abandonar(estado, jugadorId),
   terminarTurno: (estado, jugadorId) => terminarTurno(estado, jugadorId),
 };
@@ -340,7 +344,8 @@ export class MapGameService {
       // de esta cadena protegida por el .catch de abajo: si falla, se cae al
       // mismo lugar que un fallo de narracion y nunca rompe la partida.
       Promise.resolve(this.repo.eventosDeRonda(estado.id, turnoRonda))
-        .then(eventosRonda => this.narrador(eventosRonda, estado.jugadores))
+        // El texto de la crónica lo ven TODOS los jugadores: los eventos privados no entran.
+        .then(eventosRonda => this.narrador(eventosRonda.filter(e => !EVENTOS_PRIVADOS_DE_GOBIERNO.has(e.tipo)), estado.jugadores))
         .then(async (narrativa) => {
           if (!narrativa) return;
           await this.repo.guardarNarrativa(estado.id, turnoRonda, narrativa);
