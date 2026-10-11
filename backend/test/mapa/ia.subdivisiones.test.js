@@ -48,10 +48,39 @@ describe('la IA organiza sus subdivisiones', () => {
     expect(organizarSubdivisionesIA(e, 'bot').length).toBeGreaterThan(0);
   });
 
-  it('con menos de 3 ciudades sigue unitario', () => {
-    agregarCiudades(1);
+  it('con una sola ciudad sigue unitario', () => {
     expect(correr()).toEqual([]);
     expect(formaEstadoDe(bot)).toBe('unitario');
+  });
+
+  it('con 2 ciudades ya pasa a federal y arma los 6 niveles, cada uno dentro del anterior', () => {
+    agregarCiudades(1);
+    correr();
+    expect(formaEstadoDe(bot)).toBe('federal');
+    const subs = subdivisionesDe(bot);
+    const cadena = ['provincia', 'distrito', 'condado', 'municipio', 'freguesia'];
+    expect(subs.map(s => s.tipo).sort()).toEqual([...cadena].sort());
+    const porTipo = (tipo) => subs.find(s => s.tipo === tipo);
+    expect(porTipo('provincia').padreId).toBeNull();
+    cadena.slice(1).forEach((tipo, i) => expect(porTipo(tipo).padreId).toBe(porTipo(cadena[i]).id));
+    expect(porTipo('freguesia').ciudades).toHaveLength(2);
+  });
+
+  it('una ciudad nueva entra a la Freguesia con lugar y, si esta llena, abre otra en el mismo Municipio', () => {
+    agregarCiudades(1);
+    correr();
+    agregarCiudades(1); // 3 ciudades: cabe en la Freguesia existente
+    correr();
+    let subs = subdivisionesDe(bot);
+    expect(subs.filter(s => s.tipo === 'freguesia')).toHaveLength(1);
+    expect(subs.find(s => s.tipo === 'freguesia').ciudades).toHaveLength(3);
+    agregarCiudades(1); // la 4: la Freguesia esta llena
+    correr();
+    subs = subdivisionesDe(bot);
+    const freguesias = subs.filter(s => s.tipo === 'freguesia');
+    expect(freguesias).toHaveLength(2);
+    expect(freguesias[0].padreId).toBe(freguesias[1].padreId);
+    expect(subs.filter(s => s.tipo === 'municipio')).toHaveLength(1);
   });
 
   it('con 3 ciudades pasa a federal y arma Freguesias de hasta 3 ciudades dentro de un Municipio', () => {
@@ -97,13 +126,20 @@ describe('la IA organiza sus subdivisiones', () => {
     expect(correr()).toEqual([]);
   });
 
-  it('no cuelga ni lanza con 0, 1 o 40 ciudades, y arma Departamentos cuando hay muchos Municipios', () => {
+  it('no cuelga ni lanza con 0, 1 o 40 ciudades, usa los 6 niveles y ninguno pasa de 3 hijas', () => {
     expect(() => organizarSubdivisionesIA(e, 'bot', ACTIVA)).not.toThrow();
     agregarCiudades(39);
     expect(() => correr()).not.toThrow();
     const subs = subdivisionesDe(bot);
-    expect(subs.some(s => s.tipo === 'departamento')).toBe(true);
-    for (const s of subs.filter(x => x.padreId)) expect(subs.some(p => p.id === s.padreId)).toBe(true);
+    for (const tipo of ['provincia', 'distrito', 'condado', 'municipio', 'freguesia']) {
+      expect(subs.some(s => s.tipo === tipo)).toBe(true);
+    }
+    expect(subs.some(s => s.tipo === 'departamento')).toBe(false);
+    expect(subs.filter(s => s.padreId === null)).toHaveLength(1);
+    for (const s of subs.filter(x => x.tipo !== 'provincia')) expect(subs.some(p => p.id === s.padreId)).toBe(true);
+    for (const s of subs.filter(x => ['condado', 'municipio'].includes(x.tipo) || x.tipo === 'distrito')) {
+      expect(subs.filter(h => h.padreId === s.id).length).toBeLessThanOrEqual(3);
+    }
     for (const c of ciudadesDelBot()) expect(subdivisionDeCiudad(bot, c.x, c.y)).not.toBeNull();
   });
 

@@ -6,8 +6,8 @@ import { jugarTurnoIA, PERFILES_DIFICULTAD } from '../../src/domain/mapa/ia.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
 import { TECNOLOGIAS, COSTO_MEJORA_CIUDAD } from '../../src/domain/mapa/constantes.js';
 
-function partidaConBot(dificultadIA = 'normal', semilla = 'tec-1') {
-  const e = crearEstado({ nombre: 'T', semilla });
+function partidaConBot(dificultadIA = 'normal', semilla = 'tec-1', config = {}) {
+  const e = crearEstado({ nombre: 'T', semilla, config });
   aplicar(e, unirse(e, { id: 'bot', nombre: 'M', civilizacion: 'A', esBot: true, dificultadIA }));
   aplicar(e, unirse(e, { id: 'h1', nombre: 'H', civilizacion: 'B' }));
   aplicar(e, iniciar(e));
@@ -109,7 +109,9 @@ describe('la IA mejora sus ciudades', () => {
   });
 
   it('la facil no mejora ciudades: es parte de que juegue peor', () => {
-    const e = partidaConBot('facil');
+    // Sin organizar subdivisiones: un Estado federal mejora ciudades por su cuenta (administracion),
+    // y aca se mide solo lo que la IA decide.
+    const e = partidaConBot('facil', 'tec-1', { iaOrganizaSubdivisiones: false });
     const jugador = recursos(e, { science: 9000, gold: 9000, food: 9000, wood: 9000, stone: 9000 });
     jugador.tecnologias = Object.keys(TECNOLOGIAS);
 

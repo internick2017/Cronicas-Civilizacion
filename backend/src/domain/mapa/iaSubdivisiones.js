@@ -3,28 +3,37 @@ import { aplicar } from './aplicar.js';
 import { evento } from './reglas/comun.js';
 import { formaEstadoDe } from './reglas/gobierno.js';
 import {
-  crearSubdivision, quitarSubdivision, subdivisionesDe, subdivisionDeCiudad, territorioDe,
+  crearSubdivision, asignarCiudades, quitarSubdivision, subdivisionesDe, subdivisionDeCiudad, territorioDe,
 } from './reglas/subdivisiones.js';
 import { IA_ORGANIZA_SUBDIVISIONES } from './constantes.js';
 
 // Como la maquina arma su Estado federal (pedido del usuario: "la IA crea subdivisiones").
 // Se organiza sola, sin que nadie se lo pida:
-//   - con 3 ciudades o mas pasa a federal y NO vuelve a unitario;
-//   - agrupa las ciudades sueltas por cercania en Freguesias de hasta 3;
-//   - mete cada Freguesia en el Municipio mas cercano que tenga lugar (hasta 3), o
-//     crea uno nuevo;
-//   - a partir de 4 Municipios sin padre, los nuevos cuelgan de un Departamento (hasta 4).
-// No hay "reubicar": una subdivision no cambia de padre, asi que los primeros Municipios
-// quedan directos bajo el Pais.
+//   - con 2 ciudades o mas pasa a federal y NO vuelve a unitario;
+//   - usa los 6 niveles: Pais (virtual) > Provincia > Distrito > Condado > Municipio > Freguesia;
+//   - una ciudad suelta entra a la Freguesia mas cercana con lugar (hasta 3 ciudades); si no
+//     hay, agrupa las sueltas por cercania en Freguesias nuevas;
+//   - cada contenedor admite hasta 3 hijas (la Provincia, sin tope). Cuando uno se llena se abre
+//     otro del mismo nivel, colgado del contenedor de arriba que tenga lugar, y asi hacia arriba.
+// Una subdivision elige su padre al crearse y no se reubica, por eso la cadena se arma de arriba
+// hacia abajo: al crear una Freguesia ya existe todo lo que la contiene.
 // Trabaja sobre una COPIA y devuelve los eventos (como administrarSubdivisiones).
-const CIUDADES_PARA_FEDERAL = 3;
+const CIUDADES_PARA_FEDERAL = 2;
 const CIUDADES_POR_FREGUESIA = 3;
-const FREGUESIAS_POR_MUNICIPIO = 3;
-const MUNICIPIOS_SIN_PADRE_MAXIMOS = 4;
-const MUNICIPIOS_POR_DEPARTAMENTO = 4;
 const DISTANCIA_ENEMIGO = 3;
 
+// Cada contenedor, su nombre y el contenedor de arriba. HIJAS_MAXIMAS coincide con
+// CAPACIDAD_CIUDADES_POR_NIVEL (3 x 3 ciudades = 9, x 3 = 27, x 3 = 81).
+const CONTENEDORES = {
+  municipio: { superior: 'condado', hijasMaximas: 3, nombre: 'Municipio' },
+  condado: { superior: 'distrito', hijasMaximas: 3, nombre: 'Condado' },
+  distrito: { superior: 'provincia', hijasMaximas: 3, nombre: 'Distrito' },
+  provincia: { superior: null, hijasMaximas: Infinity, nombre: 'Provincia' },
+};
+
 const distancia = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+const distanciaMinima = (desde, hasta) =>
+  Math.min(...desde.flatMap(a => hasta.map(b => distancia(a, b))), Infinity);
 
 // Grupos de hasta `tamano` elementos cercanos entre si; determinista (desempates por orden).
 function agruparCercanos(lista, tamano) {
@@ -88,29 +97,33 @@ export function organizarSubdivisionesIA(estado, jugadorId, { activa = IA_ORGANI
     return evs[0].datos.id;
   };
 
-  // El Municipio donde cabe la Freguesia: el mas cercano a sus ciudades con lugar libre.
-  function municipioPara(ciudades) {
-    const subs = subdivisionesDe(jugador());
-    const conLugar = subs
-      .filter(s => s.tipo === 'municipio' && subs.filter(f => f.padreId === s.id).length < FREGUESIAS_POR_MUNICIPIO)
-      .map(s => ({ s, d: Math.min(...ciudades.flatMap(c => territorioDe(jugador(), s).map(t => distancia(t, c))), Infinity) }))
+  // Antes de abrir una Freguesia nueva, las sueltas llenan las que tienen lugar (la mas cercana).
+  const restantes = [];
+  for (const ciudad of sueltas) {
+    const conLugar = subdivisionesDe(jugador())
+      .filter(s => s.tipo === 'freguesia' && s.ciudades.length < CIUDADES_POR_FREGUESIA)
+      .map(s => ({ s, d: distanciaMinima([ciudad], territorioDe(jugador(), s)) }))
       .sort((a, b) => a.d - b.d || a.s.id.localeCompare(b.s.id));
-    if (conLugar.length > 0 && Number.isFinite(conLugar[0].d)) return conLugar[0].s.id;
-    // Uno nuevo. Pasados los primeros, cuelga de un Departamento (uno con lugar, o uno nuevo).
-    const sinPadre = subs.filter(s => s.tipo === 'municipio' && !s.padreId).length;
-    let padreId = null;
-    if (sinPadre >= MUNICIPIOS_SIN_PADRE_MAXIMOS) {
-      const deptos = subs.filter(s => s.tipo === 'departamento')
-        .filter(d => subs.filter(m => m.padreId === d.id).length < MUNICIPIOS_POR_DEPARTAMENTO);
-      padreId = deptos.length > 0
-        ? deptos[0].id
-        : crear({ nombre: `Departamento ${cantidad('departamento') + 1}`, tipoSubdivision: 'departamento' });
-    }
-    return crear({ nombre: `Municipio ${cantidad('municipio') + 1}`, tipoSubdivision: 'municipio', padreId });
+    if (conLugar.length === 0) { restantes.push(ciudad); continue; }
+    emitir(asignarCiudades(copia, jugadorId, { id: conLugar[0].s.id, ciudades: [ciudad] }));
   }
 
-  for (const grupo of agruparCercanos(sueltas, CIUDADES_POR_FREGUESIA)) {
-    const padreId = municipioPara(grupo);
+  // El contenedor de ese tipo donde cabe una hija mas, el mas cercano a `ciudades`; si todos
+  // estan llenos (o no hay ninguno) se crea uno nuevo, y su padre se busca igual, hacia arriba.
+  function contenedorPara(tipo, ciudades) {
+    const { superior, hijasMaximas, nombre } = CONTENEDORES[tipo];
+    const subs = subdivisionesDe(jugador());
+    const conLugar = subs
+      .filter(s => s.tipo === tipo && subs.filter(h => h.padreId === s.id).length < hijasMaximas)
+      .map(s => ({ s, d: distanciaMinima(ciudades, territorioDe(jugador(), s)) }))
+      .sort((a, b) => a.d - b.d || a.s.id.localeCompare(b.s.id));
+    if (conLugar.length > 0) return conLugar[0].s.id;
+    const padreId = superior ? contenedorPara(superior, ciudades) : null;
+    return crear({ nombre: `${nombre} ${cantidad(tipo) + 1}`, tipoSubdivision: tipo, padreId });
+  }
+
+  for (const grupo of agruparCercanos(restantes, CIUDADES_POR_FREGUESIA)) {
+    const padreId = contenedorPara('municipio', grupo);
     // Defensa si hay enemigos cerca; si no, alterna economia y comida.
     const prioridad = hayEnemigoCerca(copia, grupo, jugadorId)
       ? 'defensa'
