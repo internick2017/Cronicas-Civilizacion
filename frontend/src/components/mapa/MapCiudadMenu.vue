@@ -1,6 +1,7 @@
 <!-- frontend/src/components/mapa/MapCiudadMenu.vue -->
 <script setup>
 import { computed, ref } from 'vue'
+import { RECURSO, textoCosto } from './recursos.js'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -63,8 +64,19 @@ const escalar = (costo) =>
 const puedePagar = (costo) =>
   Object.entries(costo).every(([recurso, monto]) => (recursos.value[recurso] || 0) >= monto)
 
-const textoCosto = (costo) =>
-  Object.entries(costo).map(([r, m]) => `${m} ${r}`).join(', ')
+// Nada que cueste recursos se compra con un solo toque: el primero lo deja
+// PENDIENTE y muestra que se va a gastar y cuanto queda; el segundo confirma.
+const pendiente = ref(null) // { titulo, costo, confirmar } | null
+const pedir = (titulo, costo, confirmar) => { pendiente.value = { titulo, costo, confirmar } }
+const confirmar = () => {
+  const compra = pendiente.value
+  pendiente.value = null
+  compra?.confirmar()
+}
+const quedaTras = (costo) =>
+  Object.entries(costo)
+    .map(([r, m]) => `${RECURSO[r]?.icono ?? r} ${(recursos.value[r] || 0) - m}`)
+    .join(' · ')
 
 const motivoEdificio = (ed) => {
   if (yaConstruido(ed.tipo)) return 'ya construido'
@@ -155,7 +167,7 @@ const renombrar = () => {
       <button
         class="btn-secundario"
         :disabled="motivoMejora !== null"
-        @click="$emit('mejorar')"
+        @click="pedir(`Mejorar la ciudad a nivel ${nivelActual + 1}`, costoMejora, () => emit('mejorar'))"
       >
         <strong>Mejorar (nivel {{ nivelActual }} → {{ nivelActual + 1 }})</strong>
         <small>{{ textoCosto(costoMejora) }}</small>
@@ -171,7 +183,7 @@ const renombrar = () => {
         :key="ed.tipo"
         class="btn-secundario"
         :disabled="motivoEdificio(ed) !== null"
-        @click="$emit('construir', ed.tipo)"
+        @click="pedir(`Construir: ${ed.nombre}`, escalar(ed.costo), () => emit('construir', ed.tipo))"
       >
         <strong>{{ ed.nombre }}</strong>
         <small>{{ textoCosto(escalar(ed.costo)) }}</small>
@@ -186,7 +198,7 @@ const renombrar = () => {
         :key="u.tipo"
         class="btn-secundario"
         :disabled="motivoUnidad(u) !== null"
-        @click="$emit('reclutar', u.tipo)"
+        @click="pedir(`Reclutar: ${u.nombre}`, costoReal(u.costo, u), () => emit('reclutar', u.tipo))"
       >
         <strong>{{ u.nombre }}</strong>
         <small>ATQ {{ u.ataque }} · DEF {{ u.defensa }} · MOV {{ movimientoReal(u) }}</small>
@@ -195,6 +207,17 @@ const renombrar = () => {
         <em v-if="motivoUnidad(u)">{{ motivoUnidad(u) }}</em>
       </button>
     </section>
+
+    <!-- Pegada abajo del dialogo: se ve sin importar hasta donde se haya bajado. -->
+    <div v-if="pendiente" class="confirmar" role="alertdialog" aria-label="Confirmar compra">
+      <strong>{{ pendiente.titulo }}</strong>
+      <span>Cuesta {{ textoCosto(pendiente.costo) }}</span>
+      <small>Te quedaría: {{ quedaTras(pendiente.costo) }}</small>
+      <div class="confirmar-botones">
+        <button class="btn-confirmar" @click="confirmar">Sí, gastar</button>
+        <button class="btn-cancelar" @click="pendiente = null">No</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -218,4 +241,19 @@ em { color: #e67e22; font-size: 0.72rem; font-style: normal; }
   border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.25); color: #ecf0f1;
 }
 .bono-cuartel { color: #2ecc71; }
+.confirmar {
+  position: sticky; bottom: -1.5rem; z-index: 1;
+  margin: 0 -0.5rem; padding: 0.75rem;
+  background: #1f2d3a; border: 1px solid #f1c40f; border-radius: 8px;
+  display: flex; flex-direction: column; gap: 0.3rem;
+  box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.45);
+}
+.confirmar small { opacity: 0.8; font-size: 0.8rem; }
+.confirmar-botones { display: flex; gap: 0.5rem; margin-top: 0.3rem; }
+.btn-confirmar, .btn-cancelar {
+  flex: 1; min-height: 44px; border-radius: 6px; cursor: pointer; font-weight: bold;
+  color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.btn-confirmar { background: #27ae60; border-color: #27ae60; }
+.btn-cancelar { background: rgba(255, 255, 255, 0.1); }
 </style>

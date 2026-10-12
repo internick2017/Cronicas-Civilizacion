@@ -7,6 +7,7 @@ import MapCanvas from './MapCanvas.vue'
 import MapPlayerPanel from './MapPlayerPanel.vue'
 import MapActionBar from './MapActionBar.vue'
 import { puedeJugar } from './turno.js'
+import { textoCosto } from './recursos.js'
 import MapAlianzas from './MapAlianzas.vue'
 import { amigosDe, propuestasPara } from './alianzas.js'
 import MapRoundLog from './MapRoundLog.vue'
@@ -441,9 +442,7 @@ const puedeFundar = computed(() => {
   const costo = constantes.value.costoCiudad || {}
   return Object.entries(costo).every(([recurso, monto]) => (recursosPropios.value[recurso] || 0) >= monto)
 })
-const textoCostoCiudad = computed(() =>
-  Object.entries(constantes.value.costoCiudad || {}).map(([r, m]) => `${m} ${r}`).join(', ')
-)
+const textoCostoCiudad = computed(() => textoCosto(constantes.value.costoCiudad))
 
 const confirmarFundar = () => {
   const nombre = nombreCiudad.value.trim()
