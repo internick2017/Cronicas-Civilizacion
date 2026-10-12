@@ -38,8 +38,8 @@ export default defineConfig({
     port: 5173,
     https,
     proxy: {
-      '/api': { target: `http://localhost:${backendPort}`, changeOrigin: true },
-      '/socket.io': { target: `http://localhost:${backendPort}`, ws: true },
+      '/api': { target: `http://127.0.0.1:${backendPort}`, changeOrigin: true },
+      '/socket.io': { target: `http://127.0.0.1:${backendPort}`, ws: true },
     },
   }
 })
