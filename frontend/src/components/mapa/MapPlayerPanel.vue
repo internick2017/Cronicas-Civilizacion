@@ -3,6 +3,7 @@
 import { computed } from 'vue'
 import { esSimultaneo, puedeJugar, yaTermino } from './turno.js'
 import { aliadosDe } from './alianzas.js'
+import { colorCssDeJugador } from '../../mapa/sprites.js'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -139,6 +140,7 @@ const RECURSOS_ICONOS = {
 
     <ul class="jugadores-lista">
       <li v-for="j in vista.jugadores" :key="j.id" :class="{ activo: estaJugando(j) }">
+        <span class="color-bando" :style="{ background: colorCssDeJugador(vista.jugadores, j.id) }" title="Su color en el mapa"></span>
         <span v-if="j.esBot" title="Jugador controlado por la máquina">🤖</span>
         {{ j.nombre }} ({{ j.civilizacion }})
         <span v-if="razaDe(j)" class="raza-badge" :title="razaDe(j).descripcion">{{ razaDe(j).icono }} {{ razaDe(j).nombre }}</span>
@@ -230,6 +232,20 @@ const RECURSOS_ICONOS = {
   margin: 0;
   font-size: 0.85rem;
   color: #bdc3c7;
+}
+
+.jugadores-lista li { padding: 0.15rem 0; }
+
+/* El mismo color con el que se pintan sus tropas, ciudades y frontera. El borde
+   es para que el blanco y el gris oscuro se vean sobre el panel. */
+.color-bando {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  margin-right: 0.35rem;
+  vertical-align: -0.1em;
 }
 
 .dificultad-badge {

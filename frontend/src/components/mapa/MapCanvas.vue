@@ -1,8 +1,9 @@
 <!-- frontend/src/components/mapa/MapCanvas.vue -->
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { Application, Container, Sprite, Graphics, Assets } from 'pixi.js'
+import { Application, Container, Sprite, Graphics, Text, Assets } from 'pixi.js'
 import { SPRITE_TERRENO, TINTE_TERRENO, ROTACION_TERRENO, SPRITE_CIUDAD, SPRITE_UNIDAD, colorDeJugador, cargarSprites } from '../../mapa/sprites.js'
+import { aliadosDe } from './alianzas.js'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -164,15 +165,44 @@ function actualizarTerreno() {
 // terrenos que acabamos de separar a proposito.
 const TERRITORIO_ALPHA = 0.15
 
+// La frontera es lo que de verdad dice de quien es cada tierra: el relleno es
+// suave a proposito (ver arriba) y con cinco bandos no alcanzaba para
+// distinguirlos. Va corrida hacia ADENTRO de la casilla para que, donde se
+// tocan dos civilizaciones, se vean las dos lineas y no una tapando a la otra.
+const FRONTERA_GROSOR = 3
+const FRONTERA_ALPHA = 0.95
+
 function dibujarTerritorio() {
   limpiar(capaTerritorio)
   const g = new Graphics()
+  const duenos = new Map()
   for (const tile of props.vista.mapa) {
     if (!tile.descubierto || !tile.dueno) continue
+    duenos.set(`${tile.x}:${tile.y}`, tile.dueno)
     g.rect(tile.x * TILE, tile.y * TILE, TILE, TILE)
       .fill({ color: colorDeJugador(props.vista.jugadores, tile.dueno), alpha: TERRITORIO_ALPHA })
   }
   capaTerritorio.addChild(g)
+
+  // Un Graphics por bando: cada trazo lleva un solo color.
+  const m = FRONTERA_GROSOR / 2
+  const lineas = new Map()
+  for (const [clave, dueno] of duenos) {
+    const [x, y] = clave.split(':').map(Number)
+    const ajeno = (dx, dy) => duenos.get(`${x + dx}:${y + dy}`) !== dueno
+    const izq = x * TILE + m, der = (x + 1) * TILE - m
+    const arr = y * TILE + m, aba = (y + 1) * TILE - m
+    if (!lineas.has(dueno)) lineas.set(dueno, new Graphics())
+    const l = lineas.get(dueno)
+    if (ajeno(0, -1)) l.moveTo(izq - m, arr).lineTo(der + m, arr)
+    if (ajeno(0, 1)) l.moveTo(izq - m, aba).lineTo(der + m, aba)
+    if (ajeno(-1, 0)) l.moveTo(izq, arr - m).lineTo(izq, aba + m)
+    if (ajeno(1, 0)) l.moveTo(der, arr - m).lineTo(der, aba + m)
+  }
+  for (const [dueno, l] of lineas) {
+    l.stroke({ width: FRONTERA_GROSOR, color: colorDeJugador(props.vista.jugadores, dueno), alpha: FRONTERA_ALPHA })
+    capaTerritorio.addChild(l)
+  }
 }
 
 // --- Costa y ribera ------------------------------------------------------
@@ -241,6 +271,20 @@ function dibujarCosta() {
   capaCosta.addChild(g)
 }
 
+// Cartel sobre las tropas y ciudades de un aliado. Se ve solo desde la vista de
+// quien esta aliado con el: para el resto es un rival mas.
+const ESTILO_ALIADO = {
+  fontFamily: 'Arial', fontSize: 10, fontWeight: 'bold', fill: 0xffffff,
+  stroke: { color: 0x14532d, width: 3 }
+}
+function cartelAliado(tile) {
+  const texto = new Text({ text: '🤝 ALIADO', style: ESTILO_ALIADO })
+  texto.anchor.set(0.5, 0)
+  texto.x = (tile.x + 0.5) * TILE
+  texto.y = tile.y * TILE - 2
+  return texto
+}
+
 function dibujarPiezas() {
   // Guarda: el watcher de props.constantes puede disparar esta funcion antes
   // de que onMounted haya terminado de crear las capas de Pixi (ej. si las
@@ -249,8 +293,14 @@ function dibujarPiezas() {
   if (!capaPiezas) return
   limpiar(capaPiezas)
   spritesCiudad.clear()
+  const aliados = new Set(aliadosDe(props.vista, props.jugadorId))
+  // Van al final, encima de todas las piezas: si no, la tropa de la casilla de
+  // arriba taparia el cartel.
+  const carteles = []
   for (const tile of props.vista.mapa) {
     if (!tile.descubierto) continue
+    const deAliado = (tile.ciudad && aliados.has(tile.dueno)) || (tile.ejercito && aliados.has(tile.ejercito.dueno))
+    if (deAliado) carteles.push(cartelAliado(tile))
 
     if (tile.ciudad) {
       const sprite = new Sprite(Assets.get(SPRITE_CIUDAD))
@@ -286,6 +336,7 @@ function dibujarPiezas() {
       }
     }
   }
+  for (const cartel of carteles) capaPiezas.addChild(cartel)
 }
 
 function dibujarOverlay() {
@@ -657,7 +708,7 @@ function clavePiezas(vista) {
     const c = t.ciudad ? `c${t.dueno || ''}` : ''
     const e = t.ejercito ? `e${t.ejercito.tipo}${t.ejercito.dueno || ''}:${t.ejercito.salud}` : ''
     return `${t.x}:${t.y}:${c}${e}`
-  }).join('|')
+  }).join('|') + `#${aliadosDe(vista, props.jugadorId).join(',')}`
 }
 function claveNiebla(vista) {
   return vista.mapa.map(t => (t.descubierto ? '1' : '0')).join('')

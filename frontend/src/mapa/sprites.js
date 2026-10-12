@@ -102,12 +102,22 @@ export const SPRITE_UNIDAD = {
 // problema de "no se distingue la tierra del agua", y no se arreglaba
 // oscureciendo el oceano. Se reemplazaron por rosa y marron para no perder
 // capacidad: siguen siendo ocho bandos distinguibles entre si.
-export const COLORES_JUGADOR = [0xe74c3c, 0x2ecc71, 0xf1c40f, 0x9b59b6, 0xe67e22, 0xecf0f1, 0xe84393, 0x795548]
+//
+// El orden importa: los primeros son los mas separados entre si (rojo,
+// amarillo, violeta, blanco), porque casi todas las partidas tienen cuatro
+// bandos o menos. Los parecidos entre si (naranja con rojo, lima con la
+// llanura) quedan al final. La lista anterior ponia verde segundo y naranja
+// quinto, y en una partida de cinco se confundian con la llanura y con el rojo.
+export const COLORES_JUGADOR = [0xe6194b, 0xffe119, 0x9b30ff, 0xffffff, 0xf58231, 0xff8ad8, 0x3a3a3a, 0xa6ff00]
 
 export const colorDeJugador = (jugadores, jugadorId) => {
   const i = jugadores.findIndex(j => j.id === jugadorId)
   return i === -1 ? 0xffffff : COLORES_JUGADOR[i % COLORES_JUGADOR.length]
 }
+
+// El mismo color, para pintar con CSS (la lista de jugadores).
+export const colorCssDeJugador = (jugadores, jugadorId) =>
+  `#${colorDeJugador(jugadores, jugadorId).toString(16).padStart(6, '0')}`
 
 export async function cargarSprites() {
   // Set y no array: el rio y el mar comparten el mismo archivo (se distinguen
