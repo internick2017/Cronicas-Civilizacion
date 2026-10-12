@@ -45,4 +45,25 @@ describe('tope de mejora de ciudad de la IA', () => {
     // Y de hecho mejora alguna: el tope no puede ser una excusa para no mejorar.
     expect(Math.max(...niveles)).toBeGreaterThan(1);
   });
+
+  it('con una ciudad en nivel 3 y otra nueva en nivel 1, sube primero la de nivel 3', () => {
+    const e = crearEstado({ nombre: 'T', semilla: 'tope-2' });
+    aplicar(e, unirse(e, { id: 'bot', nombre: 'M', civilizacion: 'A', esBot: true, dificultadIA: 'dificil' }));
+    aplicar(e, unirse(e, { id: 'h1', nombre: 'H', civilizacion: 'B' }));
+    aplicar(e, iniciar(e));
+    const capital = e.mapa.find(t => t.ciudad && t.dueno === 'bot');
+    capital.ciudad.nivel = 3;
+    const libre = e.mapa.find(t => t.terreno === 'plains' && !t.ciudad && !t.dueno);
+    libre.ciudad = { nombre: 'Nueva', nivel: 1, poblacion: 100, edificios: [] };
+    libre.dueno = 'bot';
+    const jugador = e.jugadores.find(j => j.id === 'bot');
+    jugador.tecnologias = Object.keys(TECNOLOGIAS);
+    // Ciencia justa para UNA mejora de 3 a 4 (15 * 3): la mejora de menor nivel la gastaria en otra.
+    jugador.recursos = { food: 9000, gold: 9000, wood: 9000, stone: 9000, science: 45, culture: 0 };
+    e.indiceJugadorActual = e.jugadores.indexOf(jugador);
+
+    jugarTurnoIA(e, 'bot', crearRng('tope-2'));
+    // La de nivel 3 pasa de 3 (hasta donde llega sola la administracion): la mejora primero.
+    expect(capital.ciudad.nivel).toBeGreaterThan(3);
+  });
 });

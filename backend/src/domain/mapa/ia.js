@@ -18,7 +18,7 @@ import { reglasDelModo, edificioApagado } from './reglas/modo.js';
 import {
   EDIFICIOS, UNIDADES, COSTO_CIUDAD, BONO_TERRENO_PRODUCCION, TECNOLOGIAS, COSTO_MEJORA_CIUDAD,
   bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, esNaval, esTransporte, CAPACIDAD_DE,
-  DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT
+  DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, NIVEL_MAXIMO_ADMINISTRADO
 } from './constantes.js';
 import { marAdyacente } from './reglas/comun.js';
 import { aplicar } from './aplicar.js';
@@ -168,7 +168,7 @@ export const PERFILES_DIFICULTAD = {
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
     mejoraCiudades: true,
-    nivelMaximoCiudad: 3,
+    nivelMaximoCiudad: 4,
     elegirMejorFundacion: false,
     fundacionesPorTurno: 1,
   },
@@ -187,9 +187,9 @@ export const PERFILES_DIFICULTAD = {
     ordenEdificios: ORDEN_EDIFICIOS_BUENO,
     ordenTecnologias: ORDEN_TECNOLOGIAS_BUENO,
     mejoraCiudades: true,
-    // Un nivel mas que normal, pero igual por debajo del umbral donde la ciudad
-    // se vuelve intomable.
-    nivelMaximoCiudad: 4,
+    // Un nivel mas que normal, y el maximo posible: el 6 es el umbral donde la
+    // ciudad se vuelve intomable (NIVEL_CIUDAD_INCAPTURABLE).
+    nivelMaximoCiudad: 5,
     elegirMejorFundacion: true,
     fundacionesPorTurno: 2,
   },
@@ -540,20 +540,36 @@ function decidirInvestigacion(estado, jugadorId, perfil) {
 // Mejorar una ciudad es lo ULTIMO que decide: cuesta oro ademas de ciencia, y
 // ese oro es el mismo con el que recluta. Subir de nivel solo mejora la defensa
 // de esa ciudad; expandirse gana la partida. Asi que se hace con lo que sobra.
-// Se elige la ciudad de menor nivel: el costo escala con el nivel, asi que es
-// tambien la mejora mas barata disponible.
+// Hasta NIVEL_MAXIMO_ADMINISTRADO sube sola la administracion federal, asi que lo
+// que le toca a la maquina es pasar de ahi: primero las ciudades que ya llegaron
+// a ese nivel (la mas alta primero, para que alguna llegue al tope). Antes elegia
+// siempre la de menor nivel, y como funda ciudades nuevas todo el tiempo (nivel
+// 1) nunca llegaba a subir ninguna de 3 a 4. El resto, de menor a mayor: el
+// costo escala con el nivel, asi que es la mejora mas barata.
 function decidirMejoraCiudad(estado, jugadorId, perfil) {
   if (!perfil.mejoraCiudades || !reglasDelModo(estado).mejorasCiudad) return null;
   const jugador = jugadorPorId(estado, jugadorId);
+  const orden = (t) => (t.ciudad.nivel >= NIVEL_MAXIMO_ADMINISTRADO ? -t.ciudad.nivel : t.ciudad.nivel);
   const ciudades = [...ciudadesDe(estado, jugadorId)]
     .filter((t) => t.ciudad.nivel < Math.min(perfil.nivelMaximoCiudad, NIVEL_CIUDAD_INCAPTURABLE))
-    .sort((a, b) => a.ciudad.nivel - b.ciudad.nivel);
+    .sort((a, b) => orden(a) - orden(b));
   for (const tile of ciudades) {
     if (puedePagar(jugador, escalarCosto(COSTO_MEJORA_CIUDAD(tile.ciudad.nivel), multiplicadorCostos(jugador)))) {
       return { tipo: 'mejorarCiudad', x: tile.x, y: tile.y };
     }
   }
   return null;
+}
+
+// Con al menos una tropa de tierra por cada dos ciudades, subir de nivel pasa por
+// delante de seguir reclutando. Dejarlo siempre ultimo lo mataba de hambre: el oro
+// lo gastaba antes la tropa y las ciudades de la maquina se quedaban en nivel 3
+// (hasta ahi sube sola la administracion federal) toda la partida. Con menos
+// tropa, expandirse sigue siendo lo primero.
+function decidirMejoraConTropaSuficiente(estado, jugadorId, perfil) {
+  const terrestres = ejercitosDe(estado, jugadorId).filter((t) => !esNaval(t.ejercito.tipo));
+  if (terrestres.length * 2 < ciudadesDe(estado, jugadorId).length) return null;
+  return decidirMejoraCiudad(estado, jugadorId, perfil);
 }
 
 function decidirReclutamiento(estado, jugadorId, perfil) {
@@ -873,6 +889,7 @@ function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, bru
   return decidirInvestigacion(estado, jugadorId, perfil) ??
     decidirConstruccion(estado, jugadorId, perfil) ??
     decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) ??
+    decidirMejoraConTropaSuficiente(estado, jugadorId, perfil) ??
     decidirReclutamiento(estado, jugadorId, perfil) ??
     decidirReclutamientoNaval(estado, jugadorId, perfil) ??
     decidirTransporte(estado, jugadorId, perfil, brujulas) ??
