@@ -148,6 +148,23 @@ export function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turno
   return null;
 }
 
+// Si ya no queda ningun humano activo y la partida sigue (solo puede pasar con
+// varios bots), se termina: gana el bot con mas territorio, o nadie si empatan.
+// No vive en evaluarVictoria porque una partida SOLO de bots es legitima en las
+// simulaciones y en los tests de la IA: quien decide cerrar es el servicio.
+export function terminarSinHumanos(estado) {
+  if (estado.estado !== 'jugando') return [];
+  const activos = estado.jugadores.filter(j => j.activo);
+  if (activos.length === 0 || activos.some(j => !j.esBot)) return [];
+  const porTerritorio = activos
+    .map(j => ({ id: j.id, tiles: controlTerritorial(estado, j.id).tiles }))
+    .sort((a, b) => b.tiles - a.tiles);
+  const hayEmpate = porTerritorio.length > 1 && porTerritorio[0].tiles === porTerritorio[1].tiles;
+  return [evento('PartidaTerminada', estado, null, {
+    ganador: hayEmpate ? null : { jugadorId: porTerritorio[0].id, tipoVictoria: 'sin_humanos', turno: estado.turno },
+  })];
+}
+
 // terminarTurno calcula sobre el estado y devuelve eventos sin aplicarlos, pero
 // la recuperacion tiene que verse reflejada YA para que evaluarVictoria mida el
 // mapa correcto. Se aplica solo este evento, con la misma logica que aplicar.js.

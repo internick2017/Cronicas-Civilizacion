@@ -42,7 +42,8 @@ const NOMBRE_UNIDAD = {
 
 const NOMBRE_VICTORIA = {
   dominacion: 'dominacion',
-  ultimo_en_pie: 'ser el ultimo en pie'
+  ultimo_en_pie: 'ser el ultimo en pie',
+  sin_humanos: 'quedar con mas territorio cuando no quedo ningun jugador humano'
 };
 
 // --- Saneamiento de datos ---------------------------------------------------

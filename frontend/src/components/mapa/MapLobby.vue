@@ -44,6 +44,14 @@ const MODOS_TURNO = [
 ]
 const modoTurno = ref('simultaneo')
 
+// Cuantas maquinas juegan. Solo: al menos una (si no, no hay rival). En una
+// partida con gente: las que quieras sumar, o ninguna. El tope real lo pone el
+// backend (ver MapGameService#crearPartida).
+const BOTS_SOLO = [1, 2, 3, 4, 5]
+const BOTS_CON_GENTE = [0, 1, 2, 3, 4]
+const botsSolo = ref(1)
+const botsConGente = ref(0)
+
 const configElegida = () => ({
   modoTurno: modoTurno.value,
   porcentajeVictoria: porcentajeVictoria.value,
@@ -132,6 +140,8 @@ const crear = async () => {
   try {
     const { id, codigo } = await crearPartida({
       nombre: nombrePartida.value,
+      bots: botsConGente.value,
+      dificultadIA: dificultadIA.value,
       config: configElegida(),
     })
     salaDeEspera.value = await unirseAPartida(id, codigo)
@@ -158,6 +168,7 @@ const jugarContraIA = async () => {
     const { id, codigo } = await crearPartida({
       nombre: nombrePartida.value || 'Partida en solitario',
       contraIA: true,
+      bots: botsSolo.value,
       dificultadIA: dificultadIA.value,
       config: configElegida(),
     })
@@ -274,7 +285,13 @@ onMounted(() => {
 
       <section class="panel panel-ia">
         <h2>🤖 Jugar solo</h2>
-        <p class="ayuda">Sin esperar a nadie: la máquina controla al rival.</p>
+        <p class="ayuda">Sin esperar a nadie: la máquina controla a tus rivales.</p>
+        <label class="field">
+          Rivales
+          <select v-model.number="botsSolo">
+            <option v-for="n in BOTS_SOLO" :key="n" :value="n">{{ n === 1 ? '1 máquina' : `${n} máquinas` }}</option>
+          </select>
+        </label>
 
         <div v-if="dificultadesIA.length" class="dificultad-lista" role="radiogroup" aria-label="Dificultad">
           <label
@@ -320,6 +337,23 @@ onMounted(() => {
         </label>
         <p class="ayuda-config">
           Al llegar al límite gana quien controle más territorio.
+        </p>
+        <label class="field">
+          Máquinas
+          <select v-model.number="botsConGente">
+            <option v-for="n in BOTS_CON_GENTE" :key="n" :value="n">
+              {{ n === 0 ? 'Ninguna (solo personas)' : n === 1 ? '1 máquina' : `${n} máquinas` }}
+            </option>
+          </select>
+        </label>
+        <label v-if="botsConGente > 0 && dificultadesIA.length" class="field">
+          Dificultad de las máquinas
+          <select v-model="dificultadIA">
+            <option v-for="d in dificultadesIA" :key="d.tipo" :value="d.tipo">{{ d.nombre }}</option>
+          </select>
+        </label>
+        <p class="ayuda-config">
+          Las máquinas juegan como un jugador más, junto con las personas que se unan con el código.
         </p>
         <label class="field">
           Turnos

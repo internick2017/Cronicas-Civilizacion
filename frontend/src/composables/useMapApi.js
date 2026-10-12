@@ -17,8 +17,8 @@ export function useMapApi() {
   // territorio, tamaño del mapa, limite de rondas). El backend los valida y los
   // guarda en la partida; la interfaz despues los lee de la vista, no de las
   // constantes globales, porque cada partida puede tener los suyos.
-  const crearPartida = ({ nombre, contraIA, dificultadIA, config }) =>
-    api.post('/', { nombre, contraIA, dificultadIA, config })
+  const crearPartida = ({ nombre, contraIA, dificultadIA, bots, config }) =>
+    api.post('/', { nombre, contraIA, dificultadIA, bots, config })
 
   const unirse = (idOCodigo, { id, nombre, civilizacion, raza }) =>
     api.post(`/${idOCodigo}/unirse`, { id, nombre, civilizacion, raza })

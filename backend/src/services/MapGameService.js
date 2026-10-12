@@ -16,7 +16,7 @@ import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, RAZAS } from '../domain/mapa/co
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
 import { embarcar, desembarcar } from '../domain/mapa/reglas/transporte.js';
 import { atacar } from '../domain/mapa/reglas/combate.js';
-import { terminarTurno } from '../domain/mapa/reglas/turnos.js';
+import { terminarTurno, terminarSinHumanos } from '../domain/mapa/reglas/turnos.js';
 import { vistaJugador } from '../domain/mapa/reglas/visibilidad.js';
 import { esSimultaneo, listosDe } from '../domain/mapa/reglas/comun.js';
 import logger from '../utils/logger.js';
@@ -24,12 +24,37 @@ import logger from '../utils/logger.js';
 // Sin caracteres ambiguos necesarios: codigo corto, solo mayusculas y digitos.
 const ALFABETO_CODIGO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
-// Id fijo: en una partida "contra la maquina" solo hay un bot, se agrega una
-// sola vez al crear la partida, y nunca choca con un id de jugador humano
-// (esos los genera el frontend con crypto.randomUUID()/un fallback propio).
+// Ids fijos por posicion: los bots se agregan una sola vez (al unirse el primer
+// humano) y nunca chocan con un id de jugador humano (esos los genera el
+// frontend con crypto.randomUUID()/un fallback propio). El primero conserva el
+// id y el nombre de cuando solo podia haber uno.
 const ID_BOT = 'bot-ia';
 const NOMBRE_BOT = 'La Máquina';
-const CIVILIZACIONES_BOT = ['Autómatas', 'El Enjambre', 'La Colmena', 'Los Engranajes'];
+const idBot = (i) => (i === 0 ? ID_BOT : `${ID_BOT}-${i + 1}`);
+const nombreBot = (i) => (i === 0 ? NOMBRE_BOT : `${NOMBRE_BOT} ${i + 1}`);
+// Una civilizacion por bot, sin repetir: tiene que haber al menos BOTS_MAXIMOS.
+const CIVILIZACIONES_BOT = ['Autómatas', 'El Enjambre', 'La Colmena', 'Los Engranajes', 'Los Relojeros', 'La Forja'];
+const BOTS_MAXIMOS = CIVILIZACIONES_BOT.length;
+const JUGADORES_MAXIMOS = 8; // el tope de config.maxJugadores (ver MapGame.js)
+
+// Cuantos bots lleva la partida. "Contra la maquina" siempre tiene al menos uno;
+// cualquier valor raro que llegue por HTTP cae al default en vez de romper.
+function cantidadDeBots(bots, contraIA) {
+  const minimo = contraIA ? 1 : 0;
+  if (!Number.isInteger(bots)) return minimo;
+  return Math.min(BOTS_MAXIMOS, Math.max(minimo, bots));
+}
+
+function mezclar(lista) {
+  const copia = [...lista];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
+
+const quedanHumanos = (estado) => estado.jugadores.some(j => j.activo && !j.esBot);
 
 // Tope de rondas de IA resueltas EN CADENA dentro de una misma llamada (p.ej.
 // un humano abandona y deja solo bots, o hay varios bots seguidos en el orden
@@ -172,15 +197,24 @@ export class MapGameService {
     this.cache.set(estado.id, estado);
   }
 
-  async crearPartida({ nombre, semilla, config, contraIA, dificultadIA }) {
+  async crearPartida({ nombre, semilla, config, contraIA, dificultadIA, bots }) {
     const codigo = await this._generarCodigoUnico();
     // dificultadIA se valida ACA (contra la lista blanca) y no en el dominio:
     // es una preferencia de configuracion, no una regla de juego, y asi
     // cualquier valor raro que llegue por HTTP nunca pisa el default.
     const dificultad = DIFICULTADES_IA.includes(dificultadIA) ? dificultadIA : DIFICULTAD_IA_DEFAULT;
-    // maxJugadores se fuerza a 2 (creador + bot): una partida "contra la
-    // maquina" es de UN humano, no una invitacion a que se sume gente.
-    const cfg = { ...(config ?? {}), ...(contraIA ? { contraIA: true, dificultadIA: dificultad, maxJugadores: 2 } : {}) };
+    const cantidadBots = cantidadDeBots(bots, contraIA);
+    const cfg = { ...(config ?? {}) };
+    if (contraIA) {
+      // maxJugadores se fuerza a creador + bots: una partida "contra la
+      // maquina" es de UN humano, no una invitacion a que se sume gente.
+      Object.assign(cfg, { contraIA: true, dificultadIA: dificultad, cantidadBots, maxJugadores: 1 + cantidadBots });
+    } else if (cantidadBots > 0) {
+      // Humanos Y bots: los bots no le pueden sacar el lugar a la gente, asi que
+      // la partida se agranda hasta que entren al menos dos personas.
+      const lugares = Math.max(cfg.maxJugadores ?? 4, cantidadBots + 2);
+      Object.assign(cfg, { dificultadIA: dificultad, cantidadBots, maxJugadores: Math.min(JUGADORES_MAXIMOS, lugares) });
+    }
     const estado = crearEstado({ nombre, semilla: semilla ?? codigo, config: cfg });
     estado.codigo = codigo;
     // El bot NO se agrega aca: si se agregara antes de que exista un humano,
@@ -202,10 +236,22 @@ export class MapGameService {
    * llegar, porque nadie controla al bot desde afuera.
    */
   _resolverTurnosIA(estado) {
-    if (esSimultaneo(estado)) return this._resolverRondaSimultaneaIA(estado);
+    const eventos = esSimultaneo(estado)
+      ? this._resolverRondaSimultaneaIA(estado)
+      : this._resolverTurnosSecuencialesIA(estado);
+    // Con varios bots puede no quedar ningun humano (abandonaron o los
+    // conquistaron) y seguir habiendo partida: nadie la mira ni la mueve, asi
+    // que se termina aca en vez de quedar "jugando" para siempre.
+    const cierre = terminarSinHumanos(estado);
+    aplicar(estado, cierre);
+    eventos.push(...cierre);
+    return eventos;
+  }
+
+  _resolverTurnosSecuencialesIA(estado) {
     const eventos = [];
     for (let vuelta = 0; vuelta < VUELTAS_IA_MAXIMAS; vuelta++) {
-      if (estado.estado !== 'jugando') break;
+      if (estado.estado !== 'jugando' || !quedanHumanos(estado)) break;
       const actual = estado.jugadores[estado.indiceJugadorActual];
       // La maquina juega por el bot Y por el humano que perdio el poder.
       if (!actual || !(actual.esBot || !estaEnPoder(actual))) break;
@@ -226,7 +272,7 @@ export class MapGameService {
   _resolverRondaSimultaneaIA(estado) {
     const eventos = [];
     for (let vuelta = 0; vuelta < VUELTAS_IA_MAXIMAS; vuelta++) {
-      if (estado.estado !== 'jugando') break;
+      if (estado.estado !== 'jugando' || !quedanHumanos(estado)) break;
       const pendientes = estado.jugadores.filter(j => j.activo && !listosDe(estado).includes(j.id));
       if (pendientes.length === 0 || pendientes.some(j => !j.esBot)) break;
       for (const bot of pendientes) {
@@ -259,18 +305,22 @@ export class MapGameService {
     // El bot se suma en la MISMA operacion que el primer humano se une (ver
     // el comentario en crearPartida): asi es atomico bajo el candado de esta
     // partida y no hay ventana donde un tercero pueda robarle el lugar.
-    if (estado.config.contraIA && estado.jugadores.length === 1) {
-      const civilizacion = CIVILIZACIONES_BOT[Math.floor(Math.random() * CIVILIZACIONES_BOT.length)];
-      // El bot recibe una raza al azar, como su civilizacion: sin ella jugaria
-      // sin bonos contra un humano que si los tiene.
+    // Una partida guardada antes de que hubiera varios bots no trae cantidadBots.
+    const cantidadBots = estado.config.cantidadBots ?? (estado.config.contraIA ? 1 : 0);
+    if (cantidadBots > 0 && estado.jugadores.length === 1) {
+      const civilizaciones = mezclar(CIVILIZACIONES_BOT);
       const razasDisponibles = Object.keys(RAZAS);
-      const razaBot = razasDisponibles[Math.floor(Math.random() * razasDisponibles.length)];
-      const eventosBot = unirseRegla(estado, {
-        id: ID_BOT, nombre: NOMBRE_BOT, civilizacion, raza: razaBot, esBot: true,
-        dificultadIA: estado.config.dificultadIA ?? DIFICULTAD_IA_DEFAULT,
-      });
-      aplicar(estado, eventosBot);
-      eventos.push(...eventosBot);
+      for (let i = 0; i < cantidadBots; i++) {
+        // Cada bot recibe una raza al azar, como su civilizacion: sin ella
+        // jugaria sin bonos contra un humano que si los tiene.
+        const razaBot = razasDisponibles[crypto.randomInt(razasDisponibles.length)];
+        const eventosBot = unirseRegla(estado, {
+          id: idBot(i), nombre: nombreBot(i), civilizacion: civilizaciones[i], raza: razaBot, esBot: true,
+          dificultadIA: estado.config.dificultadIA ?? DIFICULTAD_IA_DEFAULT,
+        });
+        aplicar(estado, eventosBot);
+        eventos.push(...eventosBot);
+      }
     }
 
     await this._persistir(estado, eventos);
