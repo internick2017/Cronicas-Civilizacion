@@ -1,4 +1,5 @@
 import { tileEn } from '../MapGame.js';
+import { enPaz } from './bandos.js';
 import { CAPACIDAD_DE, esTransporte, esNaval } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento, radioAlrededor } from './comun.js';
@@ -102,7 +103,8 @@ export function desembarcar(estado, jugadorId, { desde, hasta }) {
   // Pisar es tomar, tambien cuando se llega por mar: es lo que convierte un
   // desembarco en una invasion y no en un paseo. Misma condicion que
   // moverEjercito, y el mar queda afuera solo, porque aca el destino es tierra.
-  if (tileTierra.dueno !== jugadorId) {
+  const esDeAmigo = Boolean(tileTierra.dueno) && enPaz(estado, jugadorId, tileTierra.dueno);
+  if (tileTierra.dueno !== jugadorId && !esDeAmigo) {
     eventos.push(evento('TerritorioReclamado', estado, jugadorId, {
       x: hasta.x, y: hasta.y, duenoAnterior: tileTierra.dueno ?? null,
     }));

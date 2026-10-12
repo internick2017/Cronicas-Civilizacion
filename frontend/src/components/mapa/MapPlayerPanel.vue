@@ -2,6 +2,7 @@
 <script setup>
 import { computed } from 'vue'
 import { esSimultaneo, puedeJugar, yaTermino } from './turno.js'
+import { aliadosDe } from './alianzas.js'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -11,10 +12,12 @@ const props = defineProps({
   constantes: { type: Object, default: null }
 })
 
+defineEmits(['sumar-maquina'])
 const simultaneo = computed(() => esSimultaneo(props.vista))
 const jugadorActual = computed(() => props.vista.jugadores[props.vista.indiceJugadorActual])
 // A quien se resalta en la lista: en secuencial, al que le toca; en simultaneo, a todo el que sigue jugando.
 const estaJugando = (j) => puedeJugar(props.vista, j.id)
+const misAliados = computed(() => aliadosDe(props.vista, props.jugadorId))
 const termino = (j) => simultaneo.value && j.activo && yaTermino(props.vista, j.id)
 const yo = computed(() => props.vista.jugadores.find(j => j.id === props.jugadorId))
 
@@ -119,9 +122,9 @@ const RECURSOS_ICONOS = {
       </span>
     </div>
 
-    <div v-if="dominacion" class="dominacion" :title="`Controlás ${dominacion.tiles} casillas de tierra. Se gana con el ${pct(metaDominacion)}% del mundo al que se puede llegar.`">
+    <div v-if="dominacion" class="dominacion" :title="`${misAliados.length ? 'Tu alianza controla' : 'Controlás'} ${dominacion.tiles} casillas de tierra. Se gana con el ${pct(metaDominacion)}% del mundo al que se puede llegar.`">
       <div class="dominacion-cabecera">
-        <span>🏆 Dominación</span>
+        <span>🏆 Dominación<template v-if="misAliados.length"> (tu alianza)</template></span>
         <strong :class="{ cerca: avanceDominacion >= 100 }">
           {{ pct(dominacion.porcentaje) }}% / {{ pct(metaDominacion) }}%
         </strong>
@@ -140,10 +143,14 @@ const RECURSOS_ICONOS = {
         {{ j.nombre }} ({{ j.civilizacion }})
         <span v-if="razaDe(j)" class="raza-badge" :title="razaDe(j).descripcion">{{ razaDe(j).icono }} {{ razaDe(j).nombre }}</span>
         <small v-if="j.esBot" class="dificultad-badge">{{ NOMBRE_DIFICULTAD[j.dificultadIA] || j.dificultadIA }}</small>
+        <span v-if="misAliados.includes(j.id)" class="aliado" title="Son aliados: ganan juntos">🤝 aliado</span>
         <span v-if="!j.activo">— eliminado</span>
         <span v-else-if="termino(j)" class="listo" title="Ya terminó su turno">✔ terminó</span>
       </li>
     </ul>
+    <button v-if="vista.estado === 'jugando'" class="btn-sumar" @click="$emit('sumar-maquina')">
+      ➕ Sumar una máquina
+    </button>
   </div>
 </template>
 
@@ -234,6 +241,25 @@ const RECURSOS_ICONOS = {
   margin-left: 0.25rem;
   font-size: 0.8em;
   opacity: 0.85;
+}
+
+.btn-sumar {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ecf0f1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 0.4rem 0.7rem;
+  min-height: 36px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-sumar:hover { background: rgba(255, 255, 255, 0.16); }
+
+.jugadores-lista .aliado {
+  color: #f1c40f;
+  margin-left: 0.25rem;
 }
 
 .jugadores-lista .listo {

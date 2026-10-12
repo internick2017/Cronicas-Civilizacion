@@ -5,6 +5,7 @@ import { validarTurno, evento, esSimultaneo, listosDe } from './comun.js';
 import { produccionPorRasgos } from './cultura.js';
 import { aplicarBonosPorcentuales } from './tecnologia.js';
 import { controlTerritorial } from './dominacion.js';
+import { bandosDe } from './bandos.js';
 import { recuperarFronteras } from './fronteras.js';
 import { estaSaqueada } from './saqueo.js';
 import { crearRng } from '../rng.js';
@@ -116,33 +117,40 @@ export function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turno
   // Una partida guardada antes de que el campo existiera cae a la constante
   // historica, igual que hacen tecnologiasDe/rasgosDe con sus campos.
   const objetivo = (estado.config.porcentajeVictoria ?? PORCENTAJE_VICTORIA_DOMINACION * 100) / 100;
-  for (const jugador of activosPostEliminacion) {
-    if (controlTerritorial(estado, jugador.id).porcentaje >= objetivo) {
-      return evento('PartidaTerminada', estado, jugadorId, {
-        ganador: { jugadorId: jugador.id, tipoVictoria: 'dominacion', turno: turnoCierre },
-      });
-    }
-  }
-  if (activosPostEliminacion.length === 1) {
-    const [unico] = activosPostEliminacion;
-    return evento('PartidaTerminada', estado, jugadorId, {
-      ganador: { jugadorId: unico.id, tipoVictoria: 'ultimo_en_pie', turno: turnoCierre },
-    });
-  }
+  // Los aliados ganan juntos: quien compite es el BANDO (una alianza, o un
+  // jugador solo), y su territorio es la suma del de sus miembros.
+  const bandos = bandosDe(estado, activosPostEliminacion).map(miembros => {
+    const porJugador = miembros
+      .map(j => ({ id: j.id, ...controlTerritorial(estado, j.id) }))
+      .sort((a, b) => b.tiles - a.tiles);
+    return {
+      miembros: porJugador.map(j => j.id),
+      tiles: porJugador.reduce((suma, j) => suma + j.tiles, 0),
+      porcentaje: porJugador.reduce((suma, j) => suma + j.porcentaje, 0),
+    };
+  });
+  // `jugadorId` es el miembro con mas territorio; el resto viaja en `aliados`
+  // (solo si los hay, para que una victoria en solitario tenga la forma de siempre).
+  const victoriaDe = (bando, tipoVictoria) => evento('PartidaTerminada', estado, jugadorId, {
+    ganador: {
+      jugadorId: bando.miembros[0], tipoVictoria, turno: turnoCierre,
+      ...(bando.miembros.length > 1 ? { aliados: bando.miembros.slice(1) } : {}),
+    },
+  });
+
+  // El epsilon cubre la suma de fracciones de los aliados (0.3 + 0.3 no da 0.6 exacto).
+  const dominante = bandos.find(b => b.porcentaje >= objetivo - 1e-9);
+  if (dominante) return victoriaDe(dominante, 'dominacion');
+  if (bandos.length === 1) return victoriaDe(bandos[0], 'ultimo_en_pie');
 
   // Limite de rondas: final garantizado para quien no quiere una partida
   // abierta. Gana el que mas territorio tenga; si van iguales NO se inventa un
   // ganador (mismo criterio que cuando no queda nadie activo).
   if (estado.config.limiteRondas && turnoCierre >= estado.config.limiteRondas) {
-    const porTerritorio = activosPostEliminacion
-      .map(j => ({ id: j.id, tiles: controlTerritorial(estado, j.id).tiles }))
-      .sort((a, b) => b.tiles - a.tiles);
+    const porTerritorio = [...bandos].sort((a, b) => b.tiles - a.tiles);
     const hayEmpate = porTerritorio.length > 1 && porTerritorio[0].tiles === porTerritorio[1].tiles;
-    return evento('PartidaTerminada', estado, jugadorId, {
-      ganador: hayEmpate ? null : {
-        jugadorId: porTerritorio[0].id, tipoVictoria: 'limite_rondas', turno: turnoCierre,
-      },
-    });
+    if (hayEmpate) return evento('PartidaTerminada', estado, jugadorId, { ganador: null });
+    return victoriaDe(porTerritorio[0], 'limite_rondas');
   }
 
   return null;

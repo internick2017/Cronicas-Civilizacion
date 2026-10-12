@@ -3,7 +3,7 @@ import { crearEstado } from '../domain/mapa/MapGame.js';
 import { aplicar } from '../domain/mapa/aplicar.js';
 import { crearRng } from '../domain/mapa/rng.js';
 import { ReglaError } from '../domain/mapa/errores.js';
-import { unirse as unirseRegla, iniciar as iniciarRegla } from '../domain/mapa/reglas/partida.js';
+import { unirse as unirseRegla, iniciar as iniciarRegla, sumarMaquina } from '../domain/mapa/reglas/partida.js';
 import { proponerGobierno, cambiarFormaEstado, darVentajas, estaEnPoder } from '../domain/mapa/reglas/gobierno.js';
 import { crearSubdivision, quitarSubdivision, renombrarSubdivision, asignarCiudades, desasignarCiudades } from '../domain/mapa/reglas/subdivisiones.js';
 import { fundarCiudad, construir, mejorarCiudad, renombrarCiudad } from '../domain/mapa/reglas/ciudades.js';
@@ -11,6 +11,7 @@ import { reclutar } from '../domain/mapa/reglas/militar.js';
 import { adoptarRasgo } from '../domain/mapa/reglas/cultura.js';
 import { investigar } from '../domain/mapa/reglas/tecnologia.js';
 import { abandonar } from '../domain/mapa/reglas/abandono.js';
+import { proponerAlianza, responderAlianza, romperAlianza, regalarRecursos } from '../domain/mapa/reglas/alianzas.js';
 import { jugarTurnoIA } from '../domain/mapa/ia.js';
 import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, RAZAS } from '../domain/mapa/constantes.js';
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
@@ -101,6 +102,10 @@ const REGLAS_POR_TIPO = {
   renombrarSubdivision: (estado, jugadorId, accion) => renombrarSubdivision(estado, jugadorId, accion),
   asignarCiudades: (estado, jugadorId, accion) => asignarCiudades(estado, jugadorId, accion),
   desasignarCiudades: (estado, jugadorId, accion) => desasignarCiudades(estado, jugadorId, accion),
+  proponerAlianza: (estado, jugadorId, accion) => proponerAlianza(estado, jugadorId, accion),
+  responderAlianza: (estado, jugadorId, accion) => responderAlianza(estado, jugadorId, accion),
+  romperAlianza: (estado, jugadorId) => romperAlianza(estado, jugadorId),
+  regalarRecursos: (estado, jugadorId, accion) => regalarRecursos(estado, jugadorId, accion),
   abandonar: (estado, jugadorId) => abandonar(estado, jugadorId),
   terminarTurno: (estado, jugadorId) => terminarTurno(estado, jugadorId),
 };
@@ -283,6 +288,30 @@ export class MapGameService {
     return eventos;
   }
 
+  /**
+   * Identidad de una maquina que entra con la partida empezada: el primer id
+   * libre y una civilizacion que nadie este usando.
+   */
+  _datosDeNuevaMaquina(estado, dificultadIA) {
+    const cantidad = estado.jugadores.filter(j => j.esBot).length;
+    if (cantidad >= BOTS_MAXIMOS || estado.jugadores.length >= JUGADORES_MAXIMOS) {
+      throw new ReglaError('PARTIDA_LLENA', 'No entran más máquinas en esta partida');
+    }
+    const usados = new Set(estado.jugadores.map(j => j.id));
+    let indice = 0;
+    while (usados.has(idBot(indice))) indice++;
+    const enUso = new Set(estado.jugadores.map(j => j.civilizacion));
+    const civilizacion = mezclar(CIVILIZACIONES_BOT).find(c => !enUso.has(c)) ?? `${NOMBRE_BOT} ${indice + 1}`;
+    const razas = Object.keys(RAZAS);
+    return {
+      id: idBot(indice), nombre: nombreBot(indice), civilizacion,
+      raza: razas[crypto.randomInt(razas.length)],
+      dificultadIA: DIFICULTADES_IA.includes(dificultadIA)
+        ? dificultadIA
+        : (estado.config.dificultadIA ?? DIFICULTAD_IA_DEFAULT),
+    };
+  }
+
   _jugarPorLaMaquina(estado, jugadorId, vuelta = 0) {
     const rng = crearRng(`ia:${estado.semilla}:${estado.turno}:${jugadorId}:${vuelta}`);
     return jugarTurnoIA(estado, jugadorId, rng);
@@ -387,6 +416,8 @@ export class MapGameService {
       // Sin esto, el tope de vueltas de _resolverTurnosIA podia dejar el turno
       // parado en un bot o en el propio jugador sin forma de seguir.
       eventos = [];
+    } else if (accion.tipo === 'sumarMaquina') {
+      eventos = sumarMaquina(estado, this._datosDeNuevaMaquina(estado, accion.dificultadIA));
     } else if (accion.tipo === 'atacar') {
       // Contar, no traer: esta semilla solo necesita CUANTOS eventos hubo, y
       // leer el log completo en cada ataque escala con la duracion de la

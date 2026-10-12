@@ -8,6 +8,7 @@ import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
 import { botinDe, saqueadaHasta } from './saqueo.js';
 import { validarTurno, evento, radio1 } from './comun.js';
+import { sonAliados, enPaz } from './bandos.js';
 import { bonoDefensaPorRasgos } from './cultura.js';
 import { bonoAtaquePorTecnologias, bonoDefensaUnidadPorTecnologias } from './tecnologia.js';
 import {
@@ -54,6 +55,14 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
 
   if (!ejercitoEnemigo && !ciudadEnemiga) {
     throw new ReglaError('OBJETIVO_INVALIDO', 'No hay un objetivo enemigo en esa casilla');
+  }
+
+  // A un aliado no se lo ataca, y a un ex aliado tampoco hasta que venza la tregua.
+  for (const duenoObjetivo of [ejercitoEnemigo?.dueno, ciudadEnemiga ? tileHasta.dueno : null]) {
+    if (!duenoObjetivo || !enPaz(estado, jugadorId, duenoObjetivo)) continue;
+    throw sonAliados(estado, jugadorId, duenoObjetivo)
+      ? new ReglaError('ES_ALIADO', 'No podés atacar a un aliado')
+      : new ReglaError('EN_TREGUA', 'Hay tregua con ese jugador hasta la próxima ronda');
   }
 
   const atacante = UNIDADES[tileDesde.ejercito.tipo];

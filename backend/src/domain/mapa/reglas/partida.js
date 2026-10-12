@@ -40,3 +40,44 @@ export function iniciar(estado) {
   });
   return eventos;
 }
+
+// Donde nace quien llega con la partida empezada: la tierra libre mas alejada
+// de todo lo que ya tiene dueño, para no caerle encima a nadie. Determinista
+// (ante un empate gana la primera casilla del mapa).
+function lugarParaNuevaCapital(estado) {
+  const ocupadas = estado.mapa.filter(t => t.dueno || t.ciudad);
+  let mejor = null;
+  let mejorDistancia = -1;
+  for (const t of estado.mapa) {
+    if (t.terreno === 'water' || t.dueno || t.ciudad || t.ejercito) continue;
+    let distancia = Infinity;
+    for (const o of ocupadas) {
+      distancia = Math.min(distancia, Math.abs(o.x - t.x) + Math.abs(o.y - t.y));
+      if (distancia <= mejorDistancia) break;
+    }
+    if (distancia > mejorDistancia) { mejor = t; mejorDistancia = distancia; }
+  }
+  return mejor;
+}
+
+/**
+ * Suma una maquina a una partida que ya esta en juego. A diferencia de
+ * `unirse` no exige la sala de espera: entra con su capital fundada en tierra
+ * libre y empieza a jugar en la ronda en curso. Arranca con lo mismo que
+ * cualquiera el primer turno, asi que si la partida va avanzada llega de atras.
+ *
+ * El id, el nombre, la civilizacion y la raza los elige el servicio, igual que
+ * con los bots que entran al crear la partida.
+ */
+export function sumarMaquina(estado, { id, nombre, civilizacion, raza = null, dificultadIA = null }) {
+  if (estado.estado !== 'jugando') throw new ReglaError('PARTIDA_NO_ACTIVA', 'La partida no está activa');
+  if (jugadorPorId(estado, id)) throw new ReglaError('JUGADOR_DUPLICADO', 'Ese jugador ya está en la partida');
+  const lugar = lugarParaNuevaCapital(estado);
+  if (!lugar) throw new ReglaError('SIN_LUGAR', 'No queda tierra libre para otra civilización');
+  const razaValida = validarRaza(raza);
+  return [
+    evento('JugadorUnido', estado, null, { id, nombre, civilizacion, raza: razaValida, esBot: true, dificultadIA }),
+    evento('CiudadFundada', estado, id, { x: lugar.x, y: lugar.y, nombre: `${civilizacion} Capital` }),
+    evento('TerritorioDescubierto', estado, id, { tiles: radio1(lugar.x, lugar.y) }),
+  ];
+}

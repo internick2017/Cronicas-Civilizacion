@@ -19,7 +19,15 @@ const NOMBRE_VICTORIA = {
 const ganador = computed(() =>
   props.vista.jugadores.find(j => j.id === props.vista.ganador?.jugadorId) || null
 )
-const gane = computed(() => props.vista.ganador?.jugadorId === props.jugadorId)
+// Los aliados ganan juntos: `jugadorId` es el que mas territorio tenia y el resto viaja en `aliados`.
+const ganadores = computed(() => {
+  const g = props.vista.ganador
+  return g ? [g.jugadorId, ...(g.aliados ?? [])] : []
+})
+const nombresGanadores = computed(() =>
+  ganadores.value.map(id => props.vista.jugadores.find(j => j.id === id)?.nombre ?? id).join(', ')
+)
+const gane = computed(() => ganadores.value.includes(props.jugadorId))
 const motivoVictoria = computed(() => {
   const tipo = props.vista.ganador?.tipoVictoria
   return NOMBRE_VICTORIA[tipo] || tipo || 'una victoria decisiva'
@@ -34,7 +42,9 @@ const motivoVictoria = computed(() => {
       <h2 v-else>Partida terminada</h2>
 
       <p v-if="ganador" class="detalle">
-        <strong>{{ ganador.nombre }}</strong> se impuso por {{ motivoVictoria }}.
+        <template v-if="ganadores.length > 1">La alianza de <strong>{{ nombresGanadores }}</strong> se impuso</template>
+        <template v-else><strong>{{ ganador.nombre }}</strong> se impuso</template>
+        por {{ motivoVictoria }}.
       </p>
       <p v-else class="detalle">Nadie quedó en pie.</p>
 
@@ -42,7 +52,7 @@ const motivoVictoria = computed(() => {
         <li v-for="j in vista.jugadores" :key="j.id">
           {{ j.nombre }}
           <span v-if="!j.activo" class="eliminado">eliminado</span>
-          <span v-if="j.id === vista.ganador?.jugadorId" class="corona">ganador</span>
+          <span v-if="ganadores.includes(j.id)" class="corona">ganador</span>
         </li>
       </ul>
 

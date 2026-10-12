@@ -21,6 +21,7 @@ import {
   DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, NIVEL_MAXIMO_ADMINISTRADO
 } from './constantes.js';
 import { marAdyacente } from './reglas/comun.js';
+import { amigosDe } from './reglas/bandos.js';
 import { aplicar } from './aplicar.js';
 import { fundarCiudad, construir, mejorarCiudad } from './reglas/ciudades.js';
 import { organizarSubdivisionesIA } from './iaSubdivisiones.js';
@@ -299,9 +300,11 @@ const transitablePara = (jugadorId) => (t) =>
  * que ganar aunque tuviera al rival al lado.
  */
 export function distanciaATierraTomable(estado, jugadorId) {
+  // La tierra de un aliado no se toma (pisarla no la reclama): no es un objetivo.
+  const amigos = amigosDe(estado, jugadorId);
   return distanciaHasta(
     estado,
-    (t) => t.terreno !== 'water' && t.dueno !== jugadorId && !t.ciudad,
+    (t) => t.terreno !== 'water' && !amigos.has(t.dueno) && !t.ciudad,
     transitablePara(jugadorId),
   );
 }
@@ -328,9 +331,10 @@ export function distanciaATierraLibre(estado, jugadorId) {
  * al lado y desde ahi se ataca.
  */
 export function distanciaACiudadEnemiga(estado, jugadorId) {
+  const amigos = amigosDe(estado, jugadorId);
   return distanciaHasta(
     estado,
-    (t) => t.ciudad && t.dueno && t.dueno !== jugadorId,
+    (t) => t.ciudad && t.dueno && !amigos.has(t.dueno),
     transitablePara(jugadorId),
   );
 }
@@ -373,9 +377,10 @@ const navegablePara = (jugadorId) => (t) =>
  * flota: mientras haya algo que hundir, el mar se disputa antes que la costa.
  */
 export function distanciaABuqueEnemigo(estado, jugadorId) {
+  const amigos = amigosDe(estado, jugadorId);
   return distanciaHasta(
     estado,
-    (t) => t.terreno === 'water' && t.ejercito && t.ejercito.dueno !== jugadorId,
+    (t) => t.terreno === 'water' && t.ejercito && !amigos.has(t.ejercito.dueno),
     navegablePara(jugadorId),
   );
 }
@@ -390,10 +395,11 @@ export function distanciaABuqueEnemigo(estado, jugadorId) {
  * quedaria flotando sin nada que hacer.
  */
 export function distanciaACostaEnemiga(estado, jugadorId) {
+  const amigos = amigosDe(estado, jugadorId);
   return distanciaHasta(
     estado,
     (t) => t.terreno === 'water' && vecinosOrtogonales(estado, t.x, t.y)
-      .some((v) => v.ciudad && v.dueno && v.dueno !== jugadorId),
+      .some((v) => v.ciudad && v.dueno && !amigos.has(v.dueno)),
     navegablePara(jugadorId),
   );
 }
@@ -427,8 +433,9 @@ export function tierraInalcanzable(estado, jugadorId) {
     transitablePara(jugadorId),
   );
   const fuera = new Set();
+  const amigos = amigosDe(estado, jugadorId);
   for (const t of estado.mapa) {
-    if (t.terreno === 'water' || t.dueno === jugadorId || t.ciudad) continue;
+    if (t.terreno === 'water' || amigos.has(t.dueno) || t.ciudad) continue;
     if (!alcanzable.has(clave(t.x, t.y))) fuera.add(clave(t.x, t.y));
   }
   return fuera;
@@ -723,6 +730,8 @@ function masCercaSegun(candidatas, brujulaPreferida, brujulaRespaldo, rng) {
 
 function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
   const ejercitos = ejercitosDe(estado, jugadorId);
+  // Yo y aquellos con los que estoy en paz: ni se los ataca ni se les quita tierra.
+  const amigos = amigosDe(estado, jugadorId);
   for (const [indice, origen] of ejercitos.entries()) {
     if (origen.ejercito.movimientoRestante <= 0) continue;
     // Un buque juega el MISMO bucle que la tropa de tierra (elegir objetivo,
@@ -749,8 +758,8 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
     // la ciudad, su anillo entero (ver reglas/combate.js) y, si era la ultima
     // del rival, lo elimina y libera todo su territorio.
     const prioridadObjetivo = (t) => {
-      const ciudadEnemiga = t.ciudad && t.dueno !== jugadorId;
-      const ejercitoEnemigo = t.ejercito && t.ejercito.dueno !== jugadorId;
+      const ciudadEnemiga = t.ciudad && !amigos.has(t.dueno);
+      const ejercitoEnemigo = t.ejercito && !amigos.has(t.ejercito.dueno);
       if (ciudadEnemiga && !ejercitoEnemigo) return 3; // se captura de una
       if (ciudadEnemiga) return 2;                     // primero la guarnicion
       if (ejercitoEnemigo) return 1;                   // no mueve el mapa
@@ -805,7 +814,7 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
     // casilla sin descubrir ganaria siempre y la flota se iria a explorar en
     // vez de ir a donde esta el enemigo.
     const puntajeDestino = (t) =>
-      naval ? 0 : (t.dueno === jugadorId ? 0 : t.dueno ? valorAjena : 2) +
+      naval ? 0 : (amigos.has(t.dueno) ? 0 : t.dueno ? valorAjena : 2) +
       (t.descubiertoPor.includes(jugadorId) ? 0 : 1);
     const mejorPuntaje = Math.max(...transitables.map(puntajeDestino));
     const mejores = transitables.filter((t) => puntajeDestino(t) === mejorPuntaje);

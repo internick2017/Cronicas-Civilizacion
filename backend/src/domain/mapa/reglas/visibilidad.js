@@ -1,7 +1,8 @@
 import { jugadorPorId } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
 import { producirParaJugador } from './turnos.js';
-import { controlTerritorial, rivalesDominantes } from './dominacion.js';
+import { controlDelBando, rivalesDominantes } from './dominacion.js';
+import { alianzasDe, aliadosDe, propuestasDe, treguasDe } from './bandos.js';
 import { DIFICULTAD_IA_DEFAULT, GRUPOS_DE_APOYO } from '../constantes.js';
 import { subdivisionesDe, nivelDe } from './subdivisiones.js';
 import { problemasParaLaVista, senalesDe } from './problemas.js';
@@ -9,8 +10,9 @@ import { multiplicadorCostos } from './efectosProblemas.js';
 import { reglasDelModo } from './modo.js';
 import { gobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo } from './gobierno.js';
 
-function vistaTile(tile, jugadorId) {
-  if (!tile.descubiertoPor.includes(jugadorId)) {
+// `videntes`: el jugador y sus aliados, que comparten lo que descubren.
+function vistaTile(tile, videntes) {
+  if (!videntes.some(id => tile.descubiertoPor.includes(id))) {
     return { x: tile.x, y: tile.y, descubierto: false };
   }
   const { descubiertoPor: _descubiertoPor, ...resto } = structuredClone(tile);
@@ -34,7 +36,8 @@ function porcentajeRedondeado(porcentaje) {
 }
 
 function dominacionParaLaVista(estado, jugadorId) {
-  const { tiles, porcentaje } = controlTerritorial(estado, jugadorId);
+  // Con aliados, el progreso es el del bando: es el numero que decide la partida.
+  const { tiles, porcentaje } = controlDelBando(estado, jugadorId);
   return { tiles, porcentaje: porcentajeRedondeado(porcentaje) };
 }
 
@@ -89,6 +92,7 @@ export function vistaJugador(estado, jugadorId) {
   if (!jugadorPorId(estado, jugadorId)) {
     throw new ReglaError('JUGADOR_DESCONOCIDO', `Jugador desconocido: ${jugadorId}`);
   }
+  const videntes = [jugadorId, ...aliadosDe(estado, jugadorId)];
   return {
     id: estado.id,
     nombre: estado.nombre,
@@ -104,7 +108,16 @@ export function vistaJugador(estado, jugadorId) {
     reglas: reglasDelModo(estado),
     ganador: estado.ganador,
     jugadores: estado.jugadores.map(j => vistaJugadorPublica(j, jugadorId, estado)),
-    mapa: estado.mapa.map(t => vistaTile(t, jugadorId)),
+    mapa: estado.mapa.map(t => vistaTile(t, videntes)),
+    // Quien esta aliado con quien es publico: hay que saber contra quien se juega.
+    alianzas: alianzasDe(estado).map(a => ({ miembros: [...a.miembros] })),
+    // Las propuestas solo las ven quien propone y quien tiene que responder.
+    propuestasAlianza: propuestasDe(estado)
+      .filter(p => p.de === jugadorId || p.para === jugadorId)
+      .map(p => ({ de: p.de, para: p.para })),
+    treguas: treguasDe(estado)
+      .filter(t => t.hasta >= estado.turno && (t.a === jugadorId || t.b === jugadorId))
+      .map(t => ({ con: t.a === jugadorId ? t.b : t.a, hasta: t.hasta })),
     // Aviso de rivales que se acercan a la victoria territorial: solo el cuanto,
     // nunca el donde (ver reglas/dominacion.js#rivalesDominantes).
     dominacionRivales: rivalesDominantes(estado, jugadorId)

@@ -3,6 +3,19 @@ import { UNIDADES, RECURSOS_INICIALES, CUARTEL, PUERTO, esNaval } from './consta
 import { vecinosOrtogonales } from './reglas/comun.js';
 import { ReglaError } from './errores.js';
 
+function quitarPropuestasEntre(estado, a, b) {
+  estado.propuestasAlianza = (estado.propuestasAlianza ?? [])
+    .filter(p => !((p.de === a && p.para === b) || (p.de === b && p.para === a)));
+}
+
+// Una alianza de uno solo no es una alianza: se disuelve.
+function sacarDeAlianzas(estado, jugadorId) {
+  if (!estado.alianzas) return;
+  estado.alianzas = estado.alianzas
+    .map(a => ({ ...a, miembros: a.miembros.filter(id => id !== jugadorId) }))
+    .filter(a => a.miembros.length >= 2);
+}
+
 export function aplicar(estado, eventos) {
   for (const evento of eventos) {
     const { tipo, jugadorId, datos, turno: evento_turno } = evento;
@@ -351,6 +364,47 @@ export function aplicar(estado, eventos) {
         estado.turno = datos.turno;
         break;
 
+      case 'AlianzaPropuesta':
+        estado.propuestasAlianza = [...(estado.propuestasAlianza ?? []), { de: jugadorId, para: datos.para }];
+        break;
+
+      case 'AlianzaRechazada':
+        quitarPropuestasEntre(estado, jugadorId, datos.de);
+        break;
+
+      // jugadorId acepta a datos.con. Si alguno ya tenia alianza, el otro entra a esa.
+      case 'AlianzaFormada': {
+        const alianzas = estado.alianzas ?? [];
+        const existente = alianzas.find(a => a.miembros.includes(jugadorId) || a.miembros.includes(datos.con));
+        if (existente) {
+          existente.miembros = [...new Set([...existente.miembros, jugadorId, datos.con])];
+        } else {
+          alianzas.push({ miembros: [datos.con, jugadorId] });
+        }
+        estado.alianzas = alianzas;
+        quitarPropuestasEntre(estado, jugadorId, datos.con);
+        // Quien vuelve a aliarse ya no necesita la tregua que le quedo de antes.
+        const miembros = (existente ?? alianzas.at(-1)).miembros;
+        estado.treguas = (estado.treguas ?? []).filter(t => !(miembros.includes(t.a) && miembros.includes(t.b)));
+        break;
+      }
+
+      case 'AlianzaRota':
+        sacarDeAlianzas(estado, jugadorId);
+        estado.treguas = [
+          ...(estado.treguas ?? []),
+          ...datos.exAliados.map(ex => ({ a: jugadorId, b: ex, hasta: datos.hasta })),
+        ];
+        break;
+
+      case 'RecursosRegalados': {
+        const de = jugadorPorId(estado, jugadorId);
+        const para = jugadorPorId(estado, datos.para);
+        de.recursos[datos.recurso] -= datos.cantidad;
+        para.recursos[datos.recurso] = (para.recursos[datos.recurso] ?? 0) + datos.cantidad;
+        break;
+      }
+
       case 'JugadorListo':
         estado.listos = [...(estado.listos ?? []), jugadorId];
         break;
@@ -358,6 +412,8 @@ export function aplicar(estado, eventos) {
       case 'RondaCompletada':
         // Ronda nueva: en turno simultaneo todos vuelven a poder jugar.
         if (estado.listos) estado.listos = [];
+        // Las treguas que vencieron con la ronda que acaba de cerrar ya no sirven.
+        if (estado.treguas) estado.treguas = estado.treguas.filter(t => t.hasta >= estado.turno);
         for (const t of estado.mapa) {
           if (!t.ejercito) continue;
           t.ejercito.movimientoRestante = UNIDADES[t.ejercito.tipo].movimiento + (t.ejercito.bonoMovimiento ?? 0);
@@ -396,6 +452,12 @@ export function aplicar(estado, eventos) {
       case 'JugadorEliminado': {
         const j = jugadorPorId(estado, datos.jugadorId);
         j.activo = false;
+        // Un eliminado no puede seguir ganando con su alianza ni contestando propuestas.
+        sacarDeAlianzas(estado, datos.jugadorId);
+        if (estado.propuestasAlianza) {
+          estado.propuestasAlianza = estado.propuestasAlianza
+            .filter(p => p.de !== datos.jugadorId && p.para !== datos.jugadorId);
+        }
         // Su territorio SUELTO vuelve a ser tierra de nadie. Si no, queda a
         // nombre de alguien que ya no juega y se convierte en un muro
         // permanente: moverEjercito lo rechaza por ajeno, fundarCiudad por

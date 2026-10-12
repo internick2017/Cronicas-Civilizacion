@@ -1,4 +1,5 @@
 import { UMBRAL_AVISO_DOMINACION } from '../constantes.js';
+import { aliadosDe } from './bandos.js';
 
 const clave = (x, y) => `${x},${y}`;
 const VECINOS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
@@ -42,19 +43,34 @@ export function controlTerritorial(estado, jugadorId) {
   };
 }
 
+// Lo mismo, sumando a los aliados: los aliados ganan juntos, asi que el numero
+// que decide la partida (y el que tiene que mostrar la barra) es el del bando.
+export function controlDelBando(estado, jugadorId) {
+  const bando = new Set([jugadorId, ...aliadosDe(estado, jugadorId)]);
+  const tierra = tierraAlcanzable(estado);
+  const propios = tierra.filter(t => bando.has(t.dueno)).length;
+  return {
+    tiles: propios,
+    totalTierra: tierra.length,
+    porcentaje: tierra.length > 0 ? propios / tierra.length : 0,
+  };
+}
+
 // Rivales que ya controlan una porcion alarmante del mundo. Devuelve el CUANTO,
 // nunca el DONDE: publicar sus tiles filtraria el mapa que el jugador todavia no
 // exploro, que es justamente lo que la niebla existe para evitar. Saber que
 // alguien se esta volviendo enorme es tension; saber donde estan sus casillas es
 // hacer trampa.
 export function rivalesDominantes(estado, jugadorId) {
+  // Un aliado no es un rival, y de un rival aliado asusta lo que suma su bando.
+  const aliados = aliadosDe(estado, jugadorId);
   return estado.jugadores
-    .filter(j => j.id !== jugadorId && j.activo)
+    .filter(j => j.id !== jugadorId && j.activo && !aliados.includes(j.id))
     .map(j => ({
       id: j.id,
       nombre: j.nombre,
       civilizacion: j.civilizacion,
-      porcentaje: controlTerritorial(estado, j.id).porcentaje,
+      porcentaje: controlDelBando(estado, j.id).porcentaje,
     }))
     .filter(j => j.porcentaje >= UMBRAL_AVISO_DOMINACION);
 }

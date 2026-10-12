@@ -129,6 +129,28 @@ const umbralAviso = computed(() =>
         La máquina juega cuando terminó el último jugador.
       </p>
     </section>
+    <section>
+      <h4>Alianzas</h4>
+      <p>
+        Desde el botón <strong>🤝 Alianzas</strong> le podés proponer una alianza a otro jugador, y él la
+        acepta o la rechaza. Los aliados <strong>ganan juntos</strong>: su territorio se suma para llegar al
+        objetivo, y si solo quedan aliados en pie también ganan. Por eso no puede haber una alianza de todos:
+        siempre tiene que quedar al menos un rival afuera.
+      </p>
+      <p>
+        Entre aliados no se pueden atacar, ven el mismo mapa, pueden caminar por la tierra del otro sin
+        quitársela (pero no entrar a sus ciudades) y se pueden regalar recursos.
+      </p>
+      <p>
+        Se puede <strong>salir de la alianza</strong> cuando quieras, pero con aviso: queda una tregua hasta
+        que termine la ronda y recién en la siguiente se pueden atacar.
+      </p>
+      <p>
+        La <strong>máquina</strong> nunca propone una alianza. Si se la proponés contesta en el momento, y
+        solo acepta cuando va perdiendo (alguien tiene más territorio que ella). Dos máquinas nunca se alían.
+      </p>
+    </section>
+
     <section v-if="guerraPura">
       <h4>Guerra pura</h4>
       <p>

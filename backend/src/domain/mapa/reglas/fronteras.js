@@ -1,5 +1,6 @@
 import { evento, radio1 } from './comun.js';
 import { tileEn } from '../MapGame.js';
+import { enPaz } from './bandos.js';
 
 /**
  * Presion de frontera: al cerrar la ronda, cada casilla que un rival te tomo
@@ -17,7 +18,8 @@ import { tileEn } from '../MapGame.js';
  * a nadie: el rival puede entrar y pelear igual, pero para QUEDARSE con tu
  * tierra tiene que sostenerla, no le alcanza con pasarle por encima.
  *
- * Tres limites deliberados:
+ * Cuatro limites deliberados:
+ * - A un aliado (o a alguien en tregua) no se le quita nada.
  * - Solo vuelve lo que tiene dueño RIVAL. La tierra de nadie no se absorbe: eso
  *   seria expansion gratis por tener ciudades, no defensa.
  * - Nunca vuelve una casilla con CIUDAD: las ciudades se toman peleando.
@@ -36,6 +38,7 @@ export function recuperarFronteras(estado) {
       if (!vecino || vecino === tile) continue;
       if (!vecino.dueno || vecino.dueno === dueñoCiudad) continue; // libre o ya mia
       if (vecino.ciudad) continue;                                  // se toma peleando
+      if (enPaz(estado, dueñoCiudad, vecino.dueno)) continue;       // a un aliado no se le quita
       // Se sostiene si su dueño tiene tropa ENCIMA o AL LADO: una fuerza
       // concentrada mantiene el terreno que toma, un merodeador suelto no. Sin
       // esto la regla castigaba igual a una invasion de verdad que a una

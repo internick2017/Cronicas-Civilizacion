@@ -271,6 +271,16 @@ export function narrarRonda(eventos, jugadores = []) {
         break;
       }
 
+      case 'AlianzaFormada': {
+        frases.push(`${quien} y ${nombreDe(jugadores, datos.con)} sellaron una alianza.`);
+        break;
+      }
+
+      case 'AlianzaRota': {
+        frases.push(`${quien} rompio su alianza. Hay tregua hasta la proxima ronda.`);
+        break;
+      }
+
       case 'JugadorEliminado': {
         // El jugadorId del evento es quien cerro el turno, no el eliminado; el eliminado
         // viaja en datos.jugadorId (ver reglas/turnos.js:terminarTurno). nombreDe ya
@@ -288,10 +298,13 @@ export function narrarRonda(eventos, jugadores = []) {
         if (ganador && typeof ganador === 'object') {
           const ganadorNombre = nombreDe(jugadores, ganador.jugadorId);
           const motivo = NOMBRE_VICTORIA[ganador.tipoVictoria] ?? textoSeguro(ganador.tipoVictoria) ?? 'una victoria decisiva';
+          const aliados = Array.isArray(ganador.aliados) ? ganador.aliados.map(id => nombreDe(jugadores, id)) : [];
           // El anuncio del final se guarda aparte y se agrega al final de todo:
           // visto jugando, la cronica decia "La partida termino..." y despues
           // seguia contando casillas, porque el territorio se narra al cierre.
-          cierre.push(`La partida termino: ${ganadorNombre} se impuso por ${motivo}.`);
+          cierre.push(aliados.length > 0
+            ? `La partida termino: la alianza de ${[ganadorNombre, ...aliados].join(', ')} se impuso por ${motivo}.`
+            : `La partida termino: ${ganadorNombre} se impuso por ${motivo}.`);
         } else {
           cierre.push('La partida termino sin vencedores.');
         }

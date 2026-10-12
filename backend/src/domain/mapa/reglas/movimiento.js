@@ -3,6 +3,7 @@ import { esNaval } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento, radioAlrededor } from './comun.js';
 import { radioVision } from './cultura.js';
+import { enPaz } from './bandos.js';
 
 export function moverEjercito(estado, jugadorId, { desde, hasta }) {
   validarTurno(estado, jugadorId);
@@ -47,7 +48,12 @@ export function moverEjercito(estado, jugadorId, { desde, hasta }) {
   const estaDefendida =
     (tileHasta.ejercito && tileHasta.ejercito.dueno !== jugadorId) ||
     (tileHasta.ciudad && tileHasta.dueno !== jugadorId);
-  if (estaDefendida) throw new ReglaError('OBJETIVO_INVALIDO', 'La casilla es enemiga; usá atacar');
+  if (estaDefendida) {
+    const defensor = tileHasta.ejercito ? tileHasta.ejercito.dueno : tileHasta.dueno;
+    throw enPaz(estado, jugadorId, defensor)
+      ? new ReglaError('CASILLA_OCUPADA', 'Esa casilla la ocupa un aliado')
+      : new ReglaError('OBJETIVO_INVALIDO', 'La casilla es enemiga; usá atacar');
+  }
 
   if (tileHasta.ejercito && tileHasta.ejercito.dueno === jugadorId) {
     throw new ReglaError('CASILLA_OCUPADA', 'Ya tenés un ejército en esa casilla');
@@ -75,7 +81,9 @@ export function moverEjercito(estado, jugadorId, { desde, hasta }) {
   // decision de diseño, no un descuido (ver docs/adr/0002): si el oceano
   // contara, el umbral real de victoria dependeria de cuanto mar genero la
   // semilla, y todo el balance ya medido dejaria de valer.
-  if (tileHasta.dueno !== jugadorId && !destinoEsMar) {
+  // Por la tierra de un aliado (o de alguien en tregua) se PASA sin quitarsela.
+  const esDeAmigo = Boolean(tileHasta.dueno) && enPaz(estado, jugadorId, tileHasta.dueno);
+  if (tileHasta.dueno !== jugadorId && !destinoEsMar && !esDeAmigo) {
     eventos.push(evento('TerritorioReclamado', estado, jugadorId, {
       x: hasta.x, y: hasta.y, duenoAnterior: tileHasta.dueno ?? null,
     }));

@@ -7,6 +7,8 @@ import MapCanvas from './MapCanvas.vue'
 import MapPlayerPanel from './MapPlayerPanel.vue'
 import MapActionBar from './MapActionBar.vue'
 import { puedeJugar } from './turno.js'
+import MapAlianzas from './MapAlianzas.vue'
+import { amigosDe, propuestasPara } from './alianzas.js'
 import MapRoundLog from './MapRoundLog.vue'
 import MapVictory from './MapVictory.vue'
 import MapDialogo from './MapDialogo.vue'
@@ -54,6 +56,19 @@ const canvasRef = ref(null)
 const ciudadesAbierto = ref(false)
 const ayudaAbierta = ref(false)
 const gobiernoAbierto = ref(false)
+const alianzasAbierto = ref(false)
+// Sumar una maquina con la partida ya empezada.
+const maquinaAbierta = ref(false)
+const dificultadMaquina = ref('normal')
+const sumarMaquina = async () => {
+  maquinaAbierta.value = false
+  await ejecutarAccion({ tipo: 'sumarMaquina', dificultadIA: dificultadMaquina.value })
+}
+const avisoAlianza = ref('')
+// Yo y aquellos con los que estoy en paz (aliados y treguas): el backend no
+// deja atacarlos ni entrar a lo que ocupan, asi que aca tampoco se ofrece.
+const amigos = computed(() => amigosDe(vista.value, jugadorId))
+const propuestasRecibidas = computed(() => propuestasPara(vista.value, jugadorId).length)
 // Cuantos problemas activos o señales de aviso hay: el boton Gobierno lo muestra
 // para que no haga falta abrirlo a mirar.
 const avisosGobierno = computed(() => {
@@ -175,6 +190,12 @@ const alcanzables = computed(() => {
       if (!tile) return false
       // Niebla: sin datos para filtrar nada. Candidata (ver comentario arriba).
       if (!tile.descubierto) return true
+      // Lo que ocupa un aliado (su tropa o su ciudad) no es destino ni objetivo:
+      // movimiento.js y combate.js lo rechazan. Su tierra suelta si se puede pisar.
+      const ocupadaPorAmigo =
+        (tile.ejercito && tile.ejercito.dueno !== jugadorId && amigos.value.has(tile.ejercito.dueno)) ||
+        (tile.ciudad && tile.dueno !== jugadorId && amigos.value.has(tile.dueno))
+      if (ocupadaPorAmigo) return false
 
       // Excepcion 1: la tropa se sube a un transporte propio con lugar.
       const transporteConLugar = tile.ejercito && tile.ejercito.dueno === jugadorId &&
@@ -184,8 +205,8 @@ const alcanzables = computed(() => {
       if (capacidad > 0 && llevaCarga && tile.terreno !== 'water' &&
         !tile.ejercito && !(tile.ciudad && tile.dueno !== jugadorId)) return true
 
-      const ejercitoEnemigo = tile.ejercito && tile.ejercito.dueno !== jugadorId
-      const ciudadEnemiga = tile.ciudad && tile.dueno !== jugadorId
+      const ejercitoEnemigo = tile.ejercito && !amigos.value.has(tile.ejercito.dueno)
+      const ciudadEnemiga = tile.ciudad && !amigos.value.has(tile.dueno)
       // Un buque NAVEGA solo por el mar, pero ATACA la costa desde ahi: una
       // ciudad o un ejercito enemigo pegado al mar es un objetivo valido (es
       // exactamente el saqueo, ver docs/adr/0003). Sin esta excepcion el
@@ -279,9 +300,23 @@ const ejecutarAccion = async (datosAccion) => {
   try {
     const resultado = await accion(id, jugadorId, token, datosAccion)
     vista.value = resultado.vista
+    return resultado
   } catch (err) {
     emit('error', err.mensaje || 'No se pudo ejecutar la acción.')
+    return null
   }
+}
+
+// La maquina contesta una propuesta en el acto: sin este aviso, al proponerle
+// la propuesta simplemente desaparecia y no se sabia si habia dicho que si.
+const onAccionAlianza = async (datosAccion) => {
+  avisoAlianza.value = ''
+  const resultado = await ejecutarAccion(datosAccion)
+  if (!resultado || datosAccion.tipo !== 'proponerAlianza') return
+  const nombre = vista.value.jugadores.find(j => j.id === datosAccion.para)?.nombre ?? 'Ese jugador'
+  const tipos = (resultado.eventos ?? []).map(e => e.tipo)
+  if (tipos.includes('AlianzaFormada')) avisoAlianza.value = `${nombre} aceptó: ya son aliados.`
+  else if (tipos.includes('AlianzaRechazada')) avisoAlianza.value = `${nombre} rechazó la alianza. La máquina solo acepta cuando va perdiendo.`
 }
 
 const onTerminarTurno = () => ejecutarAccion({ tipo: 'terminarTurno' })
@@ -305,8 +340,8 @@ const onIniciarPartida = async () => {
 // territorio sea de otro jugador: esas casillas ya se excluyen de
 // alcanzables porque el backend tampoco acepta atacarlas).
 const esEnemigo = (tile) =>
-  (tile.ejercito && tile.ejercito.dueno !== jugadorId) ||
-  (tile.ciudad && tile.dueno !== jugadorId)
+  Boolean(tile.ejercito && !amigos.value.has(tile.ejercito.dueno)) ||
+  Boolean(tile.ciudad && !amigos.value.has(tile.dueno))
 
 const onClickTile = (posicion) => {
   const tile = tileEn(posicion.x, posicion.y)
@@ -553,7 +588,7 @@ onUnmounted(() => {
 
 <template>
   <div class="map-session">
-    <MapPlayerPanel :vista="vista" :jugador-id="jugadorId" :constantes="constantes" />
+    <MapPlayerPanel :vista="vista" :jugador-id="jugadorId" :constantes="constantes" @sumar-maquina="maquinaAbierta = true" />
 
     <div v-if="vista.estado === 'esperando'" class="sala-espera">
       <p class="sala-codigo">
@@ -608,6 +643,9 @@ onUnmounted(() => {
         </button>
         <button class="btn-panel" title="Gobierno" @click="gobiernoAbierto = true">
           🏛️ Gobierno<span v-if="avisosGobierno" class="insignia-aviso">{{ avisosGobierno }}</span>
+        </button>
+        <button class="btn-panel" title="Alianzas" @click="alianzasAbierto = true">
+          🤝 Alianzas<span v-if="propuestasRecibidas" class="insignia-aviso">{{ propuestasRecibidas }}</span>
         </button>
         <button class="btn-panel" title="Manual de Instrucciones" @click="ayudaAbierta = true">
           ℹ️ Manual de Instrucciones
@@ -694,6 +732,24 @@ onUnmounted(() => {
         @quitar-subdivision="quitarSubdivision"
         @cerrar="gobiernoAbierto = false"
       />
+    </MapDialogo>
+
+    <MapDialogo :abierto="maquinaAbierta" titulo="Sumar una máquina" @cerrar="maquinaAbierta = false">
+      <p class="salida-aviso">
+        Entra una civilización nueva manejada por la máquina, con su capital en la tierra libre más
+        alejada de todos. Arranca de cero, así que si la partida va avanzada llega de atrás.
+      </p>
+      <label class="campo-maquina">
+        Dificultad
+        <select v-model="dificultadMaquina">
+          <option v-for="d in constantes.dificultadesIA || []" :key="d.tipo" :value="d.tipo">{{ d.nombre }}</option>
+        </select>
+      </label>
+      <button class="btn-primario" @click="sumarMaquina">Sumar</button>
+    </MapDialogo>
+
+    <MapDialogo :abierto="alianzasAbierto" titulo="Alianzas" @cerrar="alianzasAbierto = false; avisoAlianza = ''">
+      <MapAlianzas :vista="vista" :jugador-id="jugadorId" :aviso="avisoAlianza" @accion="onAccionAlianza" />
     </MapDialogo>
 
     <MapDialogo :abierto="ayudaAbierta" titulo="Manual de Instrucciones" @cerrar="ayudaAbierta = false">
@@ -798,11 +854,16 @@ onUnmounted(() => {
   overscroll-behavior: contain;
 }
 
+/* Los botones bajan de renglon cuando no entran. En una sola fila, en un
+   telefono los ultimos (Alianzas, Manual, Salir) quedaban fuera de la pantalla
+   y no habia forma de llegar a ellos: la fila no se podia deslizar. */
 .botonera-paneles {
   position: absolute;
   top: 0.75rem;
   left: 0.75rem;
+  max-width: calc(100% - 1.5rem);
   display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
   z-index: 2;
 }
@@ -815,6 +876,7 @@ onUnmounted(() => {
   padding: 0.4rem 0.7rem;
   cursor: pointer;
   font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .btn-panel:hover { background: rgba(52, 152, 219, 0.35); }
@@ -825,6 +887,11 @@ onUnmounted(() => {
 .btn-salir:hover { background: rgba(231, 76, 60, 0.35); }
 
 .salida-aviso { margin: 0; line-height: 1.45; }
+.campo-maquina { display: flex; flex-direction: column; gap: 0.3rem; }
+.campo-maquina select {
+  background: #34495e; color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px; padding: 0.5rem;
+}
 .salida-fuerte { color: #e67e22; }
 .btn-peligro { background: #c0392b; margin-top: 0.4rem; }
 
@@ -913,14 +980,23 @@ onUnmounted(() => {
     width: auto;
   }
 
+  /* Debajo de la botonera, que en un telefono ocupa hasta tres renglones. */
   .panel-ciudades {
+    top: 8.5rem;
     left: 0.5rem;
     right: 0.5rem;
     width: auto;
     max-height: 45%;
   }
 
-  .btn-panel { font-size: 0.8rem; padding: 0.35rem 0.55rem; }
+  /* En un telefono la botonera ocupa tres renglones: flotando sobre el mapa
+     tapaba las casillas de arriba y no se podian tocar las tropas ni las
+     ciudades que quedaban debajo. Pasa a tener su propio lugar ARRIBA del mapa. */
+  .zona-mapa { flex-direction: column; }
+  .botonera-paneles { position: static; order: -1; max-width: none; padding: 0 0 0.5rem; }
+  /* Alto de dedo: son los controles principales del juego. */
+  .btn-panel { font-size: 0.8rem; padding: 0.35rem 0.55rem; min-height: 36px; }
+  .btn-salir { margin-left: 0; }
 }
 
 .sala-espera {
