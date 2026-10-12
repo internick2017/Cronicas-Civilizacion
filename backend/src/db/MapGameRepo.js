@@ -205,10 +205,10 @@ export class MapGameRepo {
   }
 
   listarActivas() {
-    const sql = 'SELECT id, codigo, estado_json FROM map_games';
+    const sql = 'SELECT id, codigo, estado_json, actualizado FROM map_games';
     const mapear = (filas) => filas.map(f => {
       const json = JSON.parse(f.estado_json);
-      return { id: f.id, codigo: f.codigo, nombre: json.nombre, estado: json.estado };
+      return { id: f.id, codigo: f.codigo, nombre: json.nombre, estado: json.estado, actualizado: f.actualizado };
     });
     if (this.dialecto === 'sqlite') {
       return mapear(this.db.prepare(sql).all());

@@ -1,5 +1,6 @@
 import express from 'express';
 import { ReglaError } from '../domain/mapa/errores.js';
+import { esSalaAbandonada } from '../domain/mapa/salas.js';
 import { PRIORIDADES } from '../domain/mapa/reglas/subdivisiones.js';
 import {
   TIPOS_SUBDIVISION, PROBLEMAS, RESOLUCION_POR_NIVEL, LIMITE_SENAL, LIMITE_PROBLEMA, GRAVEDAD_MAXIMA,
@@ -219,7 +220,7 @@ export function crearMapRoutes(servicio) {
   router.get('/', async (req, res) => {
     try {
       const partidas = await servicio.repo.listarActivas();
-      res.status(200).json(partidas);
+      res.status(200).json(partidas.filter(p => !esSalaAbandonada(p)));
     } catch (err) {
       manejarError(err, res);
     }
