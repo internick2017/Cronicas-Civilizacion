@@ -20,8 +20,8 @@ export function useMapApi() {
   const crearPartida = ({ nombre, contraIA, dificultadIA, config }) =>
     api.post('/', { nombre, contraIA, dificultadIA, config })
 
-  const unirse = (idOCodigo, { id, nombre, civilizacion }) =>
-    api.post(`/${idOCodigo}/unirse`, { id, nombre, civilizacion })
+  const unirse = (idOCodigo, { id, nombre, civilizacion, raza }) =>
+    api.post(`/${idOCodigo}/unirse`, { id, nombre, civilizacion, raza })
 
   const iniciar = (id) => api.post(`/${id}/iniciar`)
 

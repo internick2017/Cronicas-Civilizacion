@@ -14,7 +14,7 @@ import {
   EDIFICIOS, UNIDADES, COSTO_CIUDAD, MIN_JUGADORES,
   PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, BONO_TERRENO_DEFENSA,
   BONO_DEFENSA_CIUDAD, PORCENTAJE_VICTORIA_DOMINACION, UMBRAL_AVISO_DOMINACION, RASGOS_CULTURALES,
-  DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, TECNOLOGIAS, COSTO_MEJORA_CIUDAD, CUARTEL
+  DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, TECNOLOGIAS, COSTO_MEJORA_CIUDAD, CUARTEL, RAZAS
 } from '../domain/mapa/constantes.js';
 
 // Nombres en espanol para la interfaz. Viven aca y no en el dominio porque
@@ -148,6 +148,18 @@ export function crearMapRoutes(servicio) {
         visionExtra: datos.visionExtra ?? 0,
         bonoDefensaCiudad: datos.bonoDefensaCiudad ?? 0
       })),
+      // Razas jugables: el lobby las ofrece y el panel explica sus bonos leyendolos de aca.
+      razas: Object.entries(RAZAS).map(([tipo, datos]) => ({
+        tipo,
+        nombre: datos.nombre,
+        icono: datos.icono,
+        descripcion: datos.descripcion,
+        produccionPorcentual: datos.produccionPorcentual ?? {},
+        bonoAtaqueUnidades: datos.bonoAtaqueUnidades ?? 0,
+        bonoDefensaUnidades: datos.bonoDefensaUnidades ?? 0,
+        visionExtra: datos.visionExtra ?? 0,
+        bonoDefensaCiudad: datos.bonoDefensaCiudad ?? 0
+      })),
       dificultadesIA: DIFICULTADES_IA.map((tipo) => ({
         tipo,
         nombre: DIFICULTAD_IA_INFO[tipo]?.nombre || tipo,
@@ -216,8 +228,8 @@ export function crearMapRoutes(servicio) {
   // POST /api/map/:id/unirse
   router.post('/:id/unirse', async (req, res) => {
     try {
-      const { id, nombre, civilizacion } = req.body ?? {};
-      const resultado = await servicio.unirse(req.params.id, { id, nombre, civilizacion });
+      const { id, nombre, civilizacion, raza } = req.body ?? {};
+      const resultado = await servicio.unirse(req.params.id, { id, nombre, civilizacion, raza });
       res.status(200).json(resultado); // { vista, token }
     } catch (err) {
       manejarError(err, res);

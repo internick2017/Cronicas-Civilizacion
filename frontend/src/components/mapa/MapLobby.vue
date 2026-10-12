@@ -57,6 +57,30 @@ const error = ref('')
 const dificultadesIA = ref([])
 const dificultadIA = ref(null)
 
+// Razas: tambien salen del backend, con sus bonos, para no duplicar numeros que
+// cambian con el balance. Se elige al unirse (crear, jugar solo o unirse con codigo).
+const razas = ref([])
+const raza = ref(null)
+
+const NOMBRE_RECURSO = {
+  food: 'comida', gold: 'oro', wood: 'madera', stone: 'piedra', science: 'ciencia', culture: 'cultura'
+}
+const signo = (n) => (n > 0 ? `+${n}` : `${n}`)
+
+// Resume lo que gana y lo que paga una raza, en el orden en que se leen mejor:
+// primero las ventajas. Devuelve [{ texto, bueno }] para colorearlas.
+const efectosDe = (r) => {
+  const efectos = []
+  for (const [recurso, fraccion] of Object.entries(r.produccionPorcentual ?? {})) {
+    efectos.push({ texto: `${signo(Math.round(fraccion * 100))}% ${NOMBRE_RECURSO[recurso] ?? recurso}`, bueno: fraccion > 0 })
+  }
+  if (r.bonoAtaqueUnidades) efectos.push({ texto: `${signo(r.bonoAtaqueUnidades)} ataque`, bueno: r.bonoAtaqueUnidades > 0 })
+  if (r.bonoDefensaUnidades) efectos.push({ texto: `${signo(r.bonoDefensaUnidades)} defensa de tropas`, bueno: r.bonoDefensaUnidades > 0 })
+  if (r.bonoDefensaCiudad) efectos.push({ texto: `${signo(Math.round(r.bonoDefensaCiudad * 100))}% defensa de ciudades`, bueno: r.bonoDefensaCiudad > 0 })
+  if (r.visionExtra) efectos.push({ texto: `${signo(r.visionExtra)} visión`, bueno: r.visionExtra > 0 })
+  return efectos.sort((a, b) => Number(b.bueno) - Number(a.bueno))
+}
+
 // Cuando el jugador CREA una partida no entra directo: queda en esta sala de espera
 // con el codigo a la vista, porque hasta que alguien llame a `iniciar` el mapa esta
 // 100% cubierto por la niebla y no habria nada que mirar.
@@ -84,7 +108,8 @@ const unirseAPartida = async (idOCodigo, codigoConocido = null) => {
   const { vista, token } = await unirse(idOCodigo, {
     id: jugadorId,
     nombre: nombreJugador.value,
-    civilizacion: nombreJugador.value
+    civilizacion: nombreJugador.value,
+    raza: raza.value
   })
   return { id: vista.id, codigo: codigoConocido ?? idOCodigo, jugadorId, token, vista }
 }
@@ -167,21 +192,25 @@ const unirseConCodigo = async (codigo) => {
   }
 }
 
-const cargarDificultadesIA = async () => {
+const cargarConstantes = async () => {
   try {
-    const { dificultadesIA: lista } = await obtenerConstantes()
+    const { dificultadesIA: lista, razas: listaRazas } = await obtenerConstantes()
     dificultadesIA.value = lista || []
     dificultadIA.value = lista?.find(d => d.porDefecto)?.tipo ?? lista?.[0]?.tipo ?? null
+    razas.value = listaRazas || []
+    raza.value = razas.value[0]?.tipo ?? null
   } catch {
-    // Sin la lista, el selector no se muestra: crearPartida ya cae al
-    // default del backend si dificultadIA llega null/invalido.
+    // Sin la lista, los selectores no se muestran: crearPartida ya cae al
+    // default del backend si dificultadIA llega null/invalido, y unirse sin
+    // raza juega sin bonos (como antes de que existieran).
     dificultadesIA.value = []
+    razas.value = []
   }
 }
 
 onMounted(() => {
   cargarPartidas()
-  cargarDificultadesIA()
+  cargarConstantes()
 })
 </script>
 
@@ -209,6 +238,31 @@ onMounted(() => {
         Tu nombre / civilización
         <input v-model="nombreJugador" type="text" placeholder="Incas" />
       </label>
+
+      <!-- La raza vale para las tres formas de entrar (solo, crear, unirse). Cada
+           una gana algo y paga algo: por eso se muestran las dos cosas. -->
+      <section v-if="razas.length" class="panel">
+        <h2>Tu raza</h2>
+        <div class="raza-lista" role="radiogroup" aria-label="Raza">
+          <label
+            v-for="r in razas"
+            :key="r.tipo"
+            class="raza-opcion"
+            :class="{ elegida: raza === r.tipo }"
+          >
+            <input type="radio" name="raza" :value="r.tipo" v-model="raza" />
+            <span class="raza-nombre">{{ r.icono }} {{ r.nombre }}</span>
+            <small>{{ r.descripcion }}</small>
+            <span class="raza-efectos">
+              <span
+                v-for="ef in efectosDe(r)"
+                :key="ef.texto"
+                :class="['efecto', ef.bueno ? 'efecto-bueno' : 'efecto-malo']"
+              >{{ ef.texto }}</span>
+            </span>
+          </label>
+        </div>
+      </section>
 
       <section class="panel panel-ia">
         <h2>🤖 Jugar solo</h2>
@@ -403,6 +457,38 @@ onMounted(() => {
 
 .dificultad-nombre { font-weight: 600; }
 .dificultad-opcion small { grid-column: 2; opacity: 0.7; }
+
+.raza-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.raza-opcion {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.5rem;
+  row-gap: 0.2rem;
+  align-items: baseline;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.raza-opcion.elegida {
+  border-color: rgba(52, 152, 219, 0.7);
+  background: rgba(52, 152, 219, 0.14);
+}
+
+.raza-nombre { font-weight: 600; }
+.raza-opcion small { grid-column: 2; opacity: 0.7; }
+.raza-efectos { grid-column: 2; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.efecto { font-size: 0.75rem; border-radius: 4px; padding: 0.05rem 0.4rem; }
+.efecto-bueno { background: rgba(46, 204, 113, 0.18); color: #2ecc71; }
+.efecto-malo { background: rgba(231, 76, 60, 0.18); color: #e74c3c; }
 
 .btn-primary {
   background: linear-gradient(45deg, #27ae60, #2ecc71);

@@ -12,7 +12,7 @@ import { adoptarRasgo } from '../domain/mapa/reglas/cultura.js';
 import { investigar } from '../domain/mapa/reglas/tecnologia.js';
 import { abandonar } from '../domain/mapa/reglas/abandono.js';
 import { jugarTurnoIA } from '../domain/mapa/ia.js';
-import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT } from '../domain/mapa/constantes.js';
+import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, RAZAS } from '../domain/mapa/constantes.js';
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
 import { embarcar, desembarcar } from '../domain/mapa/reglas/transporte.js';
 import { atacar } from '../domain/mapa/reglas/combate.js';
@@ -220,14 +220,14 @@ export class MapGameService {
     return this._conCandado(await this._idCanonico(idOCodigo), () => this._unirse(idOCodigo, jugador));
   }
 
-  async _unirse(idOCodigo, { id, nombre, civilizacion }) {
+  async _unirse(idOCodigo, { id, nombre, civilizacion, raza }) {
     const original = await this._resolver(idOCodigo);
     if (!original) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
 
     // Se muta un CLON, nunca el objeto que vive en el cache: si la persistencia
     // falla mas abajo, el cache no debe quedar con un estado que la DB no tiene.
     const estado = structuredClone(original);
-    const eventos = unirseRegla(estado, { id, nombre, civilizacion });
+    const eventos = unirseRegla(estado, { id, nombre, civilizacion, raza });
     aplicar(estado, eventos);
 
     // El bot se suma en la MISMA operacion que el primer humano se une (ver
@@ -235,8 +235,12 @@ export class MapGameService {
     // partida y no hay ventana donde un tercero pueda robarle el lugar.
     if (estado.config.contraIA && estado.jugadores.length === 1) {
       const civilizacion = CIVILIZACIONES_BOT[Math.floor(Math.random() * CIVILIZACIONES_BOT.length)];
+      // El bot recibe una raza al azar, como su civilizacion: sin ella jugaria
+      // sin bonos contra un humano que si los tiene.
+      const razasDisponibles = Object.keys(RAZAS);
+      const razaBot = razasDisponibles[Math.floor(Math.random() * razasDisponibles.length)];
       const eventosBot = unirseRegla(estado, {
-        id: ID_BOT, nombre: NOMBRE_BOT, civilizacion, esBot: true,
+        id: ID_BOT, nombre: NOMBRE_BOT, civilizacion, raza: razaBot, esBot: true,
         dificultadIA: estado.config.dificultadIA ?? DIFICULTAD_IA_DEFAULT,
       });
       aplicar(estado, eventosBot);

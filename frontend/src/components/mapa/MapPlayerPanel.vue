@@ -18,6 +18,10 @@ const yo = computed(() => props.vista.jugadores.find(j => j.id === props.jugador
 // esto es puramente el texto de presentacion.
 const NOMBRE_DIFICULTAD = { facil: 'fácil', normal: 'normal', dificil: 'difícil' }
 
+// La raza de cada jugador sale de la vista (es publica); su nombre, icono y
+// bonos, de las constantes del backend. Una partida vieja no la trae: no se muestra nada.
+const razaDe = (jugador) => props.constantes?.razas?.find(r => r.tipo === jugador.raza) ?? null
+
 const NOMBRE_RECURSO = {
   food: 'Comida', gold: 'Oro', wood: 'Madera',
   stone: 'Piedra', science: 'Ciencia', culture: 'Cultura'
@@ -123,6 +127,7 @@ const RECURSOS_ICONOS = {
       <li v-for="j in vista.jugadores" :key="j.id" :class="{ activo: j.id === jugadorActual?.id }">
         <span v-if="j.esBot" title="Jugador controlado por la máquina">🤖</span>
         {{ j.nombre }} ({{ j.civilizacion }})
+        <span v-if="razaDe(j)" class="raza-badge" :title="razaDe(j).descripcion">{{ razaDe(j).icono }} {{ razaDe(j).nombre }}</span>
         <small v-if="j.esBot" class="dificultad-badge">{{ NOMBRE_DIFICULTAD[j.dificultadIA] || j.dificultadIA }}</small>
         <span v-if="!j.activo">— eliminado</span>
       </li>
@@ -211,6 +216,12 @@ const RECURSOS_ICONOS = {
 .dificultad-badge {
   opacity: 0.6;
   margin-left: 0.25rem;
+}
+
+.raza-badge {
+  margin-left: 0.25rem;
+  font-size: 0.8em;
+  opacity: 0.85;
 }
 
 .jugadores-lista .activo {

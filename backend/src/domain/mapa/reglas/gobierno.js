@@ -10,6 +10,7 @@ import { ReglaError } from '../errores.js';
 import { evento } from './comun.js';
 import { controlTerritorial } from './dominacion.js';
 import { caidaApoyoPueblo } from './efectosProblemas.js';
+import { produccionPorcentualDeRaza } from './razas.js';
 
 // Toda lectura de los campos de gobierno pasa por estos accesores: una partida
 // guardada antes de que existieran no los trae, y se cae al valor por defecto
@@ -134,10 +135,16 @@ const esRepublica = (jugador) => gobiernoDe(jugador).startsWith('republica_');
 // gobiernan con lideres elegidos que "pueden mejorar el pais" (palabras del
 // usuario): +10% a todo. Monarquia y estratocracia suman el suyo (constantes.js).
 // turnos.js lo aplica AL FINAL, sobre el total ya sumado.
+//
+// La raza suma su propio porcentaje (puede ser negativo) en este mismo
+// multiplicador, y no en aplicarBonosPorcentuales (tecnologia.js): aquel
+// redondea por turno y con valores chicos (2 de cultura por ciudad) un -25% se
+// perdia entero. Este camino arrastra el decimal al turno siguiente.
 export function multiplicadorProduccion(jugador, recurso) {
   const gobierno = gobiernoDe(jugador);
   const republica = esRepublica(jugador) ? BONO_PRODUCCION_REPUBLICA : 0;
-  return 1 + republica + (BONO_PRODUCCION_GOBIERNO[gobierno]?.[recurso] ?? 0);
+  return 1 + republica + (BONO_PRODUCCION_GOBIERNO[gobierno]?.[recurso] ?? 0)
+    + produccionPorcentualDeRaza(jugador, recurso);
 }
 
 // Quien tiene que sostenerte en el cargo: el grupo del electorado de tu

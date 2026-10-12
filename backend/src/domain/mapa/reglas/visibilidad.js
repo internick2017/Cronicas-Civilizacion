@@ -40,9 +40,11 @@ function dominacionParaLaVista(estado, jugadorId) {
 
 function vistaJugadorPublica(jugador, jugadorId, estado) {
   const { id, nombre, civilizacion, activo, esBot } = jugador;
+  // La raza no es informacion sensible (como la civilizacion): se muestra a todos.
+  const raza = jugador.raza ?? null;
   if (jugador.id === jugadorId) {
     return {
-      id, nombre, civilizacion, activo, esBot: Boolean(esBot),
+      id, nombre, civilizacion, raza, activo, esBot: Boolean(esBot),
       recursos: { ...jugador.recursos },
       rasgos: [...(jugador.rasgos ?? [])],
       tecnologias: [...(jugador.tecnologias ?? [])],
@@ -75,7 +77,7 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
   // recursos/rasgos): se muestran siempre para que el frontend pueda marcar
   // "🤖" al rival y con que dificultad esta jugando.
   return {
-    id, nombre, civilizacion, activo, esBot: Boolean(esBot),
+    id, nombre, civilizacion, raza, activo, esBot: Boolean(esBot),
     gobierno: gobiernoDe(jugador),
     formaEstado: formaEstadoDe(jugador),
     enPoder: estaEnPoder(jugador),

@@ -32,6 +32,7 @@ import { atacar } from './reglas/combate.js';
 import { embarcar, desembarcar } from './reglas/transporte.js';
 import { terminarTurno } from './reglas/turnos.js';
 import { bonoDefensaPorRasgos } from './reglas/cultura.js';
+import { multiplicadorDefensaCiudadPorRaza } from './reglas/razas.js';
 import { tieneTecnologiaRequerida, tecnologiasDe } from './reglas/tecnologia.js';
 import { investigar } from './reglas/tecnologia.js';
 import { ReglaError } from './errores.js';
@@ -239,7 +240,9 @@ function poderDefensivoEstimado(estado, objetivo) {
     : defensaCiudad(objetivo.ciudad.nivel);
   const ciudadPropia = Boolean(objetivo.ciudad);
   const defensor = estado.jugadores.find((j) => j.id === objetivo.dueno);
-  const bonoCiudad = ciudadPropia ? BONO_DEFENSA_CIUDAD * bonoDefensaPorRasgos(defensor) : 1;
+  const bonoCiudad = ciudadPropia
+    ? BONO_DEFENSA_CIUDAD * bonoDefensaPorRasgos(defensor) * multiplicadorDefensaCiudadPorRaza(defensor)
+    : 1;
   return base * bonoDefensa(objetivo.terreno) * bonoCiudad;
 }
 

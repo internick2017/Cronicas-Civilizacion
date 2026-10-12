@@ -34,6 +34,24 @@ const efectoRasgo = (rasgo) => {
   return partes.join(' · ')
 }
 
+// Una raza muestra lo que gana y lo que paga, ventajas primero. Las penalizaciones
+// son los mismos campos con signo negativo: no hay una tabla aparte.
+const efectoRaza = (raza) => {
+  const partes = []
+  for (const [recurso, fraccion] of Object.entries(raza.produccionPorcentual || {})) {
+    const p = Math.round(fraccion * 100)
+    partes.push({ texto: `${p > 0 ? '+' : ''}${p}% de ${NOMBRE_RECURSO[recurso] || recurso}`, bueno: p > 0 })
+  }
+  const a = raza.bonoAtaqueUnidades
+  if (a) partes.push({ texto: `${a > 0 ? '+' : ''}${a} de ataque a tus unidades`, bueno: a > 0 })
+  const d = raza.bonoDefensaUnidades
+  if (d) partes.push({ texto: `${d > 0 ? '+' : ''}${d} de defensa a tus unidades`, bueno: d > 0 })
+  const c = Math.round((raza.bonoDefensaCiudad || 0) * 100)
+  if (c) partes.push({ texto: `${c > 0 ? '+' : ''}${c}% de defensa en tus ciudades`, bueno: c > 0 })
+  if (raza.visionExtra) partes.push({ texto: `+${raza.visionExtra} de alcance al explorar`, bueno: true })
+  return partes.sort((x, y) => Number(y.bueno) - Number(x.bueno)).map(p => p.texto).join(' · ')
+}
+
 const efectoTecnologia = (tec) => {
   const partes = []
   if (tec.bonoAtaqueUnidades) partes.push(`+${tec.bonoAtaqueUnidades} de ataque a tus unidades`)
@@ -210,6 +228,25 @@ const umbralAviso = computed(() =>
             <td>{{ r.nombre }}</td>
             <td>{{ r.costo.culture }} cultura</td>
             <td>{{ efectoRasgo(r) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section v-if="constantes.razas?.length">
+      <h4>Razas</h4>
+      <p>
+        Cada jugador elige una raza al entrar y la conserva toda la partida. Cada una
+        gana algo y paga algo, y se suma a lo que ya te dan los rasgos y las tecnologías.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Raza</th><th>Efecto</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in constantes.razas" :key="r.tipo">
+            <td>{{ r.icono }} {{ r.nombre }}</td>
+            <td>{{ efectoRaza(r) }}</td>
           </tr>
         </tbody>
       </table>

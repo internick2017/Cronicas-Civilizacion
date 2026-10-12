@@ -16,6 +16,13 @@
 //   node scripts/simular.js
 //   node scripts/simular.js --partidas 20 --tamano 20 --dificultad normal
 //   node scripts/simular.js --semilla lote-b --sin-armada
+//   node scripts/simular.js --raza-a orcos --raza-b elfos --partidas 40
+//   node scripts/simular.js --matriz --partidas 30
+//
+// --matriz juega TODOS los cruces de razas en los DOS asientos (el primer
+// jugador mueve primero y eso pesa) y reparte las victorias por raza. Una raza
+// sana gana cerca del 50% de los cruces; mucho mas o mucho menos es desbalance.
+// Ojo con el ruido: con menos de ~100 partidas por raza, tomarlo como orientativo.
 //
 // --sin-armada apaga la flota de la maquina (topeBuques = 0 en las tres
 // dificultades) sin tocar el mapa: es la comparacion que aisla el efecto de la
@@ -27,6 +34,7 @@ import { unirse, iniciar } from '../src/domain/mapa/reglas/partida.js';
 import { jugarTurnoIA, PERFILES_DIFICULTAD } from '../src/domain/mapa/ia.js';
 import { esCostera } from '../src/domain/mapa/reglas/comun.js';
 import { crearRng } from '../src/domain/mapa/rng.js';
+import { RAZAS } from '../src/domain/mapa/constantes.js';
 
 function leerArgs(argv) {
   const args = {
@@ -37,25 +45,31 @@ function leerArgs(argv) {
     turnoMaximo: 300,
     sinArmada: false,
     islas: false,
+    razaA: null,
+    razaB: null,
+    matriz: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--sin-armada') { args.sinArmada = true; continue; }
     if (a === '--islas') { args.islas = true; continue; }
+    if (a === '--matriz') { args.matriz = true; continue; }
     const valor = argv[++i];
     if (a === '--partidas') args.partidas = Number(valor);
     else if (a === '--tamano') args.tamano = Number(valor);
     else if (a === '--dificultad') args.dificultad = valor;
     else if (a === '--semilla') args.semilla = valor;
     else if (a === '--turno-maximo') args.turnoMaximo = Number(valor);
+    else if (a === '--raza-a') args.razaA = valor;
+    else if (a === '--raza-b') args.razaB = valor;
   }
   return args;
 }
 
-function jugarPartida(semilla, { tamano, dificultad, turnoMaximo, islas }) {
+function jugarPartida(semilla, { tamano, dificultad, turnoMaximo, islas, razaA = null, razaB = null }) {
   const e = crearEstado({ nombre: 'sim', semilla, config: { tamanoMapa: tamano, islas } });
-  aplicar(e, unirse(e, { id: 'a', nombre: 'A', civilizacion: 'Incas', esBot: true, dificultadIA: dificultad }));
-  aplicar(e, unirse(e, { id: 'b', nombre: 'B', civilizacion: 'Mayas', esBot: true, dificultadIA: dificultad }));
+  aplicar(e, unirse(e, { id: 'a', nombre: 'A', civilizacion: 'Incas', raza: razaA, esBot: true, dificultadIA: dificultad }));
+  aplicar(e, unirse(e, { id: 'b', nombre: 'B', civilizacion: 'Mayas', raza: razaB, esBot: true, dificultadIA: dificultad }));
   aplicar(e, iniciar(e));
 
   const rng = crearRng(`sim:${semilla}`);
@@ -114,6 +128,7 @@ function jugarPartida(semilla, { tamano, dificultad, turnoMaximo, islas }) {
     termino: e.estado === 'terminado',
     turnos: e.turno,
     tipoVictoria: e.ganador?.tipoVictoria ?? null,
+    ganador: e.ganador?.jugadorId ?? null, // 'a' | 'b' | null
     ...metricas,
   };
 }
@@ -122,6 +137,40 @@ const args = leerArgs(process.argv.slice(2));
 
 if (args.sinArmada) {
   for (const perfil of Object.values(PERFILES_DIFICULTAD)) perfil.topeBuques = 0;
+}
+
+if (args.matriz) {
+  // Todos los cruces entre razas distintas, en los dos asientos. Las MISMAS
+  // semillas para cada cruce: asi la unica diferencia entre dos corridas es la raza.
+  const ids = Object.keys(RAZAS);
+  const tabla = Object.fromEntries(ids.map(id => [id, { gana: 0, juega: 0, contra: {} }]));
+  for (const ra of ids) {
+    for (const rb of ids) {
+      if (ra === rb) continue;
+      let ganaA = 0; let ganaB = 0; let sinGanador = 0;
+      for (let i = 0; i < args.partidas; i++) {
+        const r = jugarPartida(`${args.semilla}-${i}`, { ...args, razaA: ra, razaB: rb });
+        if (r.ganador === 'a') ganaA++; else if (r.ganador === 'b') ganaB++; else sinGanador++;
+      }
+      tabla[ra].gana += ganaA; tabla[ra].juega += ganaA + ganaB;
+      tabla[rb].gana += ganaB; tabla[rb].juega += ganaA + ganaB;
+      tabla[ra].contra[rb] = (tabla[ra].contra[rb] ?? { gana: 0, juega: 0 });
+      tabla[ra].contra[rb].gana += ganaA; tabla[ra].contra[rb].juega += ganaA + ganaB;
+      tabla[rb].contra[ra] = (tabla[rb].contra[ra] ?? { gana: 0, juega: 0 });
+      tabla[rb].contra[ra].gana += ganaB; tabla[rb].contra[ra].juega += ganaA + ganaB;
+      console.log(`${ra.padEnd(7)} (asiento 1) vs ${rb.padEnd(7)} (asiento 2): ${ganaA}-${ganaB}` +
+        (sinGanador ? ` (${sinGanador} sin ganador)` : ''));
+    }
+  }
+  const pct = (g, j) => (j ? `${Math.round((100 * g) / j)}%` : '-');
+  console.log(`\n== MATRIZ | ${args.partidas} partidas por cruce y asiento | tamano ${args.tamano} | ${args.dificultad} | semillas "${args.semilla}-*"`);
+  console.log('victorias por raza (50% = equilibrada):');
+  for (const id of ids) {
+    const t = tabla[id];
+    const contra = ids.filter(o => o !== id).map(o => `${o} ${pct(t.contra[o].gana, t.contra[o].juega)}`).join(', ');
+    console.log(`  ${id.padEnd(7)} ${pct(t.gana, t.juega).padStart(4)}  (${t.gana}/${t.juega})   vs: ${contra}`);
+  }
+  process.exit(0);
 }
 
 const resultados = [];
@@ -134,6 +183,11 @@ const suma = (f) => resultados.reduce((a, r) => a + f(r), 0);
 const promedio = (lista, f) => (lista.length ? lista.reduce((a, r) => a + f(r), 0) / lista.length : 0);
 
 console.log(`\n== ${args.partidas} partidas | tamano ${args.tamano} | dificultad ${args.dificultad} | semillas "${args.semilla}-*"${args.sinArmada ? ' | SIN ARMADA' : ''}`);
+if (args.razaA || args.razaB) {
+  const gana = (id) => resultados.filter(r => r.ganador === id).length;
+  console.log(`razas                      A=${args.razaA ?? 'sin raza'} (asiento 1) vs B=${args.razaB ?? 'sin raza'} (asiento 2)`);
+  console.log(`victorias                  A ${gana('a')} | B ${gana('b')} | sin ganador ${resultados.length - gana('a') - gana('b')}`);
+}
 console.log(`terminadas                 ${terminadas.length}/${resultados.length}`);
 console.log(`turnos hasta la victoria   ${promedio(terminadas, r => r.turnos).toFixed(1)} promedio` +
   (terminadas.length ? ` (min ${Math.min(...terminadas.map(r => r.turnos))}, max ${Math.max(...terminadas.map(r => r.turnos))})` : ''));

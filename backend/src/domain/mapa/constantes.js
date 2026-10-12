@@ -350,6 +350,54 @@ export const RASGOS_CULTURALES = {
   }
 };
 
+// --- Razas -----------------------------------------------------------------
+// Cada jugador elige una al unirse y la conserva toda la partida. Son SOLO bonos
+// y penalizaciones: reusan los mismos efectos genericos que los rasgos y las
+// tecnologias (produccion porcentual, ataque/defensa plano de unidades, vision,
+// defensa de ciudad), asi que agregar una raza es tocar solo esta tabla.
+//
+// Cada una gana algo y paga algo, para que ninguna sea "la correcta":
+//   produccionPorcentual  fraccion por recurso, puede ser NEGATIVA (-0.25 = -25%)
+//   bonoAtaqueUnidades    suma plana al ataque de todas las unidades
+//   bonoDefensaUnidades   suma plana a la defensa de las unidades (no de ciudades)
+//   visionExtra           casillas extra al descubrir terreno
+//   bonoDefensaCiudad     multiplicador extra de defensa de ciudad (0.25 = +25%)
+//
+// Un jugador SIN raza (partidas guardadas antes de que existieran) no tiene
+// ningun bono ni penalizacion: se comporta exactamente como siempre.
+export const RAZAS = {
+  humanos: {
+    nombre: 'Humanos',
+    icono: '👑',
+    descripcion: 'Mercaderes y sabios: más oro y ciencia, pero tropas menos curtidas.',
+    produccionPorcentual: { gold: 0.1, science: 0.1 },
+    bonoDefensaUnidades: -1
+  },
+  orcos: {
+    nombre: 'Orcos',
+    icono: '🪓',
+    descripcion: 'Una horda guerrera: golpean más fuerte y saquean madera, pero descuidan el saber.',
+    bonoAtaqueUnidades: 2,
+    produccionPorcentual: { wood: 0.15, science: -0.25, culture: -0.25 }
+  },
+  elfos: {
+    nombre: 'Elfos',
+    icono: '🏹',
+    descripcion: 'Pueblo del bosque: ven más lejos y cultivan mejor, pero pelean peor.',
+    visionExtra: 1,
+    bonoAtaqueUnidades: -1,
+    produccionPorcentual: { food: 0.25, culture: 0.15 }
+  },
+  enanos: {
+    nombre: 'Enanos',
+    icono: '⛏️',
+    descripcion: 'Gente de la montaña: ciudades y tropas muy duras y mucha piedra, pero poca comida.',
+    bonoDefensaCiudad: 0.25,
+    bonoDefensaUnidades: 1,
+    produccionPorcentual: { stone: 0.25, food: -0.1 }
+  }
+};
+
 // --- Tecnologias -----------------------------------------------------------
 // La ciencia tenia el mismo problema que tenia la cultura antes de los
 // rasgos: se producia (biblioteca, +3/turno) y no se gastaba en NADA. Mismo

@@ -10,6 +10,9 @@ import { botinDe, saqueadaHasta } from './saqueo.js';
 import { validarTurno, evento, radio1 } from './comun.js';
 import { bonoDefensaPorRasgos } from './cultura.js';
 import { bonoAtaquePorTecnologias, bonoDefensaUnidadPorTecnologias } from './tecnologia.js';
+import {
+  bonoAtaquePorRaza, bonoDefensaUnidadPorRaza, multiplicadorDefensaCiudadPorRaza
+} from './razas.js';
 
 // La defensa PLANA de una ciudad: su nivel, mas el cuartel, menos lo que le quitan los
 // problemas sociales activos de su dueño (inseguridad, infraestructura). Nunca baja de 1.
@@ -67,15 +70,26 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   // multiplicadores: se suman antes de aplicar los multiplicadores de
   // terreno/ciudad, que siguen siendo exclusivos de la defensa.
   const propio = estado.jugadores.find(j => j.id === jugadorId);
-  const ataqueBase = atacante.ataque + bonoAtaquePorTecnologias(propio);
+  // La raza suma lo suyo al mismo bono plano (puede ser negativo).
+  const ataqueBase = atacante.ataque + bonoAtaquePorTecnologias(propio) + bonoAtaquePorRaza(propio);
 
   // El rasgo cultural del arte solo cuenta si se defiende una ciudad, y es la
   // del DUEÑO de esa casilla, no la del atacante. Fortificacion, al reves,
   // solo cuenta si se defiende con un EJERCITO: una ciudad no es "una
   // unidad", asi que su formula de defensa (defensaCiudad(nivel)) no la usa.
   const defensor = estado.jugadores.find(j => j.id === tileHasta.dueno);
-  const bonoCiudad = ciudadPropia ? BONO_DEFENSA_CIUDAD * bonoDefensaPorRasgos(defensor) : 1;
-  const defensaBase = base + (ejercitoEnemigo ? bonoDefensaUnidadPorTecnologias(defensor) : 0);
+  const bonoCiudad = ciudadPropia
+    ? BONO_DEFENSA_CIUDAD * bonoDefensaPorRasgos(defensor) * multiplicadorDefensaCiudadPorRaza(defensor)
+    : 1;
+  // Los bonos de UNIDAD son de quien manda el ejercito, no de quien es dueno de
+  // la casilla: un ejercito que defiende en tierra libre o ajena (el dueno de la
+  // casilla es otro, o nadie) igual pelea con su fortificacion y su raza.
+  const duenoDelEjercito = ejercitoEnemigo
+    ? estado.jugadores.find(j => j.id === ejercitoEnemigo.dueno)
+    : null;
+  const defensaBase = base + (ejercitoEnemigo
+    ? bonoDefensaUnidadPorTecnologias(duenoDelEjercito) + bonoDefensaUnidadPorRaza(duenoDelEjercito)
+    : 0);
 
   const poderAtaque = ataqueBase * tirada(rng);
   const poderDefensa = defensaBase * tirada(rng) * bonoDefensa(tileHasta.terreno) * bonoCiudad;

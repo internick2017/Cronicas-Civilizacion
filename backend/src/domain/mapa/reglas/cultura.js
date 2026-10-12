@@ -3,6 +3,7 @@ import { RASGOS_CULTURALES } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento } from './comun.js';
 import { exigirCivil } from './modo.js';
+import { visionExtraPorRaza } from './razas.js';
 
 // Los rasgos son de la CIVILIZACION, no de una ciudad: se adoptan una vez y
 // valen para todo lo que tengas y para todo lo que fundes despues.
@@ -47,9 +48,10 @@ export function produccionPorRasgos(jugador) {
   return total;
 }
 
-// Radio de descubrimiento: 1 casilla alrededor, mas lo que aporte el idioma.
+// Radio de descubrimiento: 1 casilla alrededor, mas lo que aporte el idioma y
+// la raza.
 export function radioVision(jugador) {
-  return 1 + rasgosDe(jugador).reduce(
+  return 1 + visionExtraPorRaza(jugador) + rasgosDe(jugador).reduce(
     (extra, rasgo) => extra + (RASGOS_CULTURALES[rasgo]?.visionExtra ?? 0), 0);
 }
 
