@@ -10,6 +10,8 @@ import { puedeJugar } from './turno.js'
 import { textoCosto } from './recursos.js'
 import MapAlianzas from './MapAlianzas.vue'
 import { amigosDe, propuestasPara } from './alianzas.js'
+import { deQuienEs } from './casilla.js'
+import { colorCssDeJugador } from '../../mapa/sprites.js'
 import MapRoundLog from './MapRoundLog.vue'
 import MapVictory from './MapVictory.vue'
 import MapDialogo from './MapDialogo.vue'
@@ -344,9 +346,14 @@ const esEnemigo = (tile) =>
   Boolean(tile.ejercito && !amigos.value.has(tile.ejercito.dueno)) ||
   Boolean(tile.ciudad && !amigos.value.has(tile.dueno))
 
+// De quien es lo ultimo ajeno que se toco (se muestra debajo del mapa). Tocar
+// cualquier otra cosa lo borra.
+const casillaAjena = ref(null)
+
 const onClickTile = (posicion) => {
   const tile = tileEn(posicion.x, posicion.y)
   if (!tile) return
+  casillaAjena.value = deQuienEs(vista.value, jugadorId, tile, constantes.value)
 
   // 1. Con un ejercito seleccionado, un click en casilla alcanzable es una orden.
   if (seleccion.value) {
@@ -676,6 +683,11 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <p v-if="casillaAjena" :class="['casilla-ajena', casillaAjena.relacion]">
+      <span class="color-bando" :style="{ background: colorCssDeJugador(vista.jugadores, casillaAjena.duenoId) }"></span>
+      {{ casillaAjena.texto }}
+    </p>
+
     <MapActionBar :vista="vista" :jugador-id="jugadorId" @terminar-turno="onTerminarTurno" />
 
     <MapVictory
@@ -886,6 +898,28 @@ onUnmounted(() => {
 .btn-salir:hover { background: rgba(231, 76, 60, 0.35); }
 
 .salida-aviso { margin: 0; line-height: 1.45; }
+
+/* De quien es la casilla ajena que se toco. */
+.casilla-ajena {
+  margin: 0.5rem 0 0;
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  border-left: 4px solid #e74c3c;
+  color: #ecf0f1;
+  font-size: 0.9rem;
+}
+.casilla-ajena.aliado { border-left-color: #2ecc71; }
+.casilla-ajena.tregua { border-left-color: #f1c40f; }
+.casilla-ajena .color-bando {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  margin-right: 0.35rem;
+  vertical-align: -0.1em;
+}
 .campo-maquina { display: flex; flex-direction: column; gap: 0.3rem; }
 .campo-maquina select {
   background: #34495e; color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.2);

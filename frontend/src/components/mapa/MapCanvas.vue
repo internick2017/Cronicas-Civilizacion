@@ -271,14 +271,18 @@ function dibujarCosta() {
   capaCosta.addChild(g)
 }
 
-// Cartel sobre las tropas y ciudades de un aliado. Se ve solo desde la vista de
-// quien esta aliado con el: para el resto es un rival mas.
+// Cartel con el nombre del aliado sobre sus tropas y ciudades. Se ve solo desde
+// la vista de quien esta aliado con el: para el resto es un rival mas.
 const ESTILO_ALIADO = {
   fontFamily: 'Arial', fontSize: 10, fontWeight: 'bold', fill: 0xffffff,
   stroke: { color: 0x14532d, width: 3 }
 }
-function cartelAliado(tile) {
-  const texto = new Text({ text: '🤝 ALIADO', style: ESTILO_ALIADO })
+// Una casilla mide 48 px: un nombre largo se montaria sobre las de al lado.
+const LARGO_CARTEL = 10
+function cartelAliado(tile, duenoId) {
+  const nombre = props.vista.jugadores.find(j => j.id === duenoId)?.nombre ?? 'Aliado'
+  const corto = nombre.length > LARGO_CARTEL ? `${nombre.slice(0, LARGO_CARTEL - 1)}…` : nombre
+  const texto = new Text({ text: `🤝 ${corto}`, style: ESTILO_ALIADO })
   texto.anchor.set(0.5, 0)
   texto.x = (tile.x + 0.5) * TILE
   texto.y = tile.y * TILE - 2
@@ -299,8 +303,9 @@ function dibujarPiezas() {
   const carteles = []
   for (const tile of props.vista.mapa) {
     if (!tile.descubierto) continue
-    const deAliado = (tile.ciudad && aliados.has(tile.dueno)) || (tile.ejercito && aliados.has(tile.ejercito.dueno))
-    if (deAliado) carteles.push(cartelAliado(tile))
+    // La tropa manda sobre la ciudad: es la que puede estar de paso en tierra ajena.
+    const aliado = [tile.ejercito?.dueno, tile.ciudad ? tile.dueno : null].find(id => aliados.has(id))
+    if (aliado) carteles.push(cartelAliado(tile, aliado))
 
     if (tile.ciudad) {
       const sprite = new Sprite(Assets.get(SPRITE_CIUDAD))
