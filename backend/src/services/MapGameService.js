@@ -37,6 +37,7 @@ const nombreBot = (i) => (i === 0 ? NOMBRE_BOT : `${NOMBRE_BOT} ${i + 1}`);
 const CIVILIZACIONES_BOT = ['Autómatas', 'El Enjambre', 'La Colmena', 'Los Engranajes', 'Los Relojeros', 'La Forja'];
 const BOTS_MAXIMOS = CIVILIZACIONES_BOT.length;
 const JUGADORES_MAXIMOS = 8; // el tope de config.maxJugadores (ver MapGame.js)
+const LUGARES_PARA_PERSONAS = 4; // el maxJugadores por defecto (ver MapGame.js)
 
 // Cuantos bots lleva la partida. "Contra la maquina" siempre tiene al menos uno;
 // cualquier valor raro que llegue por HTTP cae al default en vez de romper.
@@ -216,8 +217,8 @@ export class MapGameService {
       Object.assign(cfg, { contraIA: true, dificultadIA: dificultad, cantidadBots, maxJugadores: 1 + cantidadBots });
     } else if (cantidadBots > 0) {
       // Humanos Y bots: los bots no le pueden sacar el lugar a la gente, asi que
-      // la partida se agranda hasta que entren al menos dos personas.
-      const lugares = Math.max(cfg.maxJugadores ?? 4, cantidadBots + 2);
+      // se suman ARRIBA de los lugares para personas (hasta el tope de la mesa).
+      const lugares = (cfg.maxJugadores ?? LUGARES_PARA_PERSONAS) + cantidadBots;
       Object.assign(cfg, { dificultadIA: dificultad, cantidadBots, maxJugadores: Math.min(JUGADORES_MAXIMOS, lugares) });
     }
     const estado = crearEstado({ nombre, semilla: semilla ?? codigo, config: cfg });

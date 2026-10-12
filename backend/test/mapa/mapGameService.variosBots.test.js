@@ -32,12 +32,25 @@ describe('varios bots junto con personas', () => {
     expect(bots(b.vista)).toHaveLength(2);
   });
 
-  it('con tres bots y el cupo por defecto igual entran dos personas', async () => {
+  it('las máquinas no ocupan los lugares de las personas: con tres o cuatro bots entran cuatro', async () => {
+    for (const cantidad of [3, 4]) {
+      const svc = crearServicio();
+      const { id } = await svc.crearPartida({ nombre: 'Familia', bots: cantidad });
+      let ultima;
+      for (const j of ['a', 'b', 'c', 'd']) ultima = await unir(svc, id, j);
+      expect(ultima.vista.jugadores.filter(x => !x.esBot)).toHaveLength(4);
+      expect(bots(ultima.vista)).toHaveLength(cantidad);
+      await expect(unir(svc, id, 'e')).rejects.toThrow(/llena/);
+    }
+  });
+
+  it('con el máximo de bots la mesa llega al tope y entran dos personas', async () => {
     const svc = crearServicio();
-    const { id } = await svc.crearPartida({ nombre: 'Familia', bots: 3 });
+    const { id } = await svc.crearPartida({ nombre: 'Familia', bots: 6 });
     await unir(svc, id, 'a');
     const b = await unir(svc, id, 'b');
-    expect(b.vista.jugadores).toHaveLength(5);
+    expect(b.vista.jugadores).toHaveLength(8);
+    await expect(unir(svc, id, 'c')).rejects.toThrow(/llena/);
   });
 
   it('turno simultáneo: los bots juegan cuando terminó el último humano', async () => {
