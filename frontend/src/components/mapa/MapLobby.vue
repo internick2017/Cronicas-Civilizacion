@@ -37,7 +37,15 @@ const islas = ref(false)
 // Apagado por defecto: sin ciencia ni cultura es otro juego, asi que se elige.
 const guerraPura = ref(false)
 
+// Por defecto todos juegan a la vez; "por turnos" queda para quien lo prefiera.
+const MODOS_TURNO = [
+  { valor: 'simultaneo', etiqueta: 'Todos a la vez' },
+  { valor: 'secuencial', etiqueta: 'De a uno' },
+]
+const modoTurno = ref('simultaneo')
+
 const configElegida = () => ({
+  modoTurno: modoTurno.value,
   porcentajeVictoria: porcentajeVictoria.value,
   tamanoMapa: tamanoMapa.value,
   limiteRondas: limiteRondas.value,
@@ -312,6 +320,16 @@ onMounted(() => {
         </label>
         <p class="ayuda-config">
           Al llegar al límite gana quien controle más territorio.
+        </p>
+        <label class="field">
+          Turnos
+          <select v-model="modoTurno">
+            <option v-for="m in MODOS_TURNO" :key="m.valor" :value="m.valor">{{ m.etiqueta }}</option>
+          </select>
+        </label>
+        <p class="ayuda-config">
+          Todos a la vez: cada uno mueve cuando quiere y la ronda termina cuando
+          todos tocaron "Terminar turno". De a uno: se juega por orden, como antes.
         </p>
         <label class="field field-check">
           <input v-model="islas" type="checkbox" />

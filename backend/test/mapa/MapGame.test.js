@@ -64,8 +64,9 @@ describe('validacion de config (anti-OOM)', () => {
     }
   });
 
-  it('modoTurno distinto de secuencial es rechazado (unico modo implementado)', () => {
-    expect(crear({ modoTurno: 'simultaneo' })).toThrow(ReglaError);
+  it('modoTurno acepta secuencial y simultaneo, y rechaza cualquier otro', () => {
+    expect(crear({ modoTurno: 'cualquiera' })).toThrow(ReglaError);
+    expect(crear({ modoTurno: 'simultaneo' })).not.toThrow();
     expect(crear({ modoTurno: 'secuencial' })).not.toThrow();
   });
 });

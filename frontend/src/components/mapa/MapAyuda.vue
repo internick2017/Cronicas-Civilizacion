@@ -118,6 +118,17 @@ const umbralAviso = computed(() =>
 
 <template>
   <div v-if="constantes" class="ayuda">
+    <section v-if="config?.modoTurno === 'simultaneo'">
+      <h4>Turnos: todos a la vez</h4>
+      <p>
+        En esta partida <strong>todos juegan la misma ronda al mismo tiempo</strong>: mové, construí y
+        atacá cuando quieras, sin esperar a nadie. Lo que hacés pasa en el momento, así que si dos
+        quieren la misma casilla se la queda el que llega primero. Cuando termines tocá
+        <strong>Terminar turno</strong>: ya no podés hacer nada más en esa ronda, y la ronda cierra
+        (se cobra la producción y las tropas recuperan su movimiento) recién cuando terminaron todos.
+        La máquina juega cuando terminó el último jugador.
+      </p>
+    </section>
     <section v-if="guerraPura">
       <h4>Guerra pura</h4>
       <p>

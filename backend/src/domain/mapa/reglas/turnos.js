@@ -1,7 +1,7 @@
 import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_VICTORIA_DOMINACION } from '../constantes.js';
 import { tileEn } from '../MapGame.js';
 import { recursoApagado } from './modo.js';
-import { validarTurno, evento } from './comun.js';
+import { validarTurno, evento, esSimultaneo, listosDe } from './comun.js';
 import { produccionPorRasgos } from './cultura.js';
 import { aplicarBonosPorcentuales } from './tecnologia.js';
 import { controlTerritorial } from './dominacion.js';
@@ -158,15 +158,37 @@ function aplicarRecuperacion(estado, ev) {
   }
 }
 
+const todosListos = (estado, listos) =>
+  estado.jugadores.every(j => !j.activo || listos.includes(j.id));
+
+// Turno simultaneo: si todos los que siguen en la partida ya terminaron y nadie
+// puede tocar "Terminar" (pasa cuando ABANDONA justo el unico que faltaba), la
+// ronda se cierra sola. Recibe el estado con el abandono ya aplicado.
+export function cerrarRondaSiTodosListos(estado, jugadorId) {
+  if (!esSimultaneo(estado) || estado.estado !== 'jugando') return [];
+  if (!estado.jugadores.some(j => j.activo) || !todosListos(estado, listosDe(estado))) return [];
+  return cerrarRonda(estado, jugadorId);
+}
+
 export function terminarTurno(estado, jugadorId) {
   validarTurno(estado, jugadorId);
+  return cerrarRonda(estado, jugadorId, { terminaJugador: true });
+}
 
+// `terminaJugador`: el jugador esta terminando SU turno (administra sus
+// subdivisiones y, en simultaneo, queda anotado como listo). En false solo se
+// cierra una ronda que ya tenia a todos listos.
+function cerrarRonda(estado, jugadorId, { terminaJugador = false } = {}) {
+  const simultaneo = esSimultaneo(estado);
   const eventos = [];
-  // El indice "tentativo" decide si la ronda cierra (secuencia normal, solo salteando
-  // jugadores ya inactivos). Las eliminaciones que ocurren EN este mismo cierre todavia
-  // no se aplicaron, asi que no pueden afectar esa decision.
-  const nuevoIndiceTentativo = siguienteIndiceActivo(estado);
-  const cierraRonda = nuevoIndiceTentativo === 0;
+  // Secuencial: el indice "tentativo" decide si la ronda cierra (secuencia normal, solo
+  // salteando jugadores ya inactivos). Las eliminaciones que ocurren EN este mismo cierre
+  // todavia no se aplicaron, asi que no pueden afectar esa decision.
+  // Simultaneo: no hay orden; la ronda cierra cuando termina el ultimo que faltaba.
+  const nuevoIndiceTentativo = simultaneo ? estado.indiceJugadorActual : siguienteIndiceActivo(estado);
+  const cierraRonda = simultaneo
+    ? todosListos(estado, terminaJugador ? [...listosDe(estado), jugadorId] : listosDe(estado))
+    : nuevoIndiceTentativo === 0;
   const turnoCierre = estado.turno;
   const nuevoTurno = cierraRonda ? estado.turno + 1 : estado.turno;
 
@@ -174,7 +196,7 @@ export function terminarTurno(estado, jugadorId) {
 
   // La administracion del Estado federal se calcula UNA vez, al principio: la usan los
   // eventos finales y tambien el calculo de los problemas del cierre de ronda.
-  const eventosAdmin = administrarSubdivisiones(estado, jugadorId);
+  const eventosAdmin = terminaJugador ? administrarSubdivisiones(estado, jugadorId) : [];
 
   if (cierraRonda) {
     const activos = estado.jugadores.filter(j => j.activo);
@@ -227,7 +249,7 @@ export function terminarTurno(estado, jugadorId) {
     // mismo cierre (p.ej. el jugador del indice 0). Si es asi, buscamos el proximo jugador
     // que siga activo DESPUES de aplicar las eliminaciones, para no dejar el turno en manos
     // de alguien inactivo (lo que dejaria la partida trabada: nadie podria volver a jugar).
-    if (eliminados.length > 0) {
+    if (eliminados.length > 0 && !simultaneo) {
       nuevoIndice = siguienteIndiceActivo(estado, new Set(eliminados));
     }
 
@@ -241,7 +263,12 @@ export function terminarTurno(estado, jugadorId) {
   // estado SIN estos edificios: rinden desde la ronda siguiente.
   eventos.unshift(...eventosAdmin);
 
-  eventos.unshift(evento('TurnoAvanzado', estado, jugadorId, { indiceJugadorActual: nuevoIndice, turno: nuevoTurno }));
+  // En simultaneo el turno solo avanza al cerrar la ronda: mientras falte alguien,
+  // terminar es nada mas que quedar anotado como listo.
+  if (!simultaneo || cierraRonda) {
+    eventos.unshift(evento('TurnoAvanzado', estado, jugadorId, { indiceJugadorActual: nuevoIndice, turno: nuevoTurno }));
+  }
+  if (simultaneo && terminaJugador) eventos.unshift(evento('JugadorListo', estado, jugadorId, {}));
 
   return eventos;
 }

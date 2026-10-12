@@ -18,6 +18,7 @@ import { embarcar, desembarcar } from '../domain/mapa/reglas/transporte.js';
 import { atacar } from '../domain/mapa/reglas/combate.js';
 import { terminarTurno } from '../domain/mapa/reglas/turnos.js';
 import { vistaJugador } from '../domain/mapa/reglas/visibilidad.js';
+import { esSimultaneo, listosDe } from '../domain/mapa/reglas/comun.js';
 import logger from '../utils/logger.js';
 
 // Sin caracteres ambiguos necesarios: codigo corto, solo mayusculas y digitos.
@@ -201,6 +202,7 @@ export class MapGameService {
    * llegar, porque nadie controla al bot desde afuera.
    */
   _resolverTurnosIA(estado) {
+    if (esSimultaneo(estado)) return this._resolverRondaSimultaneaIA(estado);
     const eventos = [];
     for (let vuelta = 0; vuelta < VUELTAS_IA_MAXIMAS; vuelta++) {
       if (estado.estado !== 'jugando') break;
@@ -214,6 +216,30 @@ export class MapGameService {
       eventos.push(...jugarTurnoIA(estado, actual.id, rng));
     }
     return eventos;
+  }
+
+  /**
+   * Turno simultaneo: los bots juegan recien cuando TODOS los humanos
+   * terminaron la ronda (el ultimo bot en terminar la cierra, por la misma
+   * regla que un humano). Mientras falte un humano no se toca nada.
+   */
+  _resolverRondaSimultaneaIA(estado) {
+    const eventos = [];
+    for (let vuelta = 0; vuelta < VUELTAS_IA_MAXIMAS; vuelta++) {
+      if (estado.estado !== 'jugando') break;
+      const pendientes = estado.jugadores.filter(j => j.activo && !listosDe(estado).includes(j.id));
+      if (pendientes.length === 0 || pendientes.some(j => !j.esBot)) break;
+      for (const bot of pendientes) {
+        if (estado.estado !== 'jugando') break;
+        eventos.push(...this._jugarPorLaMaquina(estado, bot.id, vuelta));
+      }
+    }
+    return eventos;
+  }
+
+  _jugarPorLaMaquina(estado, jugadorId, vuelta = 0) {
+    const rng = crearRng(`ia:${estado.semilla}:${estado.turno}:${jugadorId}:${vuelta}`);
+    return jugarTurnoIA(estado, jugadorId, rng);
   }
 
   async unirse(idOCodigo, jugador) {
@@ -327,6 +353,14 @@ export class MapGameService {
     // Si la regla tiro ReglaError, nunca llegamos aca: nada se aplico ni se persistio,
     // y el clon descartado no dejo rastro (el cache sigue apuntando al `original`).
     aplicar(estado, eventos);
+    // Turno simultaneo: no hay "cuando le toque" para quien perdio el poder, asi
+    // que su pasar es jugar AHORA: la maquina hace su turno y lo deja listo.
+    if (actor && !estaEnPoder(actor) && accion.tipo === 'terminarTurno' && esSimultaneo(estado)) {
+      if (listosDe(estado).includes(jugadorId)) {
+        throw new ReglaError('YA_TERMINASTE', 'Ya terminaste tu turno: esperá a que terminen los demás');
+      }
+      eventos.push(...this._jugarPorLaMaquina(estado, jugadorId));
+    }
     // Si esta accion humana deja el turno en manos de un bot (terminarTurno,
     // o abandonar si le tocaba a el), se resuelve aca mismo, ANTES de
     // persistir: asi el propio jugador que actuo ya ve, en la respuesta de

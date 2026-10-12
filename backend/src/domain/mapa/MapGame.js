@@ -44,7 +44,7 @@ const LIMITES_CONFIG = {
   limiteRondas: { min: 10, max: 500 },
   rondasEntreElecciones: { min: 2, max: 50 },
 };
-const MODOS_TURNO = ['secuencial']; // unico modo implementado
+const MODOS_TURNO = ['secuencial', 'simultaneo'];
 
 function validarEntero(cfg, clave) {
   const { min, max } = LIMITES_CONFIG[clave];

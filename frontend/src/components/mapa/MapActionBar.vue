@@ -1,6 +1,7 @@
 <!-- frontend/src/components/mapa/MapActionBar.vue -->
 <script setup>
 import { computed } from 'vue'
+import { esSimultaneo, puedeJugar, yaTermino, faltanTerminar } from './turno.js'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -8,8 +9,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['terminar-turno'])
 
-const esMiTurno = computed(() =>
-  props.vista.jugadores[props.vista.indiceJugadorActual]?.id === props.jugadorId
+const esMiTurno = computed(() => puedeJugar(props.vista, props.jugadorId))
+const simultaneo = computed(() => esSimultaneo(props.vista))
+const termine = computed(() => simultaneo.value && yaTermino(props.vista, props.jugadorId))
+// Mientras espero, a quien: sin esto la ronda parece colgada.
+const esperandoA = computed(() =>
+  termine.value ? faltanTerminar(props.vista).map(j => j.nombre).join(', ') : ''
 )
 
 // Quien perdio el poder no juega sus turnos: los juega la maquina. El boton se
@@ -18,8 +23,10 @@ const esMiTurno = computed(() =>
 const sinPoder = computed(() =>
   props.vista.jugadores.find(j => j.id === props.jugadorId)?.enPoder === false
 )
-const habilitado = computed(() => sinPoder.value || esMiTurno.value)
+// En simultaneo "Esperar" tambien se toca UNA vez por ronda: es lo que te anota como listo.
+const habilitado = computed(() => (sinPoder.value && !simultaneo.value) || esMiTurno.value)
 const texto = computed(() => {
+  if (termine.value) return 'Esperando a los demás…'
   if (sinPoder.value) return 'Esperar (la máquina juega por vos)'
   return esMiTurno.value ? 'Terminar turno' : 'No es tu turno'
 })
@@ -30,6 +37,7 @@ const texto = computed(() => {
     <button class="btn-primary" :disabled="!habilitado" @click="emit('terminar-turno')">
       {{ texto }}
     </button>
+    <span v-if="esperandoA" class="esperando">Falta que termine: {{ esperandoA }}</span>
   </div>
 </template>
 
@@ -48,6 +56,12 @@ const texto = computed(() => {
   padding: 0.6rem 1.2rem;
   cursor: pointer;
   font-weight: bold;
+}
+
+.esperando {
+  align-self: center;
+  color: #f1c40f;
+  font-size: 0.9rem;
 }
 
 .btn-primary:disabled {

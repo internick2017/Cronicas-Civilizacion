@@ -96,6 +96,9 @@ export function vistaJugador(estado, jugadorId) {
     versionEsquema: estado.versionEsquema,
     turno: estado.turno,
     indiceJugadorActual: estado.indiceJugadorActual,
+    // Turno simultaneo: quienes ya terminaron esta ronda. Es publico, igual que
+    // de quien es el turno en una partida secuencial.
+    listos: [...(estado.listos ?? [])],
     config: structuredClone(estado.config),
     // Que existe en este modo (tecnologias, rasgos, mejoras, recursos): la interfaz pregunta por esto, no por el nombre del modo.
     reglas: reglasDelModo(estado),

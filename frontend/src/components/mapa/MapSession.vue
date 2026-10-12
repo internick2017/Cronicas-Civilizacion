@@ -6,6 +6,7 @@ import { useMapSocket } from '../../composables/useMapSocket.js'
 import MapCanvas from './MapCanvas.vue'
 import MapPlayerPanel from './MapPlayerPanel.vue'
 import MapActionBar from './MapActionBar.vue'
+import { puedeJugar } from './turno.js'
 import MapRoundLog from './MapRoundLog.vue'
 import MapVictory from './MapVictory.vue'
 import MapDialogo from './MapDialogo.vue'
@@ -115,9 +116,7 @@ const ataqueAbierto = ref(null)    // {desde, hasta} | null
 
 const tileEn = (x, y) => vista.value.mapa[y * vista.value.config.tamanoMapa + x]
 
-const esMiTurno = computed(() =>
-  vista.value.jugadores[vista.value.indiceJugadorActual]?.id === jugadorId
-)
+const esMiTurno = computed(() => puedeJugar(vista.value, jugadorId))
 
 // El backend no guarda un campo "anfitrion": lo unico estable es que
 // `unirse` va empujando jugadores al arreglo en el orden en que entran

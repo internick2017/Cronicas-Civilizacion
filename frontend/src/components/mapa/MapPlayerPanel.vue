@@ -1,6 +1,7 @@
 <!-- frontend/src/components/mapa/MapPlayerPanel.vue -->
 <script setup>
 import { computed } from 'vue'
+import { esSimultaneo, puedeJugar, yaTermino } from './turno.js'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -10,7 +11,11 @@ const props = defineProps({
   constantes: { type: Object, default: null }
 })
 
+const simultaneo = computed(() => esSimultaneo(props.vista))
 const jugadorActual = computed(() => props.vista.jugadores[props.vista.indiceJugadorActual])
+// A quien se resalta en la lista: en secuencial, al que le toca; en simultaneo, a todo el que sigue jugando.
+const estaJugando = (j) => puedeJugar(props.vista, j.id)
+const termino = (j) => simultaneo.value && j.activo && yaTermino(props.vista, j.id)
 const yo = computed(() => props.vista.jugadores.find(j => j.id === props.jugadorId))
 
 // Solo para la etiqueta al lado del bot: los datos de balance de cada
@@ -86,8 +91,14 @@ const RECURSOS_ICONOS = {
   <div class="player-panel">
     <div class="turno-actual">
       Turno {{ vista.turno }}<span v-if="limiteRondas" class="limite"> / {{ limiteRondas }}</span>
-      — <strong>{{ jugadorActual?.nombre }}</strong>
-      <span v-if="jugadorActual?.id === jugadorId" class="tu-turno">(tu turno)</span>
+      <template v-if="simultaneo">
+        — <strong>juegan todos</strong>
+        <span v-if="puedeJugar(vista, jugadorId)" class="tu-turno">(te falta terminar)</span>
+      </template>
+      <template v-else>
+        — <strong>{{ jugadorActual?.nombre }}</strong>
+        <span v-if="jugadorActual?.id === jugadorId" class="tu-turno">(tu turno)</span>
+      </template>
     </div>
 
     <div v-if="yo?.recursos" class="recursos">
@@ -124,12 +135,13 @@ const RECURSOS_ICONOS = {
     </div>
 
     <ul class="jugadores-lista">
-      <li v-for="j in vista.jugadores" :key="j.id" :class="{ activo: j.id === jugadorActual?.id }">
+      <li v-for="j in vista.jugadores" :key="j.id" :class="{ activo: estaJugando(j) }">
         <span v-if="j.esBot" title="Jugador controlado por la máquina">🤖</span>
         {{ j.nombre }} ({{ j.civilizacion }})
         <span v-if="razaDe(j)" class="raza-badge" :title="razaDe(j).descripcion">{{ razaDe(j).icono }} {{ razaDe(j).nombre }}</span>
         <small v-if="j.esBot" class="dificultad-badge">{{ NOMBRE_DIFICULTAD[j.dificultadIA] || j.dificultadIA }}</small>
         <span v-if="!j.activo">— eliminado</span>
+        <span v-else-if="termino(j)" class="listo" title="Ya terminó su turno">✔ terminó</span>
       </li>
     </ul>
   </div>
@@ -222,6 +234,11 @@ const RECURSOS_ICONOS = {
   margin-left: 0.25rem;
   font-size: 0.8em;
   opacity: 0.85;
+}
+
+.jugadores-lista .listo {
+  color: #2ecc71;
+  margin-left: 0.25rem;
 }
 
 .jugadores-lista .activo {

@@ -351,7 +351,13 @@ export function aplicar(estado, eventos) {
         estado.turno = datos.turno;
         break;
 
+      case 'JugadorListo':
+        estado.listos = [...(estado.listos ?? []), jugadorId];
+        break;
+
       case 'RondaCompletada':
+        // Ronda nueva: en turno simultaneo todos vuelven a poder jugar.
+        if (estado.listos) estado.listos = [];
         for (const t of estado.mapa) {
           if (!t.ejercito) continue;
           t.ejercito.movimientoRestante = UNIDADES[t.ejercito.tipo].movimiento + (t.ejercito.bonoMovimiento ?? 0);

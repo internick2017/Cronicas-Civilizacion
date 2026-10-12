@@ -1,7 +1,8 @@
 import { jugadorPorId } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
-import { evento } from './comun.js';
-import { siguienteIndiceActivo, evaluarVictoria } from './turnos.js';
+import { evento, esSimultaneo } from './comun.js';
+import { aplicar } from '../aplicar.js';
+import { siguienteIndiceActivo, evaluarVictoria, cerrarRondaSiTodosListos } from './turnos.js';
 
 /**
  * Abandonar la partida.
@@ -29,7 +30,7 @@ export function abandonar(estado, jugadorId) {
 
   // Si se va justo cuando le tocaba, hay que pasarle el turno a otro o la
   // partida queda trabada con el turno en manos de alguien que ya no juega.
-  if (eraSuTurno && activosRestantes.length > 0) {
+  if (eraSuTurno && activosRestantes.length > 0 && !esSimultaneo(estado)) {
     eventos.push(evento('TurnoAvanzado', estado, jugadorId, {
       indiceJugadorActual: siguienteIndiceActivo(estado, new Set([jugadorId])),
       turno: estado.turno,
@@ -38,6 +39,14 @@ export function abandonar(estado, jugadorId) {
 
   const victoria = evaluarVictoria(estado, jugadorId, activosRestantes, estado.turno);
   if (victoria) eventos.push(victoria);
+
+  // Turno simultaneo: si el que se va era el unico que faltaba terminar, los
+  // demas ya no pueden tocar nada y la ronda tiene que cerrarse aca mismo.
+  if (esSimultaneo(estado)) {
+    const despues = structuredClone(estado);
+    aplicar(despues, eventos);
+    eventos.push(...cerrarRondaSiTodosListos(despues, jugadorId));
+  }
 
   return eventos;
 }

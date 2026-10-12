@@ -1,8 +1,22 @@
 import { ReglaError } from '../errores.js';
 import { tileEn } from '../MapGame.js';
 
+// Turno simultaneo: todos juegan la misma ronda a la vez y la ronda cierra
+// cuando todos terminaron. `estado.listos` guarda quienes ya terminaron ESTA
+// ronda; una partida secuencial (o guardada antes de que existiera) no lo trae.
+export const esSimultaneo = (estado) => estado.config.modoTurno === 'simultaneo';
+export const listosDe = (estado) => estado.listos ?? [];
+
 export function validarTurno(estado, jugadorId) {
   if (estado.estado !== 'jugando') throw new ReglaError('PARTIDA_NO_ACTIVA', 'La partida no está activa');
+  if (esSimultaneo(estado)) {
+    const jugador = estado.jugadores.find(j => j.id === jugadorId);
+    if (!jugador?.activo) throw new ReglaError('JUGADOR_INACTIVO', 'Ya no estás en la partida');
+    if (listosDe(estado).includes(jugadorId)) {
+      throw new ReglaError('YA_TERMINASTE', 'Ya terminaste tu turno: esperá a que terminen los demás');
+    }
+    return;
+  }
   const actual = estado.jugadores[estado.indiceJugadorActual];
   if (!actual || actual.id !== jugadorId) throw new ReglaError('NO_ES_TU_TURNO', 'No es tu turno');
 }
