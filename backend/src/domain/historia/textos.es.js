@@ -90,6 +90,22 @@ export const TEXTOS_ES = {
       'Activo {objeto} aunque nadie me lo mandó',
       'Lanzo {objeto} hacia {otro}',
     ],
+    // Cuando la ultima narracion menciona un peligro o un hallazgo del genero, el companero se mete
+    // con eso (el hueco lleva la frase tal cual la dijo el narrador). Verbos que clasificarAccion reconoce.
+    reacciones: {
+      peligro: [
+        'Ataco primero, porque {peligro} y no pienso esperar',
+        'Grito a todos que {peligro} y que yo me encargo, aunque no tengo plan',
+        'Aprovecho que {peligro} para entrar por donde nadie se atreve',
+        'Corro hacia el lío justo cuando {peligro}',
+      ],
+      hallazgo: [
+        'Tomo {hallazgo} antes que nadie y no pienso soltarlo',
+        'Empujo a quien se acerque a {hallazgo}',
+        'Exploro {hallazgo} por mi cuenta, sin avisar a nadie',
+        'Abro {hallazgo} aunque nadie me dio permiso',
+      ],
+    },
   },
   union: ' y ',
   generos: {

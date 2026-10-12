@@ -87,6 +87,20 @@ export const TEXTOS_PT = {
       'Ativo {objeto} mesmo sem ninguém mandar',
       'Lanço {objeto} em direção a {otro}',
     ],
+    reacciones: {
+      peligro: [
+        'Ataco primeiro, porque {peligro} e não vou esperar',
+        'Grito a todos que {peligro} e que eu resolvo, embora não tenha plano',
+        'Aproveito que {peligro} para entrar por onde ninguém se atreve',
+        'Corro para a confusão bem quando {peligro}',
+      ],
+      hallazgo: [
+        'Tomo {hallazgo} antes de todos e não pretendo soltar',
+        'Empurro quem chegar perto de {hallazgo}',
+        'Exploro {hallazgo} por conta própria, sem avisar ninguém',
+        'Abro {hallazgo} mesmo sem ninguém me dar permissão',
+      ],
+    },
   },
   union: ' e ',
   generos: {

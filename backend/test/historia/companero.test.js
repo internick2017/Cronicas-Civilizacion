@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { accionDelCompanero, nombreDelCompanero } from '../../src/domain/historia/companero.js';
 import { clasificarAccion } from '../../src/domain/historia/clasificarAccion.js';
+import { textosDe } from '../../src/domain/historia/textos.js';
 
 const GENEROS = ['fantasy', 'historical', 'sci-fi', 'mystery', 'sports-sim'];
 const base = { idioma: 'es', genero: 'fantasy', ronda: 1, otros: ['Ana', 'Beto'], semilla: 's1' };
@@ -55,6 +56,72 @@ describe('accionDelCompanero', () => {
     const es = accionDelCompanero({ ...base, ronda: 3 });
     const pt = accionDelCompanero({ ...base, idioma: 'pt', ronda: 3 });
     expect(pt).not.toBe(es);
+  });
+});
+
+describe('accionDelCompanero: reacciona a lo narrado', () => {
+  const vocab = {
+    peligro: 'un rugido sacude las montañas',
+    hallazgo: 'una runa antigua que late con luz tenue',
+  };
+  const narracionCon = (...frases) => `Ana avanza. ${frases.join('. ')}. ¿Qué harán ahora?`;
+
+  it('si la narración trae un peligro, la acción lo nombra', () => {
+    const texto = accionDelCompanero({ ...base, narracion: narracionCon(`De pronto, ${vocab.peligro}`) });
+    expect(texto.toLowerCase()).toContain(vocab.peligro);
+  });
+
+  it('si trae un hallazgo, la acción lo nombra; y gana al peligro cuando están los dos', () => {
+    const solo = accionDelCompanero({ ...base, narracion: narracionCon(`ante todos aparece ${vocab.hallazgo}`) });
+    expect(solo.toLowerCase()).toContain(vocab.hallazgo);
+    const ambos = accionDelCompanero({ ...base, narracion: narracionCon(vocab.hallazgo, `De pronto, ${vocab.peligro}`) });
+    expect(ambos.toLowerCase()).toContain(vocab.hallazgo);
+    expect(ambos.toLowerCase()).not.toContain(vocab.peligro);
+  });
+
+  it('no vuelve sobre lo que ya tocó en su acción anterior: pasa al otro elemento, o a la acción de siempre', () => {
+    const narracion = narracionCon(vocab.hallazgo, `De pronto, ${vocab.peligro}`);
+    const primera = accionDelCompanero({ ...base, narracion });
+    expect(primera.toLowerCase()).toContain(vocab.hallazgo);
+    const segunda = accionDelCompanero({ ...base, ronda: 2, narracion, anterior: primera });
+    expect(segunda.toLowerCase()).toContain(vocab.peligro);
+    const tercera = accionDelCompanero({ ...base, ronda: 3, narracion, anterior: segunda + ' ' + primera });
+    expect(tercera.toLowerCase()).not.toContain(vocab.hallazgo);
+    expect(tercera.toLowerCase()).not.toContain(vocab.peligro);
+  });
+
+  it('sin nada que reconocer en la narración, vuelve a la acción de siempre', () => {
+    const sin = accionDelCompanero(base);
+    expect(accionDelCompanero({ ...base, narracion: 'Un día tranquilo, sin sobresaltos.' })).toBe(sin);
+    expect(accionDelCompanero({ ...base, narracion: '' })).toBe(sin);
+  });
+
+  it('también reacciona en portugués, con el vocabulario de cada género', () => {
+    const pt = accionDelCompanero({ ...base, idioma: 'pt', narracion: narracionCon('De repente, um rugido sacode as montanhas') });
+    expect(pt.toLowerCase()).toContain('um rugido sacode as montanhas');
+    const misterio = accionDelCompanero({ ...base, genero: 'mystery', narracion: narracionCon('una luz se apaga y deja la sala a oscuras') });
+    expect(misterio.toLowerCase()).toContain('una luz se apaga y deja la sala a oscuras');
+  });
+
+  it('la reacción es siempre una acción que el narrador reconoce, sin huecos, y no repite en rondas seguidas', () => {
+    for (const idioma of ['es', 'pt']) {
+      for (const genero of GENEROS) {
+        const vocabulario = textosDe(idioma).generos[genero];
+        for (const clave of ['peligro', 'hallazgo']) {
+          for (const frase of vocabulario[clave]) {
+            let anterior = '';
+            for (let ronda = 1; ronda <= 8; ronda++) {
+              const texto = accionDelCompanero({ ...base, idioma, genero, ronda, narracion: `Pasa algo: ${frase}.` });
+              expect(clasificarAccion(texto), `${idioma} ${genero} ${clave}: ${texto}`).not.toBe('otro');
+              expect(texto).not.toMatch(/[{}]|undefined/);
+              expect(texto.length).toBeLessThan(280);
+              expect(texto).not.toBe(anterior);
+              anterior = texto;
+            }
+          }
+        }
+      }
+    }
   });
 });
 

@@ -8,6 +8,14 @@ import { generateRoomCode } from '../utils/roomCode.js';
 import { apertura, narrarRonda, epilogo } from '../domain/historia/narradorHistoria.js';
 import { accionDelCompanero, nombreDelCompanero } from '../domain/historia/companero.js';
 
+// Texto de la ultima narracion del narrador (la apertura cuenta), o '' si todavia no hubo ninguna.
+const ultimaNarracion = (session) =>
+  [...session.storyHistory].reverse().find(e => e.type === 'ai_narrative')?.narrative ?? '';
+
+// Lo ultimo que escribio ese jugador, o '' si todavia no jugo.
+const ultimaAccionDe = (session, jugadorId) =>
+  [...session.storyHistory].reverse().find(e => e.type === 'player_action' && e.playerId === jugadorId)?.action ?? '';
+
 export class NarrativeService {
   constructor(options = {}) {
     this.sessions = new Map(); // Keep memory cache for performance - cleared for fresh start
@@ -801,6 +809,8 @@ export class NarrativeService {
         ronda: session.turnNumber,
         otros: session.players.filter(p => p.id !== companero.id).map(p => p.characterName),
         semilla: session.id,
+        narracion: ultimaNarracion(session),
+        anterior: ultimaAccionDe(session, companero.id),
       });
       const r = await this.registrarAccion(session.id, companero.id, accion);
       final = {

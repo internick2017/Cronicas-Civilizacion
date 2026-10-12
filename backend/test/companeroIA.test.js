@@ -45,6 +45,23 @@ describe('el compañero automático: alta', () => {
   });
 });
 
+describe('el compañero automático: reacciona a lo narrado', () => {
+  it('su acción se mete con el hallazgo o el peligro que dijo el narrador en la ronda anterior', async () => {
+    const { svc, session, jugadores, botDe } = await partida({ humanos: ['Ana'] });
+    await svc.startSession(session.id);
+    const r1 = await svc.submitAction(session.id, jugadores[0].id, 'Exploro la cueva');
+    await svc.submitAction(session.id, jugadores[0].id, 'Sigo explorando');
+    // El hallazgo va primero: si la narración trae los dos, el compañero se queda con el hallazgo.
+    const vocabulario = ['runa antigua que late', 'cofre de piedra grabado', 'sendero oculto que brilla',
+      'rugido sacude las montañas', 'sombra con alas cubre el cielo', 'encapuchados bloquea el camino'];
+    const narracionRonda1 = r1.narrative.toLowerCase();
+    const mencionado = vocabulario.find(f => narracionRonda1.includes(f));
+    expect(mencionado, 'la narración de la ronda 1 debería traer un peligro o hallazgo').toBeTruthy();
+    const accionRonda2 = accionesDe(session, botDe().id, 2)[0].action.toLowerCase();
+    expect(accionRonda2).toContain(mencionado);
+  });
+});
+
 describe('el compañero automático: por turnos', () => {
   it('juega justo después del humano y cierra la ronda: la respuesta ya trae la narración', async () => {
     const { svc, session, jugadores, botDe } = await partida({ humanos: ['Ana'] });

@@ -7,7 +7,7 @@ import { textosDe, vocabularioDe, rellenar, elegir } from './textos.js';
 // semilla se arma con la sesion y la ronda), asi se prueban y no cuestan nada.
 // No entiende el significado de las frases: las cita, deduce de que tipo de accion se trata
 // (clasificarAccion) y le agrega una consecuencia con el vocabulario del genero.
-const LARGO_MAXIMO_FRASE = 90;
+const LARGO_MAXIMO_FRASE = 140;
 const RONDAS_DE_CIERRE = 2;
 const MAXIMO_EN_EPILOGO = 6;
 
