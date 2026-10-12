@@ -30,7 +30,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 <template>
   <div v-if="abierto" class="dialogo-overlay" @click.self="$emit('cerrar')">
     <div class="dialogo">
-      <h3 v-if="titulo">{{ titulo }}</h3>
+      <!-- Pegada arriba: en un dialogo largo (el manual) el boton de abajo queda
+           a varias pantallas de distancia, y en un celular no hay tecla Escape. -->
+      <div class="cabecera">
+        <h3>{{ titulo }}</h3>
+        <button class="cerrar-x" aria-label="Cerrar" title="Cerrar" @click="$emit('cerrar')">✕</button>
+      </div>
       <slot />
       <button class="btn-secundario cerrar" @click="$emit('cerrar')">Cancelar</button>
     </div>
@@ -48,7 +53,19 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   min-width: 280px; max-width: 90vw; max-height: 85vh; overflow-y: auto;
   color: #ecf0f1; display: flex; flex-direction: column; gap: 0.5rem;
 }
-.dialogo h3 { margin: 0 0 0.5rem; }
+.cabecera {
+  position: sticky; top: -1.5rem; z-index: 1;
+  margin: -1.5rem -1.5rem 0; padding: 0.75rem 0.75rem 0.75rem 1.5rem;
+  background: #2c3e50; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+}
+.cabecera h3 { margin: 0; }
+.cerrar-x {
+  flex: none; width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1); color: #ecf0f1;
+  border: 1px solid rgba(255, 255, 255, 0.15); font-size: 1.1rem; cursor: pointer;
+}
+.cerrar-x:hover { background: rgba(255, 255, 255, 0.2); }
 .btn-secundario {
   background: rgba(255, 255, 255, 0.1); color: #ecf0f1;
   border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px;
