@@ -34,10 +34,11 @@ describe('la dificultad viaja con el jugador', () => {
 
 describe('facil vs dificil: se nota en las decisiones, no solo en un numero', () => {
   it('facil ataca aunque pierda claramente; dificil evita esa pelea', () => {
-    // Mismo escenario perdedor para las dos: catapulta propia (atq 25) contra
+    // Mismo escenario perdedor para las dos: guerrero propio (atq 10) contra
     // un lancero (def 15) parado en montaña Y en su propia ciudad: con los
     // bonos de terreno (1.25) y ciudad (1.5) el poder defensivo estimado
-    // (15 * 1.25 * 1.5 = 28.125) supera claramente el ataque de 25.
+    // (15 * 1.25 * 1.5 = 28.125) supera claramente el ataque, incluso con el
+    // margen relajado que la IA usa contra guarniciones (FACTOR_ASEDIO).
     const construirEscenario = (dificultadIA) => {
       const e = partidaCon('dificultad-1', dificultadIA);
       const capital = e.mapa.find((t) => t.ciudad && t.dueno === 'bot');
@@ -48,7 +49,7 @@ describe('facil vs dificil: se nota en las decisiones, no solo en un numero', ()
       objetivo.ejercito = { tipo: 'spearman', dueno: 'h1', salud: 90, movimientoRestante: 2 };
       aplicar(e, [{
         tipo: 'UnidadReclutada', turno: e.turno, jugadorId: 'bot',
-        datos: { x: capital.x, y: capital.y, tipo: 'catapult' },
+        datos: { x: capital.x, y: capital.y, tipo: 'warrior' },
       }]);
       return e;
     };

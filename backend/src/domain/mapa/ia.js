@@ -728,6 +728,9 @@ function masCercaSegun(candidatas, brujulaPreferida, brujulaRespaldo, rng) {
   return elegir(rng, candidatas);
 }
 
+// Cuanto se relaja el margen de ataque contra un soldado que defiende una ciudad.
+const FACTOR_ASEDIO = 0.6;
+
 function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
   const ejercitos = ejercitosDe(estado, jugadorId);
   // Yo y aquellos con los que estoy en paz: ni se los ataca ni se les quita tierra.
@@ -775,7 +778,13 @@ function decidirMilitar(estado, jugadorId, rng, perfil, brujulas) {
       const ataquePropio = UNIDADES[origen.ejercito.tipo].ataque;
       // margenAtaque=0 (facil) hace que esto siempre de verdadero: cualquier
       // poder defensivo es >= 0 * cualquier cosa, asi que ataca sin pensar.
-      const conviene = ataquePropio >= perfil.margenAtaque * poderDefensivoEstimado(estado, objetivo);
+      // Un soldado dentro de una ciudad es la llave de la ciudad (mientras viva, la ciudad
+      // no pierde vida ni se captura), asi que se le exige menos que a uno en campo
+      // abierto. Sin esto, una guarnicion fuerte (el bono de ciudad pesa 1.5) quedaba
+      // fuera del margen y la maquina nunca la atacaba. El combate es de dano mutuo: un
+      // golpe "malo" igual la desgasta, y la guarnicion no se cura sin cuartel.
+      const margen = perfil.margenAtaque * (objetivo.ciudad && objetivo.ejercito ? FACTOR_ASEDIO : 1);
+      const conviene = ataquePropio >= margen * poderDefensivoEstimado(estado, objetivo);
       if (conviene) {
         return { tipo: 'atacar', desde: { x: origen.x, y: origen.y }, hasta: { x: objetivo.x, y: objetivo.y } };
       }

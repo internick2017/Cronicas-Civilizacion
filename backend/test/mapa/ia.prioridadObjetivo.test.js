@@ -33,6 +33,10 @@ function cruz({ arriba, abajo, dificultadIA = 'dificil' } = {}) {
       t.ciudad = { nombre: 'R', nivel: 1, poblacion: 500, edificios: [] };
       t.ejercito = { tipo: 'warrior', dueno: 'riv', salud: 100, movimientoRestante: 0, bonoMovimiento: 0 };
     }
+    if (que === 'ciudadConLanza') {
+      t.ciudad = { nombre: 'R', nivel: 1, poblacion: 500, edificios: [] };
+      t.ejercito = { tipo: 'spearman', dueno: 'riv', salud: 90, movimientoRestante: 0, bonoMovimiento: 0 };
+    }
     if (que === 'ejercito') t.ejercito = { tipo: 'warrior', dueno: 'riv', salud: 100, movimientoRestante: 0, bonoMovimiento: 0 };
   };
   if (arriba) poner(1, 0, arriba);
@@ -73,5 +77,12 @@ describe('contra que ataca la IA cuando tiene varias opciones', () => {
     // Guerrero (ataque 10) contra ciudad nivel 1 (10 x 1.5 = 15): perdida segura.
     tileEn(e, 1, 1).ejercito = { tipo: 'warrior', dueno: 'bot', salud: 100, movimientoRestante: 2, bonoMovimiento: 0 };
     expect(atacoA(jugarTurnoIA(e, 'bot', crearRng('obj-5')))).toBe(null);
+  });
+
+  it('ataca a un soldado fuerte dentro de una ciudad (margen relajado para guarniciones)', () => {
+    // Caballeria (20) contra lancero (15) con el bono de ciudad (x1.5) = 22.5: fuera del
+    // margen de la dificil (1.15), pero dentro una vez relajado para guarniciones.
+    const e = cruz({ abajo: 'ciudadConLanza' });
+    expect(atacoA(jugarTurnoIA(e, 'bot', crearRng('obj-3')))).toBe('1,2');
   });
 });
