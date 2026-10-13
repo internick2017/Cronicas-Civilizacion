@@ -12,7 +12,9 @@ const emit = defineEmits(['investigar'])
 
 const ICONO = {
   metalurgia: '⚔️', fortificacion: '🛡️', irrigacion: '🌾',
-  mineria: '⛏️', formacionMilitar: '🏇', filosofia: '📜'
+  mineria: '⛏️', formacionMilitar: '🏇', filosofia: '📜',
+  carpinteria: '🪵', canteria: '🪨', escritura: '✍️', literatura: '📚',
+  acero: '🗡️', murallas: '🏰'
 }
 
 const ciencia = computed(() => props.recursos?.science ?? 0)
@@ -36,7 +38,7 @@ const disponibles = computed(() =>
   })
 )
 
-const NOMBRE_RECURSO = { food: 'comida', gold: 'oro', wood: 'madera', stone: 'piedra', culture: 'cultura' }
+const NOMBRE_RECURSO = { food: 'comida', gold: 'oro', wood: 'madera', stone: 'piedra', culture: 'cultura', science: 'ciencia' }
 
 const efecto = (tec) => {
   const partes = []

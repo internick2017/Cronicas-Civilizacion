@@ -442,6 +442,46 @@ export const TECNOLOGIAS = {
     costo: { science: 60 },
     descripcion: 'Desbloquea la universidad: la ciencia empieza a alimentarse sola.',
     desbloqueaEdificio: 'university'
+  },
+  // Las seis siguientes reusan los mismos efectos genericos (bonos planos a
+  // unidades y produccionPorcentual): agregar una tecnologia asi es tocar solo
+  // esta tabla y el icono en MapCiencia.vue. Los bonos de ataque y defensa se SUMAN
+  // con los de metalurgia y fortificacion, por eso cuestan casi el doble.
+  carpinteria: {
+    nombre: 'Carpintería',
+    costo: { science: 35 },
+    descripcion: '+20% de producción de madera en todas tus ciudades.',
+    produccionPorcentual: { wood: 0.2 }
+  },
+  canteria: {
+    nombre: 'Cantería',
+    costo: { science: 35 },
+    descripcion: '+20% de producción de piedra en todas tus ciudades.',
+    produccionPorcentual: { stone: 0.2 }
+  },
+  escritura: {
+    nombre: 'Escritura',
+    costo: { science: 50 },
+    descripcion: '+25% de producción de ciencia en todas tus ciudades.',
+    produccionPorcentual: { science: 0.25 }
+  },
+  literatura: {
+    nombre: 'Literatura',
+    costo: { science: 45 },
+    descripcion: '+25% de producción de cultura en todas tus ciudades.',
+    produccionPorcentual: { culture: 0.25 }
+  },
+  acero: {
+    nombre: 'Acero',
+    costo: { science: 80 },
+    descripcion: 'Armas de acero: +3 de ataque para todas tus unidades (se suma a Metalurgia).',
+    bonoAtaqueUnidades: 3
+  },
+  murallas: {
+    nombre: 'Murallas',
+    costo: { science: 80 },
+    descripcion: 'Defensas reforzadas: +3 de defensa para todas tus unidades (se suma a Fortificación).',
+    bonoDefensaUnidades: 3
   }
 };
 
