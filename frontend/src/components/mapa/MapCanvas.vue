@@ -291,7 +291,7 @@ function cartelAliado(tile, duenoId) {
 
 // Barra de vida de una ciudad con el numero adentro ("70/100"). Va arriba de la
 // casilla porque la de la tropa va abajo: una ciudad con guarnicion muestra las dos.
-const ESTILO_VIDA_CIUDAD = {
+const ESTILO_VIDA = {
   fontFamily: 'Arial', fontSize: 9, fontWeight: 'bold', fill: 0xffffff,
   stroke: { color: 0x000000, width: 3 }
 }
@@ -301,18 +301,22 @@ function colorVida(fraccion) {
   return 0xe74c3c
 }
 function barraVidaCiudad(tile) {
-  const { salud, saludMax } = tile.ciudad
+  return barraVida(tile, tile.ciudad.salud, tile.ciudad.saludMax, 2)
+}
+// `arriba`: distancia al borde superior de la casilla. La ciudad va arriba y la
+// tropa abajo, asi una ciudad con guarnicion muestra las dos sin taparse.
+function barraVida(tile, salud, saludMax, arriba) {
   if (typeof salud !== 'number' || !saludMax) return null
   const ancho = TILE - 6
   const x = tile.x * TILE + 3
-  const y = tile.y * TILE + 2
+  const y = tile.y * TILE + arriba
   const grupo = new Container()
   const barra = new Graphics()
   barra.rect(x, y, ancho, 11).fill({ color: 0x000000, alpha: 0.65 })
   barra.rect(x, y, ancho * Math.max(0, Math.min(1, salud / saludMax)), 11)
     .fill({ color: colorVida(salud / saludMax) })
   grupo.addChild(barra)
-  const texto = new Text({ text: `${salud}/${saludMax}`, style: ESTILO_VIDA_CIUDAD })
+  const texto = new Text({ text: `${salud}/${saludMax}`, style: ESTILO_VIDA })
   texto.anchor.set(0.5, 0.5)
   texto.x = x + ancho / 2
   texto.y = y + 5.5
@@ -363,15 +367,9 @@ function dibujarPiezas() {
       }
       capaPiezas.addChild(sprite)
 
-      // Barra de salud, solo si esta danado y se conoce el maximo real.
-      const salud = tile.ejercito.salud
-      const maxSalud = saludMaximaDe(tile.ejercito.tipo)
-      if (typeof salud === 'number' && maxSalud && salud < maxSalud) {
-        const barra = new Graphics()
-        barra.rect(tile.x * TILE + 4, tile.y * TILE + TILE - 7, TILE - 8, 4).fill({ color: 0x000000, alpha: 0.6 })
-        barra.rect(tile.x * TILE + 4, tile.y * TILE + TILE - 7, (TILE - 8) * (salud / maxSalud), 4).fill({ color: 0x2ecc71 })
-        capaPiezas.addChild(barra)
-      }
+      // Barra de salud con el numero adentro, siempre (no solo si esta danado).
+      const barra = barraVida(tile, tile.ejercito.salud, saludMaximaDe(tile.ejercito.tipo), TILE - 18)
+      if (barra) capaPiezas.addChild(barra)
     }
   }
   for (const cartel of carteles) capaPiezas.addChild(cartel)
