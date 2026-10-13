@@ -139,6 +139,10 @@ const nombreNuevo = ref(tile.value?.ciudad?.nombre ?? '')
 const nombreLimpio = computed(() => nombreNuevo.value.trim())
 const puedeRenombrar = computed(() =>
   nombreLimpio.value !== '' && nombreLimpio.value !== tile.value?.ciudad?.nombre)
+const vidaCiudad = computed(() => {
+  const c = tile.value?.ciudad
+  return c && typeof c.salud === 'number' && c.saludMax ? `${c.salud}/${c.saludMax}` : null
+})
 const renombrar = () => {
   if (puedeRenombrar.value) emit('renombrar', nombreLimpio.value)
 }
@@ -160,6 +164,11 @@ const renombrar = () => {
           <strong>Renombrar</strong>
         </button>
       </div>
+    </section>
+
+    <section v-if="vidaCiudad">
+      <h4>Vida de la ciudad</h4>
+      <p class="vida-ciudad">❤️ {{ vidaCiudad }}</p>
     </section>
 
     <section v-if="reglas.mejorasCiudad">

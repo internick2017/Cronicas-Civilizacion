@@ -18,9 +18,11 @@ const OBJETIVOS = [
   { valor: 75, etiqueta: '75% — larga' },
 ]
 const TAMANOS = [
+  { valor: 10, etiqueta: 'Mini (10×10)' },
   { valor: 14, etiqueta: 'Chico (14×14)' },
   { valor: 20, etiqueta: 'Mediano (20×20)' },
   { valor: 28, etiqueta: 'Grande (28×28)' },
+  { valor: 36, etiqueta: 'Enorme (36×36)' },
 ]
 const DURACIONES = [
   { valor: null, etiqueta: 'Sin límite' },

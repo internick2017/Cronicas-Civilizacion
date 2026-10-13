@@ -3,7 +3,7 @@ import { ReglaError } from '../errores.js';
 import { producirParaJugador } from './turnos.js';
 import { controlDelBando, rivalesDominantes } from './dominacion.js';
 import { alianzasDe, aliadosDe, propuestasDe, treguasDe } from './bandos.js';
-import { DIFICULTAD_IA_DEFAULT, GRUPOS_DE_APOYO } from '../constantes.js';
+import { DIFICULTAD_IA_DEFAULT, GRUPOS_DE_APOYO, saludDeCiudad, saludMaximaCiudad } from '../constantes.js';
 import { subdivisionesDe, nivelDe } from './subdivisiones.js';
 import { problemasParaLaVista, senalesDe } from './problemas.js';
 import { multiplicadorCostos } from './efectosProblemas.js';
@@ -16,6 +16,11 @@ function vistaTile(tile, videntes) {
     return { x: tile.x, y: tile.y, descubierto: false };
   }
   const { descubiertoPor: _descubiertoPor, ...resto } = structuredClone(tile);
+  // La interfaz muestra "70/100": el maximo sale de aca, no se recalcula en el cliente.
+  if (resto.ciudad) {
+    resto.ciudad.salud = saludDeCiudad(resto.ciudad);
+    resto.ciudad.saludMax = saludMaximaCiudad(resto.ciudad.nivel);
+  }
   return { ...resto, descubierto: true };
 }
 

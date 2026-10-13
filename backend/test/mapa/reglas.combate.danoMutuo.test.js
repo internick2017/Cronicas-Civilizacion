@@ -107,7 +107,7 @@ describe('daño mutuo en combate', () => {
     const t = tileEn(e, 18, 1);
     t.terreno = 'plains';
     t.dueno = 'p2';
-    t.ciudad = { nombre: 'Rival', nivel: 1, poblacion: 500, edificios: [] };
+    t.ciudad = { nombre: 'Rival', nivel: 1, poblacion: 500, edificios: [], salud: 1 }; // a un golpe de caer
     const saludAntes = tileEn(e, 19, 1).ejercito.salud;
 
     const evs = atacarConSemilla('ciudad-1');

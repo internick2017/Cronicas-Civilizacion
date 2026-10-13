@@ -1,5 +1,8 @@
 import { tileEn, jugadorPorId } from './MapGame.js';
-import { UNIDADES, RECURSOS_INICIALES, CUARTEL, PUERTO, esNaval } from './constantes.js';
+import {
+  UNIDADES, RECURSOS_INICIALES, CUARTEL, PUERTO, esNaval,
+  saludMaximaCiudad, saludDeCiudad, REGENERACION_CIUDAD, FRACCION_SALUD_AL_CAPTURAR
+} from './constantes.js';
 import { vecinosOrtogonales } from './reglas/comun.js';
 import { ReglaError } from './errores.js';
 
@@ -43,7 +46,7 @@ export function aplicar(estado, eventos) {
 
       case 'CiudadFundada': {
         const t = tileEn(estado, datos.x, datos.y);
-        t.ciudad = { nombre: datos.nombre, nivel: 1, poblacion: 500, edificios: [] };
+        t.ciudad = { nombre: datos.nombre, nivel: 1, poblacion: 500, edificios: [], salud: saludMaximaCiudad(1) };
         t.dueno = jugadorId;
         break;
       }
@@ -220,8 +223,13 @@ export function aplicar(estado, eventos) {
 
       case 'CiudadMejorada': {
         const t = tileEn(estado, datos.x, datos.y);
+        // Subir de nivel agranda el maximo y regala la diferencia: mejorar no puede
+        // dejar la barra "mas vacia" que antes.
+        const salud = saludDeCiudad(t.ciudad);
+        const maximoAntes = saludMaximaCiudad(t.ciudad.nivel);
         t.ciudad.nivel += 1;
         t.ciudad.poblacion += 250;
+        t.ciudad.salud = salud + saludMaximaCiudad(t.ciudad.nivel) - maximoAntes;
         break;
       }
 
@@ -322,6 +330,11 @@ export function aplicar(estado, eventos) {
         const defensorTile = tileEn(estado, datos.hasta.x, datos.hasta.y);
         atacanteTile.ejercito.salud -= datos.danoAtacante;
         if (defensorTile.ejercito) defensorTile.ejercito.salud -= datos.danoDefensor;
+        // `danoCiudad` solo viaja cuando el golpe cayo sobre la ciudad (sin
+        // ejercito en medio y sin buque): los eventos viejos no lo traen.
+        if (datos.danoCiudad && defensorTile.ciudad) {
+          defensorTile.ciudad.salud = Math.max(0, saludDeCiudad(defensorTile.ciudad) - datos.danoCiudad);
+        }
         atacanteTile.ejercito.movimientoRestante = 0;
         break;
       }
@@ -344,6 +357,7 @@ export function aplicar(estado, eventos) {
           for (const s of anterior.subdivisiones ?? []) s.ciudades = s.ciudades.filter(c => !mismo(c));
         }
         t.dueno = jugadorId;
+        t.ciudad.salud = Math.ceil(saludMaximaCiudad(t.ciudad.nivel) * FRACCION_SALUD_AL_CAPTURAR);
         break;
       }
 
@@ -419,6 +433,10 @@ export function aplicar(estado, eventos) {
         // Las treguas que vencieron con la ronda que acaba de cerrar ya no sirven.
         if (estado.treguas) estado.treguas = estado.treguas.filter(t => t.hasta >= estado.turno);
         for (const t of estado.mapa) {
+          if (t.ciudad) {
+            t.ciudad.salud = Math.min(
+              saludMaximaCiudad(t.ciudad.nivel), saludDeCiudad(t.ciudad) + REGENERACION_CIUDAD);
+          }
           if (!t.ejercito) continue;
           t.ejercito.movimientoRestante = UNIDADES[t.ejercito.tipo].movimiento + (t.ejercito.bonoMovimiento ?? 0);
           // La tropa que viaja adentro de un transporte tambien recupera su

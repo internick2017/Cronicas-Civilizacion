@@ -28,7 +28,7 @@ function escenario({ tamano = 6 } = {}) {
 
   // p2: la ciudad objetivo, de nivel 1 y en llanura para que la captura sea posible.
   en(2, 1).dueno = 'p2';
-  en(2, 1).ciudad = { nombre: 'Objetivo', nivel: 1, poblacion: 500, edificios: [] };
+  en(2, 1).ciudad = { nombre: 'Objetivo', nivel: 1, poblacion: 500, edificios: [], salud: 1 };
   // Anillo de la ciudad: casillas de p2 que SI deben voltear.
   for (const [x, y] of [[2, 0], [3, 1], [2, 2]]) en(x, y).dueno = 'p2';
   // Ciudad vecina de p2: NO debe voltear (se toma peleando, no de regalo).
@@ -84,6 +84,7 @@ describe('capturar una ciudad voltea el territorio de alrededor', () => {
     const e = escenario();
     // Guerrero en vez de caballeria: pierde contra la ciudad, asi no hay captura.
     tileEn(e, 1, 1).ejercito = { tipo: 'warrior', dueno: 'p1', salud: 100, movimientoRestante: 2, bonoMovimiento: 0 };
+    tileEn(e, 2, 1).ciudad.salud = 100; // con vida de sobra, ni el golpe de respuesta la derriba
     const antes = e.mapa.filter(t => t.dueno === 'p2').length;
 
     aplicar(e, atacar(e, 'p1', { desde: { x: 1, y: 1 }, hasta: { x: 2, y: 1 } }, rngFijo));
@@ -110,7 +111,7 @@ describe('capturar una ciudad voltea el territorio de alrededor', () => {
     tileEn(e, 5, 5).dueno = 'p1';
     tileEn(e, 5, 5).ciudad = { nombre: 'P1', nivel: 1, poblacion: 500, edificios: [] };
     tileEn(e, 0, 0).dueno = 'p2';
-    tileEn(e, 0, 0).ciudad = { nombre: 'Esquina', nivel: 1, poblacion: 500, edificios: [] };
+    tileEn(e, 0, 0).ciudad = { nombre: 'Esquina', nivel: 1, poblacion: 500, edificios: [], salud: 1 };
     tileEn(e, 0, 1).dueno = 'p2';
     tileEn(e, 1, 0).dueno = 'p1';
     tileEn(e, 1, 0).ejercito = { tipo: 'cavalry', dueno: 'p1', salud: 120, movimientoRestante: 3, bonoMovimiento: 0 };

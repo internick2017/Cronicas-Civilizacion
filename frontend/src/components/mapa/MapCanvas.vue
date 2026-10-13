@@ -289,6 +289,37 @@ function cartelAliado(tile, duenoId) {
   return texto
 }
 
+// Barra de vida de una ciudad con el numero adentro ("70/100"). Va arriba de la
+// casilla porque la de la tropa va abajo: una ciudad con guarnicion muestra las dos.
+const ESTILO_VIDA_CIUDAD = {
+  fontFamily: 'Arial', fontSize: 9, fontWeight: 'bold', fill: 0xffffff,
+  stroke: { color: 0x000000, width: 3 }
+}
+function colorVida(fraccion) {
+  if (fraccion > 0.5) return 0x2ecc71
+  if (fraccion > 0.25) return 0xf1c40f
+  return 0xe74c3c
+}
+function barraVidaCiudad(tile) {
+  const { salud, saludMax } = tile.ciudad
+  if (typeof salud !== 'number' || !saludMax) return null
+  const ancho = TILE - 6
+  const x = tile.x * TILE + 3
+  const y = tile.y * TILE + 2
+  const grupo = new Container()
+  const barra = new Graphics()
+  barra.rect(x, y, ancho, 11).fill({ color: 0x000000, alpha: 0.65 })
+  barra.rect(x, y, ancho * Math.max(0, Math.min(1, salud / saludMax)), 11)
+    .fill({ color: colorVida(salud / saludMax) })
+  grupo.addChild(barra)
+  const texto = new Text({ text: `${salud}/${saludMax}`, style: ESTILO_VIDA_CIUDAD })
+  texto.anchor.set(0.5, 0.5)
+  texto.x = x + ancho / 2
+  texto.y = y + 5.5
+  grupo.addChild(texto)
+  return grupo
+}
+
 function dibujarPiezas() {
   // Guarda: el watcher de props.constantes puede disparar esta funcion antes
   // de que onMounted haya terminado de crear las capas de Pixi (ej. si las
@@ -316,6 +347,8 @@ function dibujarPiezas() {
       if (tile.dueno) sprite.tint = colorDeJugador(props.vista.jugadores, tile.dueno)
       capaPiezas.addChild(sprite)
       spritesCiudad.set(`${tile.x}:${tile.y}`, sprite)
+      const vida = barraVidaCiudad(tile)
+      if (vida) capaPiezas.addChild(vida)
     }
 
     if (tile.ejercito) {
@@ -710,7 +743,7 @@ function claveTerritorio(vista) {
 function clavePiezas(vista) {
   return vista.mapa.map(t => {
     if (!t.descubierto || (!t.ciudad && !t.ejercito)) return ''
-    const c = t.ciudad ? `c${t.dueno || ''}` : ''
+    const c = t.ciudad ? `c${t.dueno || ''}:${t.ciudad.salud}` : ''
     const e = t.ejercito ? `e${t.ejercito.tipo}${t.ejercito.dueno || ''}:${t.ejercito.salud}` : ''
     return `${t.x}:${t.y}:${c}${e}`
   }).join('|') + `#${aliadosDe(vista, props.jugadorId).join(',')}`

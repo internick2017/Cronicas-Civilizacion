@@ -101,7 +101,7 @@ describe('atacar', () => {
     const t = tileEn(e, 18, 1);
     t.terreno = 'plains';
     t.dueno = 'p2';
-    t.ciudad = { nombre: 'Rival', nivel: 1, poblacion: 500, edificios: [] };
+    t.ciudad = { nombre: 'Rival', nivel: 1, poblacion: 500, edificios: [], salud: 1 }; // a un golpe de caer
 
     // base = defensaCiudad(1) = 10; poderDefensa = 10 * 0.evaluado * 1.0 * 1.5 (BONO_DEFENSA_CIUDAD)
     // con rng 'ciudad-1': pA=27.487..., pD=12.701... => gana atacante

@@ -514,6 +514,17 @@ export const bonoDefensa = (terreno) => BONO_TERRENO_DEFENSA[terreno] ?? 1.0;
 
 export const defensaCiudad = (nivel) => 8 + 2 * nivel;
 
+// Vida de la ciudad. Es DISTINTA de la defensa: la defensa decide quien gana la
+// tirada, la vida decide cuantos golpes aguanta antes de caer. Una ciudad se
+// captura al llegar a 0, no en una sola tirada. Las partidas viejas no traen
+// `salud` en la ciudad: `saludDeCiudad` cae al maximo.
+export const saludMaximaCiudad = (nivel) => 100 + 25 * (nivel - 1);
+export const saludDeCiudad = (ciudad) => ciudad.salud ?? saludMaximaCiudad(ciudad.nivel);
+// Lo que se cura por ronda, y la fraccion de la vida maxima con la que la
+// ciudad pasa a manos del conquistador (no se la entrega entera: acaba de caer).
+export const REGENERACION_CIUDAD = 5;
+export const FRACCION_SALUD_AL_CAPTURAR = 0.5;
+
 // Mejorar el nivel de una ciudad es repetible (a diferencia de una
 // tecnologia): cada nivel cuesta mas que el anterior, y el beneficio ya
 // existia de antes sin usarse — defensaCiudad(nivel) escala con esto desde

@@ -1,7 +1,7 @@
 import { tileEn } from '../MapGame.js';
 import {
   UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, CUARTEL,
-  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, esNaval, puedeAtacar
+  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, esNaval, puedeAtacar, saludDeCiudad
 } from '../constantes.js';
 import { penalizacionDefensa } from './efectosProblemas.js';
 import { ReglaError } from '../errores.js';
@@ -126,6 +126,12 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   const atacanteEsNaval = esNaval(tileDesde.ejercito.tipo);
   const combateNaval = atacanteEsNaval || Boolean(ejercitoEnemigo && esNaval(ejercitoEnemigo.tipo));
 
+  // El golpe cae sobre la ciudad solo si nadie la guarnece y el que pega no es un
+  // buque (el buque hostiga y saquea, no la derriba: docs/adr/0003). La ciudad
+  // se captura cuando su vida llega a 0, gane quien gane la tirada.
+  const danoCiudad = ciudadEnemiga && !ejercitoEnemigo && !atacanteEsNaval ? danoDefensor : 0;
+  const ciudadCae = danoCiudad > 0 && saludDeCiudad(ciudadEnemiga) - danoCiudad <= 0;
+
   const eventos = [
     evento('CombateResuelto', estado, jugadorId, {
       desde: { x: desde.x, y: desde.y },
@@ -134,6 +140,7 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
       danoAtacante,
       danoDefensor,
       naval: combateNaval,
+      ...(danoCiudad > 0 && { danoCiudad }),
     }),
   ];
 
@@ -158,7 +165,8 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   }
 
   // Solo se toma la ciudad si queda alguien en pie para tomarla.
-  if (ganador === 'atacante' && !ejercitoEnemigo && !atacanteCae) {
+  const buqueVenceCiudad = ganador === 'atacante' && !ejercitoEnemigo && !atacanteCae && atacanteEsNaval;
+  if (buqueVenceCiudad || (ciudadCae && !atacanteCae)) {
     // Un buque vence pero NO toma: no pisa tierra. Sin esta rama la regla
     // quedaba muerta, porque las ciudades no tienen vida y lo unico que podia
     // pasar al ganarle a una ciudad indefensa era capturarla. El saqueo es lo

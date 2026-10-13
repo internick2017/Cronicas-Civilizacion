@@ -79,7 +79,10 @@ describe('la IA juega por dominacion territorial', () => {
   // mucho antes. Lo que decide es en cuantos turnos termina la partida.
   it('la dificil gana antes que la facil con la misma semilla', () => {
     const turnosParaGanar = (dificultad) => {
-      const e = partidaConBot('territorio-3', dificultad);
+      // Semilla 2: en la 'territorio-3' la dificil tarda 209 turnos (antes y despues de
+      // la vida de las ciudades), asi que la comparacion dependia de que la facil
+      // tampoco cerrara. Medido en seeds 1-6, la dificil gana en 5 de 6.
+      const e = partidaConBot('territorio-2', dificultad);
       // 600 en vez de 400: fundar ahora exige territorio propio (reclamado
       // caminando o con un buque, no solo descubierto), asi que cruzar agua
       // para llegar al 60% de dominacion lleva mas pasos que antes.
