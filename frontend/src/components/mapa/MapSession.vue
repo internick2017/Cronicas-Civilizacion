@@ -594,7 +594,7 @@ onUnmounted(() => {
 
 <template>
   <div class="map-session">
-    <MapPlayerPanel :vista="vista" :jugador-id="jugadorId" :constantes="constantes" @sumar-maquina="maquinaAbierta = true" />
+    <MapPlayerPanel :vista="vista" :jugador-id="jugadorId" :constantes="constantes" @sumar-maquina="maquinaAbierta = true" @renombrar-pais="nombre => ejecutarAccion({ tipo: 'renombrarPais', nombre })" />
 
     <div v-if="vista.estado === 'esperando'" class="sala-espera">
       <p class="sala-codigo">

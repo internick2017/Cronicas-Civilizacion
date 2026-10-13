@@ -1,6 +1,6 @@
 <!-- frontend/src/components/mapa/MapPlayerPanel.vue -->
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { esSimultaneo, puedeJugar, yaTermino } from './turno.js'
 import { aliadosDe } from './alianzas.js'
 import { colorCssDeJugador } from '../../mapa/sprites.js'
@@ -13,7 +13,7 @@ const props = defineProps({
   constantes: { type: Object, default: null }
 })
 
-defineEmits(['sumar-maquina'])
+const emit = defineEmits(['sumar-maquina', 'renombrar-pais'])
 const simultaneo = computed(() => esSimultaneo(props.vista))
 const jugadorActual = computed(() => props.vista.jugadores[props.vista.indiceJugadorActual])
 // A quien se resalta en la lista: en secuencial, al que le toca; en simultaneo, a todo el que sigue jugando.
@@ -21,6 +21,23 @@ const estaJugando = (j) => puedeJugar(props.vista, j.id)
 const misAliados = computed(() => aliadosDe(props.vista, props.jugadorId))
 const termino = (j) => simultaneo.value && j.activo && yaTermino(props.vista, j.id)
 const yo = computed(() => props.vista.jugadores.find(j => j.id === props.jugadorId))
+
+// Renombrar el pais es gratis y no exige turno. El limite de largo es el del
+// backend (LARGO_MAXIMO_NOMBRE_PAIS en reglas/pais.js): aca solo evita que el
+// input deje escribir de mas, el backend vuelve a validar.
+const LARGO_MAXIMO_NOMBRE_PAIS = 30
+const puedeRenombrarPais = computed(() => Boolean(yo.value?.activo) && props.vista.estado !== 'terminado')
+const editandoPais = ref(false)
+const paisNuevo = ref('')
+const abrirEdicionPais = () => {
+  paisNuevo.value = yo.value?.civilizacion ?? ''
+  editandoPais.value = true
+}
+const guardarPais = () => {
+  const limpio = paisNuevo.value.trim()
+  if (limpio && limpio !== yo.value?.civilizacion) emit('renombrar-pais', limpio)
+  editandoPais.value = false
+}
 
 // Solo para la etiqueta al lado del bot: los datos de balance de cada
 // dificultad (que hace mejor/peor) viven en el backend (/api/map/constantes),
@@ -143,6 +160,13 @@ const RECURSOS_ICONOS = {
         <span class="color-bando" :style="{ background: colorCssDeJugador(vista.jugadores, j.id) }" title="Su color en el mapa"></span>
         <span v-if="j.esBot" title="Jugador controlado por la máquina">🤖</span>
         {{ j.nombre }} ({{ j.civilizacion }})
+        <button
+          v-if="j.id === jugadorId && puedeRenombrarPais && !editandoPais"
+          class="btn-renombrar"
+          title="Cambiar el nombre de tu país"
+          aria-label="Cambiar el nombre de tu país"
+          @click="abrirEdicionPais"
+        >✏️</button>
         <span v-if="razaDe(j)" class="raza-badge" :title="razaDe(j).descripcion">{{ razaDe(j).icono }} {{ razaDe(j).nombre }}</span>
         <small v-if="j.esBot" class="dificultad-badge">{{ NOMBRE_DIFICULTAD[j.dificultadIA] || j.dificultadIA }}</small>
         <span v-if="misAliados.includes(j.id)" class="aliado" title="Son aliados: ganan juntos">🤝 aliado</span>
@@ -150,6 +174,18 @@ const RECURSOS_ICONOS = {
         <span v-else-if="termino(j)" class="listo" title="Ya terminó su turno">✔ terminó</span>
       </li>
     </ul>
+    <form v-if="editandoPais" class="fila-pais" @submit.prevent="guardarPais">
+      <input
+        v-model="paisNuevo"
+        class="entrada-pais"
+        :maxlength="LARGO_MAXIMO_NOMBRE_PAIS"
+        placeholder="Nombre de tu país"
+        aria-label="Nombre de tu país"
+        @keyup.esc="editandoPais = false"
+      />
+      <button type="submit" class="btn-sumar" :disabled="!paisNuevo.trim()">Guardar</button>
+      <button type="button" class="btn-sumar" @click="editandoPais = false">Cancelar</button>
+    </form>
     <button v-if="vista.estado === 'jugando'" class="btn-sumar" @click="$emit('sumar-maquina')">
       ➕ Sumar una máquina
     </button>
@@ -272,6 +308,33 @@ const RECURSOS_ICONOS = {
 }
 
 .btn-sumar:hover { background: rgba(255, 255, 255, 0.16); }
+.btn-sumar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-renombrar {
+  background: none;
+  border: none;
+  padding: 0 0.3rem;
+  min-height: 28px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.fila-pais {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.entrada-pais {
+  flex: 1 1 10rem;
+  min-height: 36px;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.25);
+  color: #ecf0f1;
+  font-size: 0.9rem;
+}
 
 .jugadores-lista .aliado {
   color: #f1c40f;

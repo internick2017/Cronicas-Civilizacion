@@ -12,6 +12,7 @@ import { adoptarRasgo } from '../domain/mapa/reglas/cultura.js';
 import { investigar } from '../domain/mapa/reglas/tecnologia.js';
 import { abandonar } from '../domain/mapa/reglas/abandono.js';
 import { proponerAlianza, responderAlianza, romperAlianza, regalarRecursos } from '../domain/mapa/reglas/alianzas.js';
+import { renombrarPais } from '../domain/mapa/reglas/pais.js';
 import { jugarTurnoIA } from '../domain/mapa/ia.js';
 import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, RAZAS } from '../domain/mapa/constantes.js';
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
@@ -67,8 +68,8 @@ const VUELTAS_IA_MAXIMAS = 10;
 
 // Quien perdio el poder (ver reglas/gobierno.js) solo puede dar ventajas para
 // recuperar apoyo, pasar el turno o abandonar: el resto de las acciones del
-// mapa las juega por el la maquina.
-const ACCIONES_SIN_PODER = new Set(['darVentajas', 'terminarTurno', 'abandonar']);
+// mapa las juega por el la maquina. Renombrar el pais no es una orden.
+const ACCIONES_SIN_PODER = new Set(['darVentajas', 'terminarTurno', 'abandonar', 'renombrarPais']);
 
 // El apoyo y la administracion de subdivisiones de un jugador son privados,
 // igual que sus recursos (ver visibilidad.js): un humano no los recibe dentro de
@@ -107,6 +108,7 @@ const REGLAS_POR_TIPO = {
   responderAlianza: (estado, jugadorId, accion) => responderAlianza(estado, jugadorId, accion),
   romperAlianza: (estado, jugadorId) => romperAlianza(estado, jugadorId),
   regalarRecursos: (estado, jugadorId, accion) => regalarRecursos(estado, jugadorId, accion),
+  renombrarPais: (estado, jugadorId, accion) => renombrarPais(estado, jugadorId, accion),
   abandonar: (estado, jugadorId) => abandonar(estado, jugadorId),
   terminarTurno: (estado, jugadorId) => terminarTurno(estado, jugadorId),
 };

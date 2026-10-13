@@ -53,6 +53,10 @@ export function aplicar(estado, eventos) {
         break;
       }
 
+      case 'PaisRenombrado':
+        jugadorPorId(estado, jugadorId).civilizacion = datos.nombre;
+        break;
+
       case 'GobiernoCambiado':
         jugadorPorId(estado, jugadorId).gobierno = datos.gobierno;
         break;
