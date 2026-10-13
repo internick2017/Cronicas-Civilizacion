@@ -432,6 +432,24 @@ const onClickTile = (posicion) => {
   }
 }
 
+// Contra quien pega un ataque: si hay soldado en la casilla, el golpe es contra el, aunque
+// este dentro de una ciudad (el backend resuelve igual, combate.js). Antes el dialogo
+// nombraba solo a la ciudad y parecia que al soldado no se lo podia atacar.
+const soldadoEnCiudad = computed(() => {
+  const t = ataqueAbierto.value && tileEn(ataqueAbierto.value.hasta.x, ataqueAbierto.value.hasta.y)
+  return Boolean(t?.ejercito && t?.ciudad)
+})
+const textoDefensor = computed(() => {
+  const t = ataqueAbierto.value && tileEn(ataqueAbierto.value.hasta.x, ataqueAbierto.value.hasta.y)
+  if (!t) return ''
+  const unidad = (constantes.value?.unidades || []).find(u => u.tipo === t.ejercito?.tipo)
+  const soldado = t.ejercito
+    ? `${unidad?.nombre ?? t.ejercito.tipo} (${t.ejercito.salud}${unidad?.salud ? '/' + unidad.salud : ''})`
+    : null
+  const ciudad = t.ciudad ? `Ciudad ${t.ciudad.nombre} (${t.ciudad.salud}/${t.ciudad.saludMax})` : null
+  return [soldado, ciudad].filter(Boolean).join(' dentro de la ')
+})
+
 const confirmarAtaque = () => {
   if (!ataqueAbierto.value) return
   const { desde, hasta } = ataqueAbierto.value
@@ -807,11 +825,7 @@ onUnmounted(() => {
         </p>
         <p class="ataque-linea">
           <strong>Defensor</strong>
-          <span>
-            {{ tileEn(ataqueAbierto.hasta.x, ataqueAbierto.hasta.y)?.ciudad
-              ? 'Ciudad ' + tileEn(ataqueAbierto.hasta.x, ataqueAbierto.hasta.y).ciudad.nombre
-              : tileEn(ataqueAbierto.hasta.x, ataqueAbierto.hasta.y)?.ejercito?.tipo }}
-          </span>
+          <span>{{ textoDefensor }}</span>
         </p>
         <p class="ataque-nota">
           Terreno del defensor:
@@ -819,6 +833,9 @@ onUnmounted(() => {
           <span v-if="tileEn(ataqueAbierto.hasta.x, ataqueAbierto.hasta.y)?.ciudad">
             · la ciudad suma defensa
           </span>
+        </p>
+        <p v-if="soldadoEnCiudad" class="ataque-nota">
+          El golpe cae sobre el soldado: la ciudad no pierde vida hasta que lo derrotes.
         </p>
         <button class="btn-primario" @click="confirmarAtaque">Atacar</button>
       </div>
