@@ -474,6 +474,14 @@ const umbralAviso = computed(() =>
         reclutar, la mala salud baja la población y la pobreza baja el apoyo del pueblo. El botón
         <strong>🏛️ Gobierno</strong> muestra un número naranja cuando hay avisos o problemas.
       </p>
+      <p v-if="constantes.cabecera">
+        Cada subdivisión puede tener una <strong>cabecera</strong>: una de sus ciudades (propia o de una hija), que
+        se elige gratis en el árbol. Las demás ciudades que cubre rinden
+        +{{ Math.round(constantes.cabecera.bonoProduccion * 100) }}% (una sola vez, aunque varias subdivisiones que
+        las contienen tengan cabecera), y los problemas que resuelve esa subdivisión cuestan
+        {{ Math.round(constantes.cabecera.descuentoResolucion * 100) }}% menos. Si la cabecera cae en manos
+        enemigas o sale de la subdivisión, se pierde y hay que elegir otra.
+      </p>
     </section>
 
     <section>

@@ -1,5 +1,6 @@
 import {
   PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_VICTORIA_DOMINACION, BONO_PRODUCCION_CAPITAL,
+  BONO_PRODUCCION_CABECERA,
 } from '../constantes.js';
 import { tileEn } from '../MapGame.js';
 import { recursoApagado } from './modo.js';
@@ -14,7 +15,7 @@ import { capitalDe, estaEnMudanza } from './capital.js';
 import { crearRng } from '../rng.js';
 import { aplicar } from '../aplicar.js';
 import { cerrarRondaGobierno, multiplicadorProduccion } from './gobierno.js';
-import { administrarSubdivisiones } from './subdivisiones.js';
+import { administrarSubdivisiones, ciudadesConBonoCabecera } from './subdivisiones.js';
 import { cerrarRondaProblemas } from './problemas.js';
 import { factorProduccionCiudad, perdidaFijaOro, consumoExtraComida } from './efectosProblemas.js';
 
@@ -47,8 +48,11 @@ export function produccionBruta(estado, jugadorId) {
   const jugador = estado.jugadores.find(j => j.id === jugadorId);
   const porRasgos = produccionPorRasgos(jugador);
   const capital = capitalDe(estado, jugador);
+  const conCabecera = ciudadesConBonoCabecera(estado, jugador);
   for (const tile of ciudadesDe(estado, jugadorId)) {
-    const bonoCiudad = 1 + (capital?.x === tile.x && capital?.y === tile.y ? BONO_PRODUCCION_CAPITAL : 0);
+    const bonoCiudad = 1
+      + (capital?.x === tile.x && capital?.y === tile.y ? BONO_PRODUCCION_CAPITAL : 0)
+      + (conCabecera.has(`${tile.x},${tile.y}`) ? BONO_PRODUCCION_CABECERA : 0);
     // Los problemas sociales activos (federal) bajan lo que rinde ESTA ciudad.
     const acumularEn = (recurso, cantidad) =>
       acumular(recurso, cantidad * bonoCiudad * factorProduccionCiudad(jugador, tile.x, tile.y, recurso));

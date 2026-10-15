@@ -111,6 +111,12 @@ export function aplicar(estado, eventos) {
         break;
       }
 
+      case 'CabeceraElegida': {
+        const sub = (jugadorPorId(estado, jugadorId).subdivisiones ?? []).find(s => s.id === datos.id);
+        if (sub) sub.cabecera = datos.x === null ? null : { x: datos.x, y: datos.y };
+        break;
+      }
+
       case 'CiudadesAsignadas': {
         const j = jugadorPorId(estado, jugadorId);
         const destino = (j.subdivisiones ?? []).find(s => s.id === datos.id);

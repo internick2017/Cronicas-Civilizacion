@@ -73,6 +73,11 @@ La ciudad que rinde y se defiende más. Es la primera que se funda hasta que el 
 (pagando oro); si se la capturan, pasa sola a su ciudad de mayor nivel.
 _Avoid_: sede, ciudad principal
 
+**Cabecera**:
+La ciudad que encabeza una subdivisión del Estado federal, elegida entre las de su territorio. Las
+demás ciudades que cubre rinden más y los problemas que resuelve esa subdivisión salen más baratos.
+_Avoid_: capital de provincia, sede
+
 **Ejército**:
 La pieza militar que ocupa una casilla. Contiene exactamente una unidad, nunca varias.
 _Avoid_: tropa, contingente, stack

@@ -4,7 +4,7 @@ import { producirParaJugador } from './turnos.js';
 import { controlDelBando, rivalesDominantes } from './dominacion.js';
 import { alianzasDe, aliadosDe, propuestasDe, treguasDe } from './bandos.js';
 import { DIFICULTAD_IA_DEFAULT, GRUPOS_DE_APOYO, saludDeCiudad, saludMaximaCiudad } from '../constantes.js';
-import { subdivisionesDe, nivelDe } from './subdivisiones.js';
+import { subdivisionesDe, nivelDe, cabeceraDe } from './subdivisiones.js';
 import { problemasParaLaVista, senalesDe } from './problemas.js';
 import { multiplicadorCostos } from './efectosProblemas.js';
 import { reglasDelModo } from './modo.js';
@@ -83,7 +83,9 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       multiplicadorCostos: multiplicadorCostos(jugador),
       senales: senalesDe(estado, jugador),
       // Cada una con su nivel (derivado del tipo) para que la interfaz arme el arbol.
-      subdivisiones: subdivisionesDe(jugador).map(s => ({ ...s, nivel: nivelDe(s) })),
+      // La cabecera sale ya validada: una guardada que dejo de valer se ve como ninguna.
+      subdivisiones: subdivisionesDe(jugador)
+        .map(s => ({ ...s, nivel: nivelDe(s), cabecera: cabeceraDe(estado, jugador, s) })),
       capital: capitalDe(estado, jugador),
     };
   }

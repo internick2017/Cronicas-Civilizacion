@@ -1,9 +1,10 @@
-import { jugadorPorId } from './MapGame.js';
+import { jugadorPorId, tileEn } from './MapGame.js';
 import { aplicar } from './aplicar.js';
 import { evento } from './reglas/comun.js';
 import { formaEstadoDe } from './reglas/gobierno.js';
 import {
   crearSubdivision, asignarCiudades, quitarSubdivision, subdivisionesDe, subdivisionDeCiudad, territorioDe,
+  cabeceraDe, elegirCabecera,
 } from './reglas/subdivisiones.js';
 import { IA_ORGANIZA_SUBDIVISIONES } from './constantes.js';
 
@@ -85,10 +86,24 @@ export function organizarSubdivisionesIA(estado, jugadorId, { activa = IA_ORGANI
     emitir(quitarSubdivision(copia, jugadorId, { id: vacia.id }));
   }
 
+  // Cada subdivision con ciudades y sin cabecera valida (nueva, o la perdio) se
+  // encabeza con su ciudad de mayor nivel; en un empate, la primera del mapa.
+  const ponerCabeceras = () => {
+    for (const sub of subdivisionesDe(jugador())) {
+      if (cabeceraDe(copia, jugador(), sub)) continue;
+      const [mayor] = territorioDe(jugador(), sub)
+        .map(c => tileEn(copia, c.x, c.y))
+        .filter(t => t?.ciudad && t.dueno === jugadorId)
+        .sort((a, b) => b.ciudad.nivel - a.ciudad.nivel || a.y - b.y || a.x - b.x);
+      if (mayor) emitir(elegirCabecera(copia, jugadorId, { subdivisionId: sub.id, x: mayor.x, y: mayor.y }));
+    }
+    return eventos;
+  };
+
   const sueltas = propias(copia)
     .filter(c => !subdivisionDeCiudad(jugador(), c.x, c.y))
     .sort((a, b) => a.y - b.y || a.x - b.x);
-  if (sueltas.length === 0) return eventos;
+  if (sueltas.length === 0) return ponerCabeceras();
 
   const cantidad = (tipo) => subdivisionesDe(jugador()).filter(s => s.tipo === tipo).length;
   const crear = (datos) => {
@@ -133,5 +148,5 @@ export function organizarSubdivisionesIA(estado, jugadorId, { activa = IA_ORGANI
       padreId, prioridad, ciudades: grupo,
     });
   }
-  return eventos;
+  return ponerCabeceras();
 }

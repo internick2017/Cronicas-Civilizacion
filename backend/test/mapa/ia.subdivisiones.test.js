@@ -3,7 +3,7 @@ import { crearEstado, jugadorPorId, tileEn } from '../../src/domain/mapa/MapGame
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { terminarTurno } from '../../src/domain/mapa/reglas/turnos.js';
-import { subdivisionesDe, subdivisionDeCiudad, territorioDe } from '../../src/domain/mapa/reglas/subdivisiones.js';
+import { subdivisionesDe, subdivisionDeCiudad, territorioDe, cabeceraDe } from '../../src/domain/mapa/reglas/subdivisiones.js';
 import { formaEstadoDe } from '../../src/domain/mapa/reglas/gobierno.js';
 import { organizarSubdivisionesIA } from '../../src/domain/mapa/iaSubdivisiones.js';
 import { jugarTurnoIA } from '../../src/domain/mapa/ia.js';
@@ -153,6 +153,26 @@ describe('la IA organiza sus subdivisiones', () => {
     for (const id of antes) expect(despues.some(s => s.id === id)).toBe(true);
     for (const c of ciudadesDelBot()) {
       expect(despues.filter(s => s.ciudades.some(x => clave(x) === clave(c)))).toHaveLength(1);
+    }
+  });
+
+  it('encabeza cada subdivisión que arma con su ciudad de mayor nivel, y la repone si la pierde', () => {
+    agregarCiudades(5);
+    const grande = ciudadesDelBot()[3];
+    tileEn(e, grande.x, grande.y).ciudad.nivel = 3;
+    correr();
+    for (const s of subdivisionesDe(bot)) {
+      const territorio = territorioDe(bot, s);
+      const esperada = territorio.some(c => clave(c) === clave(grande))
+        ? grande
+        : [...territorio].sort((a, b) => a.y - b.y || a.x - b.x)[0];
+      expect(cabeceraDe(e, bot, s)).toEqual(esperada);
+    }
+    tileEn(e, grande.x, grande.y).dueno = 'h1';
+    correr();
+    for (const s of subdivisionesDe(bot)) {
+      const propias = territorioDe(bot, s).filter(c => tileEn(e, c.x, c.y).dueno === 'bot');
+      if (propias.length > 0) expect(cabeceraDe(e, bot, s)).not.toBeNull();
     }
   });
 

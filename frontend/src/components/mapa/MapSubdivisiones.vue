@@ -9,7 +9,7 @@ const props = defineProps({
   jugadorId: { type: String, required: true },
   constantes: { type: Object, required: true }
 })
-const emit = defineEmits(['crear', 'renombrar', 'asignar', 'desasignar', 'quitar'])
+const emit = defineEmits(['crear', 'renombrar', 'asignar', 'desasignar', 'quitar', 'cabecera'])
 
 const NOMBRE_PRIORIDAD = { defensa: 'Defensa', comida: 'Comida', ciencia: 'Ciencia', economia: 'Economía' }
 const tipos = computed(() => props.constantes.tiposSubdivision || [])
@@ -39,6 +39,19 @@ const arbol = computed(() => {
   for (const raiz of hijas(null)) recorrer(raiz, 0)
   return filas
 })
+
+// --- Cabecera: una ciudad del territorio (directas y de las hijas) ---
+const territorio = (s) => {
+  const hijas = subdivisiones.value.filter(h => (h.padreId ?? null) === s.id)
+  return [...s.ciudades, ...hijas.flatMap(territorio)]
+    .filter(c => misCiudades.value.some(m => m.x === c.x && m.y === c.y))
+}
+const claveCabecera = (s) => (s.cabecera ? `${s.cabecera.x},${s.cabecera.y}` : '')
+const elegirCabecera = (s, valor) => {
+  if (!valor) return emit('cabecera', s.id, null)
+  const [x, y] = valor.split(',').map(Number)
+  emit('cabecera', s.id, { x, y })
+}
 
 // --- Renombrar en el lugar ---
 const editando = ref(null) // id de la subdivision que se esta renombrando
@@ -121,6 +134,7 @@ const alCambiarTipo = () => {
                 {{ s.prioridad ? NOMBRE_PRIORIDAD[s.prioridad] : 'hereda prioridad' }} ·
                 {{ s.ciudades.length ? s.ciudades.map(nombreDeCiudad).join(', ') : 'sin ciudades directas' }}
               </small>
+              <small v-if="s.cabecera" class="cabecera">🏛️ Cabecera: {{ nombreDeCiudad(s.cabecera) }}</small>
             </template>
           </div>
           <div class="acciones">
@@ -129,6 +143,17 @@ const alCambiarTipo = () => {
             <button class="mini" @click="emit('quitar', s.id)">Quitar</button>
           </div>
         </div>
+        <select
+          v-if="territorio(s).length"
+          class="entrada ancha"
+          :value="claveCabecera(s)"
+          @change="elegirCabecera(s, $event.target.value)"
+        >
+          <option value="">Sin cabecera</option>
+          <option v-for="c in territorio(s)" :key="`${c.x},${c.y}`" :value="`${c.x},${c.y}`">
+            Cabecera: {{ nombreDeCiudad(c) }}
+          </option>
+        </select>
         <div v-if="asignando === s.id" class="asignar">
           <small>Marcá las ciudades de esta subdivisión (las que estén en otra se mueven acá).</small>
           <label v-for="c in misCiudades" :key="c.clave" class="check">
@@ -186,5 +211,6 @@ h5 { margin: 0.6rem 0 0; font-size: 0.8rem; text-transform: uppercase; opacity: 
 }
 .boton:disabled { opacity: 0.45; cursor: not-allowed; }
 .vacio { font-size: 0.72rem; font-style: normal; color: #e67e22; }
+.datos small.cabecera { color: #f1c40f; opacity: 1; }
 small { opacity: 0.7; font-size: 0.75rem; }
 </style>

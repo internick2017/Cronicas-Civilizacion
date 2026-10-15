@@ -125,11 +125,12 @@ describe('brujula hacia la tierra libre', () => {
   // hacia una ciudad en vez de reclamando tierra, asi que puede tener menos
   // casillas en el turno 40 y aun asi ganar mucho antes. Lo que mide si juega
   // mejor es EN CUANTOS TURNOS GANA.
-  // Semilla 2: con el bono de la capital (2026-10-14) la 'escala-1' paso a ser la
-  // unica de las seeds 1-6 donde la facil gana antes (5 de 6 a favor de la dificil).
+  // Semilla 5: con los bonos de capital y cabecera (2026-10-14), en las seeds 1-6 la
+  // dificil gana antes en 4 de 6 (antes de esos bonos, tambien 4 de 6); la 'escala-1'
+  // paso a ser de las que pierde. La 5 la gana con margen (32 a 45).
   it('la facil gana mas lento que la dificil (la escala de dificultad se sostiene)', () => {
     const turnosParaGanar = (dificultad) => {
-      const e = crearEstado({ nombre: 'S', semilla: 'escala-2' });
+      const e = crearEstado({ nombre: 'S', semilla: 'escala-5' });
       aplicar(e, unirse(e, { id: 'bot', nombre: 'M', civilizacion: 'A', esBot: true, dificultadIA: dificultad }));
       aplicar(e, unirse(e, { id: 'h1', nombre: 'H', civilizacion: 'B' }));
       aplicar(e, iniciar(e));

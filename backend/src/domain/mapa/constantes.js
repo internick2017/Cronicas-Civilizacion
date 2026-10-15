@@ -727,3 +727,9 @@ export const BONO_PRODUCCION_CAPITAL = 0.2;   // +20% de todo lo que produce la 
 export const BONO_DEFENSA_CAPITAL = 1;        // defensa plana extra
 export const COSTO_MOVER_CAPITAL = { gold: 60 };
 export const RONDAS_SIN_PRODUCIR_MUDANZA = 1;
+
+// --- Cabecera de subdivision ---------------------------------------------------
+// La ciudad que encabeza una subdivision (ver reglas/subdivisiones.js#cabeceraDe).
+// AJUSTABLE.
+export const BONO_PRODUCCION_CABECERA = 0.05;       // a las demas ciudades que cubre, sin acumular niveles
+export const DESCUENTO_RESOLUCION_CABECERA = 0.2;   // resolver un problema cuesta 20% menos

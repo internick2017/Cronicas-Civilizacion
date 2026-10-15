@@ -21,6 +21,7 @@ export const PRIORIDADES = {
 // --- Lectura del arbol -------------------------------------------------------
 // Toda lectura pasa por aca: una subdivision guardada antes de la jerarquia no
 // trae `tipo`, `padreId` ni `prioridad`, y se lee como un Municipio sin padre.
+// Tampoco trae `cabecera`: se lee sin cabecera.
 // Los accesores devuelven COPIAS: mutar el resultado nunca toca el estado.
 const normalizar = (s) => ({
   id: s.id,
@@ -29,6 +30,7 @@ const normalizar = (s) => ({
   padreId: s.padreId ?? null,
   prioridad: s.prioridad ?? null,
   ciudades: (s.ciudades ?? []).map(({ x, y }) => ({ x, y })),
+  cabecera: s.cabecera ? { x: s.cabecera.x, y: s.cabecera.y } : null,
 });
 
 export const subdivisionesDe = (jugador) => (jugador?.subdivisiones ?? []).map(normalizar);
@@ -94,6 +96,30 @@ export function subdivisionResolutora(jugador, ciudades) {
   candidatas.sort((a, b) =>
     nivelDe(b.s) - nivelDe(a.s) || a.territorio.length - b.territorio.length || a.s.id.localeCompare(b.s.id));
   return candidatas[0].s;
+}
+
+// La cabecera guardada solo vale si sigue siendo una ciudad del jugador dentro del
+// territorio de la subdivision: una ciudad capturada o reasignada a otra rama la
+// pierde sola, sin evento.
+export function cabeceraDe(estado, jugador, sub) {
+  const { cabecera } = normalizar(sub);
+  if (!cabecera || !territorioDe(jugador, sub).some(c => clave(c) === clave(cabecera))) return null;
+  const tile = tileEn(estado, cabecera.x, cabecera.y);
+  return tile?.ciudad && tile.dueno === jugador.id ? cabecera : null;
+}
+
+// Claves "x,y" de las ciudades que rinden el bono de cabecera: las cubiertas por al
+// menos una subdivision (propia o ancestro) con cabecera valida que no sean esa
+// misma cabecera. Es un conjunto, asi que no se acumula entre niveles.
+export function ciudadesConBonoCabecera(estado, jugador) {
+  const conBono = new Set();
+  if (formaEstadoDe(jugador) !== 'federal') return conBono;
+  for (const sub of subdivisionesDe(jugador)) {
+    const cabecera = cabeceraDe(estado, jugador, sub);
+    if (!cabecera) continue;
+    for (const c of territorioDe(jugador, sub)) if (clave(c) !== clave(cabecera)) conBono.add(clave(c));
+  }
+  return conBono;
 }
 
 function jugadorFederal(estado, jugadorId) {
@@ -206,6 +232,20 @@ export function quitarSubdivision(estado, jugadorId, { id }) {
     throw new ReglaError('SUBDIVISION_DESCONOCIDA', 'Esa subdivisión no existe');
   }
   return [evento('SubdivisionQuitada', estado, jugadorId, { id })];
+}
+
+// Gratis. `x: null` la quita. La cabecera tiene que ser una ciudad propia del
+// territorio de la subdivision (directa o de una hija).
+export function elegirCabecera(estado, jugadorId, { subdivisionId, x, y }) {
+  const jugador = jugadorFederal(estado, jugadorId);
+  const sub = subdivisionPorId(jugador, subdivisionId);
+  if (!sub) throw new ReglaError('SUBDIVISION_DESCONOCIDA', 'Esa subdivisión no existe');
+  if (x === null) return [evento('CabeceraElegida', estado, jugadorId, { id: subdivisionId, x: null, y: null })];
+  ciudadesPropias(estado, jugadorId, [{ x, y }]);
+  if (!territorioDe(jugador, sub).some(c => c.x === x && c.y === y)) {
+    throw new ReglaError('FUERA_DE_SUBDIVISION', 'La cabecera tiene que ser una ciudad de esa subdivisión');
+  }
+  return [evento('CabeceraElegida', estado, jugadorId, { id: subdivisionId, x, y })];
 }
 
 // Prioridad de las ciudades que el jugador no puso en ninguna subdivision: en

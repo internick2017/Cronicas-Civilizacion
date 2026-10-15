@@ -1,10 +1,11 @@
 import {
   PROBLEMAS, LIMITE_SENAL, LIMITE_PROBLEMA, GRAVEDAD_MAXIMA, MEDIDOR_NEUTRO,
   DISTANCIA_PROPAGACION, RONDAS_RECUPERACION, RESOLUCION_POR_NIVEL, JITTER_INICIAL, MAX_PROBLEMAS_NUEVOS_POR_RONDA,
+  DESCUENTO_RESOLUCION_CABECERA,
 } from '../constantes.js';
 import { evento } from './comun.js';
 import { formaEstadoDe } from './gobierno.js';
-import { subdivisionResolutora, nivelDe } from './subdivisiones.js';
+import { subdivisionResolutora, nivelDe, cabeceraDe } from './subdivisiones.js';
 import { perdidaPoblacion } from './efectosProblemas.js';
 import { problemaApagado } from './modo.js';
 
@@ -20,6 +21,14 @@ const resueltosDe = (jugador) => structuredClone(jugador?.problemasResueltos ?? 
 
 const clave = (c) => `${c.x},${c.y}`;
 const acotar = (n) => Math.max(0, Math.min(100, n));
+
+// Lo que cobra `sub` (null = el Pais) por resolver un problema. Con cabecera, menos,
+// redondeado hacia arriba como cualquier costo escalado (ver efectosProblemas.js).
+function costoResolucion(estado, jugador, sub) {
+  const base = RESOLUCION_POR_NIVEL[sub ? nivelDe(sub) : 1].oro;
+  if (!sub || !cabeceraDe(estado, jugador, sub)) return base;
+  return Math.ceil(base * (1 - DESCUENTO_RESOLUCION_CABECERA) - 1e-9);
+}
 const distancia = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 
 // --- Que mueve cada medidor -----------------------------------------------------
@@ -155,7 +164,7 @@ function pasada(estado, jugador, rng) {
   for (const p of problemas) {
     if (p.desde >= turno || p.listoEn > turno) continue;
     const sub = subdivisionResolutora(jugador, p.ciudades);
-    const costo = RESOLUCION_POR_NIVEL[sub ? nivelDe(sub) : 1].oro;
+    const costo = costoResolucion(estado, jugador, sub);
     if (oro >= costo) {
       oro -= costo;
       eventos.push(evento('RecursosGastados', estado, jugador.id, { costo: { gold: costo } }));
@@ -233,7 +242,7 @@ export function problemasParaLaVista(estado, jugador) {
       ...p,
       resolutorActual: sub ? sub.id : null,
       nivelResolutor: nivel,
-      costoResolver: RESOLUCION_POR_NIVEL[nivel].oro,
+      costoResolver: costoResolucion(estado, jugador, sub),
       rondasRestantes: Math.max(0, p.listoEn - estado.turno),
     };
   });

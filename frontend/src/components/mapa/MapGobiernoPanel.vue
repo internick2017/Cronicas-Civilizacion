@@ -9,7 +9,7 @@ const props = defineProps({
   jugadorId: { type: String, required: true },
   constantes: { type: Object, required: true } // {gobiernos, gruposDeApoyo, enfriamientoVoto, ...}
 })
-const emit = defineEmits(['proponer', 'ventajas', 'forma', 'crearSubdivision', 'renombrarSubdivision', 'asignarCiudades', 'desasignarCiudades', 'quitarSubdivision', 'cerrar'])
+const emit = defineEmits(['proponer', 'ventajas', 'forma', 'crearSubdivision', 'renombrarSubdivision', 'asignarCiudades', 'desasignarCiudades', 'quitarSubdivision', 'elegirCabecera', 'cerrar'])
 
 const NOMBRE_GRUPO = { pueblo: 'Pueblo', lideres: 'Líderes', militares: 'Militares' }
 const QUIEN_APRUEBA = {
@@ -166,6 +166,7 @@ const ventajas = (grupo) => {
         @asignar="(id, ciudades) => emit('asignarCiudades', id, ciudades)"
         @desasignar="(id, ciudades) => emit('desasignarCiudades', id, ciudades)"
         @quitar="(id) => emit('quitarSubdivision', id)"
+        @cabecera="(id, ciudad) => emit('elegirCabecera', id, ciudad)"
       />
     </section>
   </div>

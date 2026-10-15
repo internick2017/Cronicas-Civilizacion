@@ -533,6 +533,8 @@ const quitarSubdivision = (id) => ejecutarAccion({ tipo: 'quitarSubdivision', id
 const renombrarSubdivision = (id, nombre) => ejecutarAccion({ tipo: 'renombrarSubdivision', id, nombre })
 const asignarCiudades = (id, ciudades) => ejecutarAccion({ tipo: 'asignarCiudades', id, ciudades })
 const desasignarCiudades = (id, ciudades) => ejecutarAccion({ tipo: 'desasignarCiudades', id, ciudades })
+const elegirCabecera = (subdivisionId, ciudad) =>
+  ejecutarAccion({ tipo: 'elegirCabecera', subdivisionId, x: ciudad?.x ?? null, y: ciudad?.y ?? null })
 
 const cerrarMenuEdificio = () => {
   edificioMenuAbierto.value = null
@@ -766,6 +768,7 @@ onUnmounted(() => {
         @asignar-ciudades="asignarCiudades"
         @desasignar-ciudades="desasignarCiudades"
         @quitar-subdivision="quitarSubdivision"
+        @elegir-cabecera="elegirCabecera"
         @cerrar="gobiernoAbierto = false"
       />
     </MapDialogo>
