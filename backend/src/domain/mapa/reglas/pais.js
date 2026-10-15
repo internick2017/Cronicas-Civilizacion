@@ -6,14 +6,20 @@ export const LARGO_MAXIMO_NOMBRE_PAIS = 30;
 
 const sinMayusculas = (texto) => texto.toLocaleLowerCase('es');
 
-// El nombre del pais es `jugador.civilizacion`. Cambiarlo es gratis y no exige
-// turno ni partida iniciada: es una etiqueta, no una jugada. Las ciudades ya
-// fundadas ("Incas Capital") conservan su nombre: se renombran aparte.
-export function renombrarPais(estado, jugadorId, { nombre }) {
+// Quien puede ponerle nombre a algo suyo (pais, moneda, gobierno): es gratis y no
+// exige turno ni partida iniciada, porque es una etiqueta y no una jugada.
+export function jugadorQueNombra(estado, jugadorId) {
   if (estado.estado === 'terminado') throw new ReglaError('PARTIDA_TERMINADA', 'La partida ya terminó');
   const jugador = jugadorPorId(estado, jugadorId);
   if (!jugador) throw new ReglaError('JUGADOR_DESCONOCIDO', `Jugador desconocido: ${jugadorId}`);
   if (!jugador.activo) throw new ReglaError('JUGADOR_INACTIVO', 'Ya no estás en la partida');
+  return jugador;
+}
+
+// El nombre del pais es `jugador.civilizacion`. Las ciudades ya fundadas
+// ("Incas Capital") conservan su nombre: se renombran aparte.
+export function renombrarPais(estado, jugadorId, { nombre }) {
+  jugadorQueNombra(estado, jugadorId);
 
   const limpio = typeof nombre === 'string' ? nombre.trim() : '';
   if (!limpio) throw new ReglaError('NOMBRE_INVALIDO', 'El nombre no puede estar vacío');

@@ -16,6 +16,7 @@ import { abandonar } from '../domain/mapa/reglas/abandono.js';
 import { proponerAlianza, responderAlianza, romperAlianza, regalarRecursos } from '../domain/mapa/reglas/alianzas.js';
 import { renombrarPais } from '../domain/mapa/reglas/pais.js';
 import { moverCapital } from '../domain/mapa/reglas/capital.js';
+import { nombrarMoneda, acunarMoneda } from '../domain/mapa/reglas/moneda.js';
 import { jugarTurnoIA } from '../domain/mapa/ia.js';
 import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, RAZAS } from '../domain/mapa/constantes.js';
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
@@ -71,8 +72,8 @@ const VUELTAS_IA_MAXIMAS = 10;
 
 // Quien perdio el poder (ver reglas/gobierno.js) solo puede dar ventajas para
 // recuperar apoyo, pasar el turno o abandonar: el resto de las acciones del
-// mapa las juega por el la maquina. Renombrar el pais no es una orden.
-const ACCIONES_SIN_PODER = new Set(['darVentajas', 'terminarTurno', 'abandonar', 'renombrarPais']);
+// mapa las juega por el la maquina. Ponerle nombre al pais o a la moneda no es una orden.
+const ACCIONES_SIN_PODER = new Set(['darVentajas', 'terminarTurno', 'abandonar', 'renombrarPais', 'nombrarMoneda']);
 
 // El apoyo y la administracion de subdivisiones de un jugador son privados,
 // igual que sus recursos (ver visibilidad.js): un humano no los recibe dentro de
@@ -80,7 +81,7 @@ const ACCIONES_SIN_PODER = new Set(['darVentajas', 'terminarTurno', 'abandonar',
 // coordenadas revelarian una ciudad que el rival quizas no descubrio.
 const EVENTOS_PRIVADOS_DE_GOBIERNO = new Set(['ApoyoActualizado', 'SubdivisionCreada', 'SubdivisionQuitada', 'SubdivisionRenombrada', 'CiudadesAsignadas', 'CiudadesDesasignadas', 'CabeceraElegida',
   'MedidoresActualizados', 'ProblemaSurgido', 'ProblemaAgravado', 'ProblemaResuelto', 'ProblemasDescartados', 'PoblacionAjustada',
-  'CapitalMovida']);
+  'CapitalMovida', 'MonedaAcunada']);
 const eventosVisiblesPara = (eventos, jugadorId) =>
   eventos.filter(e => !EVENTOS_PRIVADOS_DE_GOBIERNO.has(e.tipo) || e.jugadorId === jugadorId);
 
@@ -116,6 +117,8 @@ const REGLAS_POR_TIPO = {
   romperAlianza: (estado, jugadorId) => romperAlianza(estado, jugadorId),
   regalarRecursos: (estado, jugadorId, accion) => regalarRecursos(estado, jugadorId, accion),
   renombrarPais: (estado, jugadorId, accion) => renombrarPais(estado, jugadorId, accion),
+  nombrarMoneda: (estado, jugadorId, accion) => nombrarMoneda(estado, jugadorId, accion),
+  acunarMoneda: (estado, jugadorId, accion) => acunarMoneda(estado, jugadorId, accion),
   abandonar: (estado, jugadorId) => abandonar(estado, jugadorId),
   terminarTurno: (estado, jugadorId) => terminarTurno(estado, jugadorId),
 };

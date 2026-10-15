@@ -10,8 +10,18 @@ export const RECURSO = {
   culture: { icono: '🎭', nombre: 'cultura' }
 }
 
+// El oro propio se muestra con el nombre y el simbolo de la moneda del jugador
+// (vista.jugadores[i].moneda). Sin moneda, como siempre.
+export const recursoDe = (recurso, moneda = null) =>
+  recurso === 'gold' && moneda
+    ? { icono: moneda.simbolo, nombre: moneda.nombre }
+    : RECURSO[recurso]
+
 // { gold: 40, food: 20 } -> "💰 40 de oro · 🌾 20 de comida"
-export const textoCosto = (costo) =>
+export const textoCosto = (costo, moneda = null) =>
   Object.entries(costo ?? {})
-    .map(([r, m]) => `${RECURSO[r]?.icono ?? ''} ${m} de ${RECURSO[r]?.nombre ?? r}`.trim())
+    .map(([r, m]) => {
+      const info = recursoDe(r, moneda)
+      return `${info?.icono ?? ''} ${m} de ${info?.nombre ?? r}`.trim()
+    })
     .join(' · ')

@@ -9,7 +9,7 @@ const props = defineProps({
   jugadorId: { type: String, required: true },
   constantes: { type: Object, required: true } // {gobiernos, gruposDeApoyo, enfriamientoVoto, ...}
 })
-const emit = defineEmits(['proponer', 'ventajas', 'forma', 'crearSubdivision', 'renombrarSubdivision', 'asignarCiudades', 'desasignarCiudades', 'quitarSubdivision', 'elegirCabecera', 'cerrar'])
+const emit = defineEmits(['proponer', 'ventajas', 'forma', 'crearSubdivision', 'renombrarSubdivision', 'asignarCiudades', 'desasignarCiudades', 'quitarSubdivision', 'elegirCabecera', 'nombrarMoneda', 'acunar', 'cerrar'])
 
 const NOMBRE_GRUPO = { pueblo: 'Pueblo', lideres: 'Líderes', militares: 'Militares' }
 const QUIEN_APRUEBA = {
@@ -54,6 +54,31 @@ const motivoProponer = computed(() => {
 const motivoVentajas = computed(() =>
   (oroVentajas.value > oroDisponible.value ? 'sin oro suficiente' : null)
 )
+
+// --- Moneda: el nombre es gratis y sin turno; acuñar da oro a cambio de inflacion ---
+const reglasMoneda = computed(() => props.constantes.moneda || { largoNombre: 20, largoSimbolo: 3 })
+const acunacion = computed(() => props.constantes.acunacion || null)
+const nombreMoneda = ref(yo.value?.moneda?.nombre ?? '')
+const simboloMoneda = ref(yo.value?.moneda?.simbolo ?? '')
+const puedeNombrarMoneda = computed(() => nombreMoneda.value.trim() !== '' && simboloMoneda.value.trim() !== '')
+const nombrarMoneda = () => {
+  if (puedeNombrarMoneda.value) emit('nombrarMoneda', nombreMoneda.value.trim(), simboloMoneda.value.trim())
+}
+const oroAcunar = ref(10)
+const inflacionAcunada = computed(() => yo.value?.inflacionAcunada ?? 0)
+const quedaAcunar = computed(() => (acunacion.value?.maximoPorRonda ?? 0) - (yo.value?.acunadoEstaRonda ?? 0))
+const inflacionTras = computed(() => Math.round(
+  (inflacionAcunada.value + (Number(oroAcunar.value) || 0) * (acunacion.value?.puntosPorOro ?? 0)) * 100) / 100)
+const motivoAcunar = computed(() => {
+  const oro = Number(oroAcunar.value)
+  if (!Number.isInteger(oro) || oro < 1) return 'elegí cuánto oro acuñar'
+  if (oro > quedaAcunar.value) return `esta ronda podés acuñar hasta ${quedaAcunar.value}`
+  if (inflacionTras.value > (acunacion.value?.techo ?? 100) + 1e-9) return 'pasaría el techo de inflación'
+  return null
+})
+const acunar = () => {
+  if (!motivoAcunar.value) emit('acunar', Number(oroAcunar.value))
+}
 
 const proponer = (tipo) => {
   if (motivoProponer.value) return
@@ -129,6 +154,31 @@ const ventajas = (grupo) => {
     </section>
 
     <section>
+      <h4>Moneda</h4>
+      <div class="fila-botones">
+        <input v-model="nombreMoneda" class="entrada-oro ancha-media" :maxlength="reglasMoneda.largoNombre" placeholder="Nombre">
+        <input v-model="simboloMoneda" class="entrada-oro corta" placeholder="Símbolo" @keyup.enter="nombrarMoneda">
+        <button class="btn-secundario" :disabled="!puedeNombrarMoneda" @click="nombrarMoneda">
+          <strong>Nombrar</strong>
+        </button>
+      </div>
+      <template v-if="acunacion">
+        <small>
+          Acuñar da oro al instante pero encarece todo lo que comprás: cada {{ Math.round(1 / acunacion.puntosPorOro) }}
+          de oro suman 1% a los costos. Baja {{ acunacion.bajadaPorRonda }} puntos por ronda.
+        </small>
+        <p class="actual">Inflación por acuñar: {{ inflacionAcunada }}%</p>
+        <div class="fila-botones">
+          <input v-model.number="oroAcunar" class="entrada-oro" type="number" min="1" :max="quedaAcunar">
+          <button class="btn-secundario" :disabled="motivoAcunar !== null" @click="acunar">
+            <strong>Acuñar</strong><small>Quedaría en {{ inflacionTras }}%</small>
+          </button>
+        </div>
+        <em v-if="motivoAcunar">{{ motivoAcunar }}</em>
+      </template>
+    </section>
+
+    <section>
       <h4>Forma de Estado</h4>
       <div class="fila-botones">
         <button
@@ -195,6 +245,8 @@ section { display: flex; flex-direction: column; gap: 0.35rem; }
 .btn-secundario:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
 .btn-secundario:disabled { opacity: 0.45; cursor: not-allowed; }
 .entrada-oro.ancha { width: 100%; box-sizing: border-box; }
+.entrada-oro.ancha-media { width: 9rem; }
+.entrada-oro.corta { width: 4rem; }
 .subdivision { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
 .subdivision small { display: block; }
 .ciudad-check { font-size: 0.8rem; display: flex; gap: 0.4rem; align-items: center; }

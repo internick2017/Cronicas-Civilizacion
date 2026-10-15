@@ -10,6 +10,7 @@ import { multiplicadorCostos } from './efectosProblemas.js';
 import { reglasDelModo } from './modo.js';
 import { gobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo } from './gobierno.js';
 import { capitalDe } from './capital.js';
+import { monedaDe, inflacionAcunadaDe, acunadoEnRonda } from './moneda.js';
 
 // `videntes`: el jugador y sus aliados, que comparten lo que descubren.
 // `capitales`: claves "x,y" de la capital de cada jugador. Viajan marcadas EN la
@@ -87,6 +88,10 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       subdivisiones: subdivisionesDe(jugador)
         .map(s => ({ ...s, nivel: nivelDe(s), cabecera: cabeceraDe(estado, jugador, s) })),
       capital: capitalDe(estado, jugador),
+      moneda: monedaDe(jugador),
+      // Puntos porcentuales que ya estan dentro de multiplicadorCostos.
+      inflacionAcunada: inflacionAcunadaDe(jugador),
+      acunadoEstaRonda: acunadoEnRonda(jugador, estado.turno),
     };
   }
   // esBot y dificultadIA no son informacion sensible (a diferencia de
@@ -97,6 +102,8 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
     gobierno: gobiernoDe(jugador),
     formaEstado: formaEstadoDe(jugador),
     enPoder: estaEnPoder(jugador),
+    // El nombre de la moneda es una etiqueta, como el del pais: lo ven todos.
+    moneda: monedaDe(jugador),
     ...(esBot ? { dificultadIA: jugador.dificultadIA ?? DIFICULTAD_IA_DEFAULT } : {}),
   };
 }

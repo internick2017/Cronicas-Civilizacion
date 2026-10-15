@@ -4,6 +4,7 @@ import {
   saludMaximaCiudad, saludDeCiudad, REGENERACION_CIUDAD, FRACCION_SALUD_AL_CAPTURAR
 } from './constantes.js';
 import { vecinosOrtogonales } from './reglas/comun.js';
+import { acunadoEnRonda, inflacionAcunadaDe, inflacionTrasRonda } from './reglas/moneda.js';
 import { ReglaError } from './errores.js';
 
 function quitarPropuestasEntre(estado, a, b) {
@@ -66,6 +67,18 @@ export function aplicar(estado, eventos) {
       case 'PaisRenombrado':
         jugadorPorId(estado, jugadorId).civilizacion = datos.nombre;
         break;
+
+      case 'MonedaNombrada':
+        jugadorPorId(estado, jugadorId).moneda = { nombre: datos.nombre, simbolo: datos.simbolo };
+        break;
+
+      case 'MonedaAcunada': {
+        const j = jugadorPorId(estado, jugadorId);
+        j.recursos.gold += datos.oro;
+        j.inflacionAcunada = datos.inflacion;
+        j.acunacion = { ronda: evento_turno, oro: acunadoEnRonda(j, evento_turno) + datos.oro };
+        break;
+      }
 
       case 'GobiernoCambiado':
         jugadorPorId(estado, jugadorId).gobierno = datos.gobierno;
@@ -452,6 +465,9 @@ export function aplicar(estado, eventos) {
         if (estado.listos) estado.listos = [];
         // Las treguas que vencieron con la ronda que acaba de cerrar ya no sirven.
         if (estado.treguas) estado.treguas = estado.treguas.filter(t => t.hasta >= estado.turno);
+        for (const j of estado.jugadores) {
+          if (inflacionAcunadaDe(j) > 0) j.inflacionAcunada = inflacionTrasRonda(j);
+        }
         for (const t of estado.mapa) {
           if (t.ciudad) {
             t.ciudad.salud = Math.min(

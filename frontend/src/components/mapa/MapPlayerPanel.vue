@@ -58,8 +58,13 @@ const NOMBRE_RECURSO = {
 // lo prometido y lo entregado no puedan separarse.
 const rinde = (recurso) => yo.value?.produccion?.[recurso] ?? 0
 
+// El oro propio lleva el nombre y el simbolo de la moneda del jugador.
+const moneda = computed(() => yo.value?.moneda ?? null)
+const iconoRecurso = (recurso) =>
+  (recurso === 'gold' && moneda.value ? moneda.value.simbolo : RECURSOS_ICONOS[recurso] || recurso)
+
 const tituloRecurso = (recurso) => {
-  const nombre = NOMBRE_RECURSO[recurso] || recurso
+  const nombre = recurso === 'gold' && moneda.value ? moneda.value.nombre : NOMBRE_RECURSO[recurso] || recurso
   const porTurno = rinde(recurso)
   return porTurno
     ? `${nombre}: +${porTurno} por turno`
@@ -129,7 +134,7 @@ const RECURSOS_ICONOS = {
         class="recurso"
         :title="tituloRecurso(recurso)"
       >
-        {{ RECURSOS_ICONOS[recurso] || recurso }} {{ cantidad }}
+        {{ iconoRecurso(recurso) }} {{ cantidad }}
         <!-- El rendimiento por turno importa tanto como el stock: sin el no se
              puede saber si juntar para una ciudad lleva dos turnos o quince.
              El cero se marca distinto porque suele ser un problema (madera y

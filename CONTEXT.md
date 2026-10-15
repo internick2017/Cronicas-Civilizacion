@@ -118,6 +118,12 @@ Robarle oro a una ciudad venciéndola sin tomarla. Además, la ciudad saqueada n
 unas rondas (`SAQUEO.rondasSinProduccion`); un nuevo saqueo renueva ese plazo, no lo acumula.
 _Avoid_: pillaje, botín, raid
 
+**Acuñar**:
+Crear oro de la nada a cambio de inflación: los costos suben un tanto por ciento que baja solo con
+las rondas. Es distinto de la inflación que aparece como problema social en el Estado federal, aunque
+las dos se multiplican.
+_Avoid_: imprimir, emitir
+
 **Crónica**:
 El relato de lo que pasó en la ronda, que es lo que el jugador lee para enterarse de la partida.
 _Avoid_: log, historial, registro, narración

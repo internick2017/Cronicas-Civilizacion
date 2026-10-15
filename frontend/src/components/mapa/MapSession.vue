@@ -467,7 +467,8 @@ const puedeFundar = computed(() => {
   const costo = constantes.value.costoCiudad || {}
   return Object.entries(costo).every(([recurso, monto]) => (recursosPropios.value[recurso] || 0) >= monto)
 })
-const textoCostoCiudad = computed(() => textoCosto(constantes.value.costoCiudad))
+const textoCostoCiudad = computed(() =>
+  textoCosto(constantes.value.costoCiudad, vista.value.jugadores.find(j => j.id === jugadorId)?.moneda))
 
 const confirmarFundar = () => {
   const nombre = nombreCiudad.value.trim()
@@ -769,6 +770,8 @@ onUnmounted(() => {
         @desasignar-ciudades="desasignarCiudades"
         @quitar-subdivision="quitarSubdivision"
         @elegir-cabecera="elegirCabecera"
+        @nombrar-moneda="(nombre, simbolo) => ejecutarAccion({ tipo: 'nombrarMoneda', nombre, simbolo })"
+        @acunar="(oro) => ejecutarAccion({ tipo: 'acunarMoneda', oro })"
         @cerrar="gobiernoAbierto = false"
       />
     </MapDialogo>

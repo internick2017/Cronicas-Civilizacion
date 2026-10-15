@@ -1,4 +1,5 @@
 import { EFECTOS_PROBLEMAS, ESCALA_GRAVEDAD } from '../constantes.js';
+import { inflacionAcunadaDe } from './moneda.js';
 
 // Como cada problema social castiga mientras esta ACTIVO (ver problemas.js). Todas
 // puras, aceptan un jugador viejo sin el campo y devuelven la identidad (1 o 0) si
@@ -38,10 +39,12 @@ export function penalizacionDefensa(jugador, x, y) {
     .reduce((s, p) => s + EFECTOS_PROBLEMAS[p.tipo] * escala(p.gravedad), 0));
 }
 
-// Inflacion: construir, reclutar y mejorar cuestan mas, en TODAS las ciudades.
+// Inflacion: construir, reclutar y mejorar cuestan mas, en TODAS las ciudades. La
+// del problema social (solo federal) y la de acuñar moneda (cualquier Estado) se multiplican.
 export function multiplicadorCostos(jugador) {
   const gravedades = activos(jugador, 'inflacion').map(p => p.gravedad);
-  return gravedades.length === 0 ? 1 : 1 + EFECTOS_PROBLEMAS.inflacion * escala(Math.max(...gravedades));
+  const porProblema = gravedades.length === 0 ? 1 : 1 + EFECTOS_PROBLEMAS.inflacion * escala(Math.max(...gravedades));
+  return porProblema * (1 + inflacionAcunadaDe(jugador) / 100);
 }
 
 // Redondea hacia ARRIBA: nunca baja un costo y nunca regala un recurso.

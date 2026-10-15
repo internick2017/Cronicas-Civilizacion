@@ -733,3 +733,18 @@ export const RONDAS_SIN_PRODUCIR_MUDANZA = 1;
 // AJUSTABLE.
 export const BONO_PRODUCCION_CABECERA = 0.05;       // a las demas ciudades que cubre, sin acumular niveles
 export const DESCUENTO_RESOLUCION_CABECERA = 0.2;   // resolver un problema cuesta 20% menos
+
+// --- Moneda --------------------------------------------------------------------
+// El oro de cada jugador se muestra con el nombre y el simbolo de su moneda (ver
+// reglas/moneda.js). 💰 y no 🪙: la moneda es Emoji 13 y la fuente de Windows 10 no la trae.
+export const MONEDA_POR_DEFECTO = { nombre: 'Oro', simbolo: '💰' };
+export const LARGO_MAXIMO_NOMBRE_MONEDA = 20;
+export const LARGO_MAXIMO_SIMBOLO_MONEDA = 3;
+// Acuñar da oro a cambio de inflacion: puntos porcentuales que encarecen todo lo
+// que cuesta y bajan solos al cerrar cada ronda. AJUSTABLE.
+export const ACUNACION = {
+  maximoPorRonda: 100,  // oro acuñable por jugador y por ronda
+  puntosPorOro: 0.2,    // 50 de oro = +10% a los costos
+  techo: 100,           // la inflacion acuñada nunca pasa de aca
+  bajadaPorRonda: 3,
+};

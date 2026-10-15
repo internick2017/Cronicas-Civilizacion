@@ -1,7 +1,7 @@
 <!-- frontend/src/components/mapa/MapCiudadMenu.vue -->
 <script setup>
 import { computed, ref } from 'vue'
-import { RECURSO, textoCosto } from './recursos.js'
+import { recursoDe, textoCosto as textoCostoEn } from './recursos.js'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -28,6 +28,9 @@ const tile = computed(() =>
 const recursos = computed(() =>
   props.vista.jugadores.find(j => j.id === props.jugadorId)?.recursos || {}
 )
+// Los precios en oro se leen en la moneda propia del jugador.
+const moneda = computed(() => props.vista.jugadores.find(j => j.id === props.jugadorId)?.moneda ?? null)
+const textoCosto = (costo) => textoCostoEn(costo, moneda.value)
 const tieneBarracks = computed(() => (tile.value?.ciudad?.edificios || []).includes('barracks'))
 const tienePuerto = computed(() => (tile.value?.ciudad?.edificios || []).includes('port'))
 
@@ -75,7 +78,7 @@ const confirmar = () => {
 }
 const quedaTras = (costo) =>
   Object.entries(costo)
-    .map(([r, m]) => `${RECURSO[r]?.icono ?? r} ${(recursos.value[r] || 0) - m}`)
+    .map(([r, m]) => `${recursoDe(r, moneda.value)?.icono ?? r} ${(recursos.value[r] || 0) - m}`)
     .join(' · ')
 
 const motivoEdificio = (ed) => {
