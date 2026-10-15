@@ -415,7 +415,8 @@ const umbralAviso = computed(() =>
       <p class="aviso">
         <strong>Podés perder el poder</strong> (nunca la partida): por una crisis, por una expulsión si el apoyo de
         los líderes (o de los militares, en estratocracia) cae por debajo de {{ constantes.umbralesGobierno?.expulsion }},
-        por sucesión en la monarquía, o en las elecciones de las repúblicas, que son cada {{ rondasElecciones }} rondas.
+        por sucesión en la monarquía, o en las elecciones de las repúblicas, que son cada {{ rondasElecciones }} rondas
+        salvo que fijes otro mandato.
         Sin poder, <strong>la máquina juega tus turnos</strong> y el botón pasa a "Esperar". Mientras tanto
         solo podés dar ventajas para volver a ganar apoyo.
       </p>
@@ -428,6 +429,15 @@ const umbralAviso = computed(() =>
       </p>
       <p>
         Además, en el menú de cada ciudad propia podés <strong>renombrarla</strong> cuando quieras.
+      </p>
+      <p v-if="constantes.impuestos">
+        <strong>Ajustes del gobierno.</strong> Mientras tengas el poder fijás los <strong>impuestos</strong>: los
+        altos dan {{ pct(constantes.impuestos.altos.oro) }} más de oro pero cuestan
+        {{ -constantes.impuestos.altos.apoyoPueblo }} de apoyo del pueblo por ronda; los bajos rinden
+        {{ pct(-constantes.impuestos.bajos.oro) }} menos de oro y suman {{ constantes.impuestos.bajos.apoyoPueblo }}
+        por ronda. Una república elige además la duración del <strong>mandato</strong> (de
+        {{ constantes.limitesMandato?.min }} a {{ constantes.limitesMandato?.max }} rondas entre elecciones). Y
+        cualquier gobierno puede llevar un <strong>nombre propio</strong> (gratis, aunque hayas perdido el poder).
       </p>
       <p v-if="constantes.acunacion">
         <strong>Moneda.</strong> Tu oro puede llevar el nombre y el símbolo que quieras (gratis, en cualquier

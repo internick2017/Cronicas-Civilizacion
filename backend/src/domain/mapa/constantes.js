@@ -734,6 +734,16 @@ export const RONDAS_SIN_PRODUCIR_MUDANZA = 1;
 export const BONO_PRODUCCION_CABECERA = 0.05;       // a las demas ciudades que cubre, sin acumular niveles
 export const DESCUENTO_RESOLUCION_CABECERA = 0.2;   // resolver un problema cuesta 20% menos
 
+// --- Gobierno configurable -------------------------------------------------------
+// Cuanto oro de mas (o de menos) rinde cada nivel de impuestos y cuanto apoyo del
+// pueblo gana o pierde por ronda (ver reglas/gobierno.js). AJUSTABLE.
+export const IMPUESTOS = {
+  bajos: { oro: -0.2, apoyoPueblo: 1 },
+  normales: { oro: 0, apoyoPueblo: 0 },
+  altos: { oro: 0.25, apoyoPueblo: -2 },
+};
+export const LARGO_MAXIMO_NOMBRE_GOBIERNO = 40;
+
 // --- Moneda --------------------------------------------------------------------
 // El oro de cada jugador se muestra con el nombre y el simbolo de su moneda (ver
 // reglas/moneda.js). 💰 y no 🪙: la moneda es Emoji 13 y la fuente de Windows 10 no la trae.

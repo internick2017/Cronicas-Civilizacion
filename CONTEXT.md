@@ -118,6 +118,10 @@ Robarle oro a una ciudad venciéndola sin tomarla. Además, la ciudad saqueada n
 unas rondas (`SAQUEO.rondasSinProduccion`); un nuevo saqueo renueva ese plazo, no lo acumula.
 _Avoid_: pillaje, botín, raid
 
+**Mandato**:
+Las rondas entre dos elecciones de una república. Lo fija la partida y cada república puede cambiarlo.
+_Avoid_: período, legislatura
+
 **Acuñar**:
 Crear oro de la nada a cambio de inflación: los costos suben un tanto por ciento que baja solo con
 las rondas. Es distinto de la inflación que aparece como problema social en el Estado federal, aunque

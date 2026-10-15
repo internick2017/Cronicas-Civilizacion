@@ -84,6 +84,18 @@ export function aplicar(estado, eventos) {
         jugadorPorId(estado, jugadorId).gobierno = datos.gobierno;
         break;
 
+      case 'ImpuestosFijados':
+        jugadorPorId(estado, jugadorId).impuestos = datos.nivel;
+        break;
+
+      case 'MandatoFijado':
+        jugadorPorId(estado, jugadorId).mandato = datos.rondas;
+        break;
+
+      case 'GobiernoNombrado':
+        jugadorPorId(estado, jugadorId).nombreGobierno = datos.nombre;
+        break;
+
       case 'VotacionFallida':
         jugadorPorId(estado, jugadorId).cambioBloqueadoHasta = datos.hastaTurno;
         break;

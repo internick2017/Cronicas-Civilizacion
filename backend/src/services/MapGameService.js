@@ -4,7 +4,9 @@ import { aplicar } from '../domain/mapa/aplicar.js';
 import { crearRng } from '../domain/mapa/rng.js';
 import { ReglaError } from '../domain/mapa/errores.js';
 import { unirse as unirseRegla, iniciar as iniciarRegla, sumarMaquina } from '../domain/mapa/reglas/partida.js';
-import { proponerGobierno, cambiarFormaEstado, darVentajas, estaEnPoder } from '../domain/mapa/reglas/gobierno.js';
+import {
+  proponerGobierno, cambiarFormaEstado, darVentajas, estaEnPoder, fijarImpuestos, fijarMandato, nombrarGobierno,
+} from '../domain/mapa/reglas/gobierno.js';
 import {
   crearSubdivision, quitarSubdivision, renombrarSubdivision, asignarCiudades, desasignarCiudades, elegirCabecera,
 } from '../domain/mapa/reglas/subdivisiones.js';
@@ -72,8 +74,11 @@ const VUELTAS_IA_MAXIMAS = 10;
 
 // Quien perdio el poder (ver reglas/gobierno.js) solo puede dar ventajas para
 // recuperar apoyo, pasar el turno o abandonar: el resto de las acciones del
-// mapa las juega por el la maquina. Ponerle nombre al pais o a la moneda no es una orden.
-const ACCIONES_SIN_PODER = new Set(['darVentajas', 'terminarTurno', 'abandonar', 'renombrarPais', 'nombrarMoneda']);
+// mapa las juega por el la maquina. Ponerle nombre al pais, a la moneda o al
+// gobierno no es una orden.
+const ACCIONES_SIN_PODER = new Set([
+  'darVentajas', 'terminarTurno', 'abandonar', 'renombrarPais', 'nombrarMoneda', 'nombrarGobierno',
+]);
 
 // El apoyo y la administracion de subdivisiones de un jugador son privados,
 // igual que sus recursos (ver visibilidad.js): un humano no los recibe dentro de
@@ -81,7 +86,7 @@ const ACCIONES_SIN_PODER = new Set(['darVentajas', 'terminarTurno', 'abandonar',
 // coordenadas revelarian una ciudad que el rival quizas no descubrio.
 const EVENTOS_PRIVADOS_DE_GOBIERNO = new Set(['ApoyoActualizado', 'SubdivisionCreada', 'SubdivisionQuitada', 'SubdivisionRenombrada', 'CiudadesAsignadas', 'CiudadesDesasignadas', 'CabeceraElegida',
   'MedidoresActualizados', 'ProblemaSurgido', 'ProblemaAgravado', 'ProblemaResuelto', 'ProblemasDescartados', 'PoblacionAjustada',
-  'CapitalMovida', 'MonedaAcunada']);
+  'CapitalMovida', 'MonedaAcunada', 'ImpuestosFijados', 'MandatoFijado']);
 const eventosVisiblesPara = (eventos, jugadorId) =>
   eventos.filter(e => !EVENTOS_PRIVADOS_DE_GOBIERNO.has(e.tipo) || e.jugadorId === jugadorId);
 
@@ -106,6 +111,9 @@ const REGLAS_POR_TIPO = {
   proponerGobierno: (estado, jugadorId, accion) => proponerGobierno(estado, jugadorId, accion),
   cambiarFormaEstado: (estado, jugadorId, accion) => cambiarFormaEstado(estado, jugadorId, accion),
   darVentajas: (estado, jugadorId, accion) => darVentajas(estado, jugadorId, accion),
+  fijarImpuestos: (estado, jugadorId, accion) => fijarImpuestos(estado, jugadorId, accion),
+  fijarMandato: (estado, jugadorId, accion) => fijarMandato(estado, jugadorId, accion),
+  nombrarGobierno: (estado, jugadorId, accion) => nombrarGobierno(estado, jugadorId, accion),
   crearSubdivision: (estado, jugadorId, accion) => crearSubdivision(estado, jugadorId, accion),
   quitarSubdivision: (estado, jugadorId, accion) => quitarSubdivision(estado, jugadorId, accion),
   renombrarSubdivision: (estado, jugadorId, accion) => renombrarSubdivision(estado, jugadorId, accion),

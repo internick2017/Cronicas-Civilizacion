@@ -8,7 +8,9 @@ import { subdivisionesDe, nivelDe, cabeceraDe } from './subdivisiones.js';
 import { problemasParaLaVista, senalesDe } from './problemas.js';
 import { multiplicadorCostos } from './efectosProblemas.js';
 import { reglasDelModo } from './modo.js';
-import { gobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo } from './gobierno.js';
+import {
+  gobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo, impuestosDe, mandatoDe, nombreGobiernoDe,
+} from './gobierno.js';
 import { capitalDe } from './capital.js';
 import { monedaDe, inflacionAcunadaDe, acunadoEnRonda } from './moneda.js';
 
@@ -72,8 +74,11 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       // mapa oculto tiene tomado el rival.
       dominacion: dominacionParaLaVista(estado, jugador.id),
       gobierno: gobiernoDe(jugador),
+      nombreGobierno: nombreGobiernoDe(jugador),
       formaEstado: formaEstadoDe(jugador),
       enPoder: estaEnPoder(jugador),
+      impuestos: impuestosDe(jugador),
+      mandato: mandatoDe(estado, jugador),
       // Apoyo EFECTIVO (con el respeto del gobierno ya sumado): es lo que
       // cuenta en una votacion. Privado, como los recursos.
       apoyo: Object.fromEntries(GRUPOS_DE_APOYO.map(g => [g, apoyoEfectivo(jugador, g)])),
@@ -100,6 +105,7 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
   return {
     id, nombre, civilizacion, raza, activo, esBot: Boolean(esBot),
     gobierno: gobiernoDe(jugador),
+    nombreGobierno: nombreGobiernoDe(jugador),
     formaEstado: formaEstadoDe(jugador),
     enPoder: estaEnPoder(jugador),
     // El nombre de la moneda es una etiqueta, como el del pais: lo ven todos.

@@ -33,7 +33,7 @@ const CONFIG_DEFAULT = {
 // arbitrario (venga de una request, de un test o de otro servicio) puede
 // tumbar el proceso entero. El limite es una regla del juego, no una
 // validacion de transporte.
-const LIMITES_CONFIG = {
+export const LIMITES_CONFIG = {
   tamanoMapa: { min: 10, max: 60 },
   maxJugadores: { min: 2, max: 8 },
   // Menos del 30% seria ganar casi sin jugar; mas del 90% es practicamente

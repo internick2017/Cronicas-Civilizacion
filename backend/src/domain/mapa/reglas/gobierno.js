@@ -3,14 +3,15 @@ import {
   PREFERENCIAS, PESO_PREFERENCIA, PESO_APOYO, ORO_A_VOTOS, UMBRAL_APROBACION, ENFRIAMIENTO_VOTO,
   ORO_POR_PUNTO_APOYO, VARIACION_APOYO_POR_RONDA, BAJADA_APOYO_POR_RONDA, PISO_APOYO_POR_TERRITORIO,
   RECUPERACION_APOYO_SIN_PODER, BONO_PRODUCCION_GOBIERNO, PROBABILIDAD_CRISIS, UMBRAL_EXPULSION,
-  UMBRAL_REGRESO_MILITAR, UMBRAL_ELECCION, BONO_PRODUCCION_REPUBLICA,
+  UMBRAL_REGRESO_MILITAR, UMBRAL_ELECCION, BONO_PRODUCCION_REPUBLICA, IMPUESTOS, LARGO_MAXIMO_NOMBRE_GOBIERNO,
 } from '../constantes.js';
-import { jugadorPorId, puedePagar } from '../MapGame.js';
+import { jugadorPorId, puedePagar, LIMITES_CONFIG } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
 import { evento } from './comun.js';
 import { controlTerritorial } from './dominacion.js';
 import { caidaApoyoPueblo } from './efectosProblemas.js';
 import { produccionPorcentualDeRaza } from './razas.js';
+import { jugadorQueNombra } from './pais.js';
 
 // Toda lectura de los campos de gobierno pasa por estos accesores: una partida
 // guardada antes de que existieran no los trae, y se cae al valor por defecto
@@ -22,6 +23,16 @@ export const formaEstadoDe = (jugador) =>
   (FORMAS_ESTADO.includes(jugador?.formaEstado) ? jugador.formaEstado : 'unitario');
 
 export const estaEnPoder = (jugador) => jugador?.enPoder !== false;
+
+export const impuestosDe = (jugador) =>
+  (Object.hasOwn(IMPUESTOS, jugador?.impuestos) ? jugador.impuestos : 'normales');
+
+// Rondas entre elecciones de una republica: la que eligio el jugador o la de la partida.
+export const mandatoDe = (estado, jugador) =>
+  (Number.isInteger(jugador?.mandato) ? jugador.mandato : (estado.config.rondasEntreElecciones ?? 8));
+
+// null = el nombre por defecto del tipo de gobierno (la interfaz lo resuelve).
+export const nombreGobiernoDe = (jugador) => jugador?.nombreGobierno || null;
 
 export function apoyoDe(jugador) {
   const guardado = jugador?.apoyo ?? {};
@@ -131,10 +142,41 @@ export function darVentajas(estado, jugadorId, { grupo, oro }) {
 
 const esRepublica = (jugador) => gobiernoDe(jugador).startsWith('republica_');
 
+// Gratis y sin turno, como el resto del gobierno; solo quien manda.
+export function fijarImpuestos(estado, jugadorId, { nivel }) {
+  const jugador = jugadorDeGobierno(estado, jugadorId);
+  if (!estaEnPoder(jugador)) throw new ReglaError('SIN_PODER', 'No tenés el poder para fijar los impuestos');
+  if (!Object.hasOwn(IMPUESTOS, nivel)) throw new ReglaError('IMPUESTOS_INVALIDOS', 'Nivel de impuestos inválido');
+  return [evento('ImpuestosFijados', estado, jugadorId, { nivel })];
+}
+
+export function fijarMandato(estado, jugadorId, { rondas }) {
+  const jugador = jugadorDeGobierno(estado, jugadorId);
+  if (!estaEnPoder(jugador)) throw new ReglaError('SIN_PODER', 'No tenés el poder para cambiar el mandato');
+  if (!esRepublica(jugador)) throw new ReglaError('NO_ES_REPUBLICA', 'Solo las repúblicas tienen elecciones');
+  const { min, max } = LIMITES_CONFIG.rondasEntreElecciones;
+  if (!Number.isInteger(rondas) || rondas < min || rondas > max) {
+    throw new ReglaError('MANDATO_INVALIDO', `El mandato dura de ${min} a ${max} rondas`);
+  }
+  return [evento('MandatoFijado', estado, jugadorId, { rondas })];
+}
+
+// Vacio vuelve al nombre por defecto del tipo de gobierno.
+export function nombrarGobierno(estado, jugadorId, { nombre }) {
+  jugadorQueNombra(estado, jugadorId);
+  if (typeof nombre !== 'string') throw new ReglaError('NOMBRE_INVALIDO', 'El nombre tiene que ser un texto');
+  const limpio = nombre.trim();
+  if (limpio.length > LARGO_MAXIMO_NOMBRE_GOBIERNO) {
+    throw new ReglaError('NOMBRE_INVALIDO', `El nombre admite hasta ${LARGO_MAXIMO_NOMBRE_GOBIERNO} caracteres`);
+  }
+  return [evento('GobiernoNombrado', estado, jugadorId, { nombre: limpio || null })];
+}
+
 // Cuanto multiplica el gobierno la produccion de UN recurso. Las republicas
 // gobiernan con lideres elegidos que "pueden mejorar el pais" (palabras del
-// usuario): +10% a todo. Monarquia y estratocracia suman el suyo (constantes.js).
-// turnos.js lo aplica AL FINAL, sobre el total ya sumado.
+// usuario): +10% a todo. Monarquia y estratocracia suman el suyo (constantes.js),
+// y los impuestos suben o bajan el oro. turnos.js lo aplica AL FINAL, sobre el
+// total ya sumado.
 //
 // La raza suma su propio porcentaje (puede ser negativo) en este mismo
 // multiplicador, y no en aplicarBonosPorcentuales (tecnologia.js): aquel
@@ -143,8 +185,9 @@ const esRepublica = (jugador) => gobiernoDe(jugador).startsWith('republica_');
 export function multiplicadorProduccion(jugador, recurso) {
   const gobierno = gobiernoDe(jugador);
   const republica = esRepublica(jugador) ? BONO_PRODUCCION_REPUBLICA : 0;
+  const impuestos = recurso === 'gold' ? IMPUESTOS[impuestosDe(jugador)].oro : 0;
   return 1 + republica + (BONO_PRODUCCION_GOBIERNO[gobierno]?.[recurso] ?? 0)
-    + produccionPorcentualDeRaza(jugador, recurso);
+    + produccionPorcentualDeRaza(jugador, recurso) + impuestos;
 }
 
 // Quien tiene que sostenerte en el cargo: el grupo del electorado de tu
@@ -195,8 +238,9 @@ export function cerrarRondaGobierno(estado, rng) {
         apoyo[g] = Math.min(APOYO_INICIAL, apoyo[g] + RECUPERACION_APOYO_SIN_PODER);
       }
     }
-    // Un problema de pobreza activo (Estado federal) erosiona el apoyo del pueblo.
-    apoyo.pueblo = acotar(apoyo.pueblo - caidaApoyoPueblo(jugador));
+    // Un problema de pobreza activo (Estado federal) erosiona el apoyo del pueblo,
+    // y los impuestos lo suben (bajos) o lo bajan (altos).
+    apoyo.pueblo = acotar(apoyo.pueblo - caidaApoyoPueblo(jugador) + IMPUESTOS[impuestosDe(jugador)].apoyoPueblo);
     if (GRUPOS_DE_APOYO.some(g => apoyo[g] !== apoyoAntes[g])) {
       eventos.push(evento('ApoyoActualizado', estado, jugador.id, { apoyo }));
     }
@@ -204,7 +248,7 @@ export function cerrarRondaGobierno(estado, rng) {
     // evento todavia no se haya aplicado.
     const j = { ...jugador, apoyo };
     const gobierno = gobiernoDe(j);
-    const haceElecciones = esRepublica(j) && estado.turno % (estado.config.rondasEntreElecciones ?? 8) === 0;
+    const haceElecciones = esRepublica(j) && estado.turno % mandatoDe(estado, j) === 0;
 
     if (estaEnPoder(j)) {
       if (gobierno === 'despotismo') continue; // el despota no se pierde

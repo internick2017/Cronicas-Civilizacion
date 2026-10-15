@@ -772,6 +772,9 @@ onUnmounted(() => {
         @elegir-cabecera="elegirCabecera"
         @nombrar-moneda="(nombre, simbolo) => ejecutarAccion({ tipo: 'nombrarMoneda', nombre, simbolo })"
         @acunar="(oro) => ejecutarAccion({ tipo: 'acunarMoneda', oro })"
+        @nombrar-gobierno="(nombre) => ejecutarAccion({ tipo: 'nombrarGobierno', nombre })"
+        @impuestos="(nivel) => ejecutarAccion({ tipo: 'fijarImpuestos', nivel })"
+        @mandato="(rondas) => ejecutarAccion({ tipo: 'fijarMandato', rondas })"
         @cerrar="gobiernoAbierto = false"
       />
     </MapDialogo>

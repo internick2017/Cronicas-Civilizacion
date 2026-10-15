@@ -9,7 +9,7 @@ const props = defineProps({
   jugadorId: { type: String, required: true },
   constantes: { type: Object, required: true } // {gobiernos, gruposDeApoyo, enfriamientoVoto, ...}
 })
-const emit = defineEmits(['proponer', 'ventajas', 'forma', 'crearSubdivision', 'renombrarSubdivision', 'asignarCiudades', 'desasignarCiudades', 'quitarSubdivision', 'elegirCabecera', 'nombrarMoneda', 'acunar', 'cerrar'])
+const emit = defineEmits(['proponer', 'ventajas', 'forma', 'crearSubdivision', 'renombrarSubdivision', 'asignarCiudades', 'desasignarCiudades', 'quitarSubdivision', 'elegirCabecera', 'nombrarMoneda', 'acunar', 'nombrarGobierno', 'impuestos', 'mandato', 'cerrar'])
 
 const NOMBRE_GRUPO = { pueblo: 'Pueblo', lideres: 'Líderes', militares: 'Militares' }
 const QUIEN_APRUEBA = {
@@ -55,6 +55,36 @@ const motivoVentajas = computed(() =>
   (oroVentajas.value > oroDisponible.value ? 'sin oro suficiente' : null)
 )
 
+// --- Nombre propio, impuestos y mandato ---
+const nombreDelGobierno = computed(() => yo.value?.nombreGobierno || nombreGobierno(yo.value?.gobierno))
+const largoNombreGobierno = computed(() => props.constantes.largoNombreGobierno || 40)
+const nombreGobiernoNuevo = ref(yo.value?.nombreGobierno ?? '')
+// Vacio vuelve al nombre del tipo de gobierno.
+const nombrarGobierno = () => emit('nombrarGobierno', nombreGobiernoNuevo.value.trim())
+
+const NIVELES_IMPUESTOS = { bajos: 'Bajos', normales: 'Normales', altos: 'Altos' }
+const impuestos = computed(() => props.constantes.impuestos || {})
+const efectoImpuestos = (nivel) => {
+  const { oro = 0, apoyoPueblo = 0 } = impuestos.value[nivel] || {}
+  if (!oro && !apoyoPueblo) return 'sin efecto'
+  const signo = (n) => (n > 0 ? `+${n}` : `${n}`)
+  return `${signo(Math.round(oro * 100))}% de oro, ${signo(apoyoPueblo)} de apoyo del pueblo por ronda`
+}
+
+const esRepublica = computed(() => (yo.value?.gobierno || '').startsWith('republica_'))
+const limitesMandato = computed(() => props.constantes.limitesMandato || { min: 2, max: 50 })
+const mandatoNuevo = ref(yo.value?.mandato ?? 8)
+const motivoMandato = computed(() => {
+  const r = Number(mandatoNuevo.value)
+  if (!Number.isInteger(r) || r < limitesMandato.value.min || r > limitesMandato.value.max) {
+    return `de ${limitesMandato.value.min} a ${limitesMandato.value.max} rondas`
+  }
+  return null
+})
+const fijarMandato = () => {
+  if (!motivoMandato.value) emit('mandato', Number(mandatoNuevo.value))
+}
+
 // --- Moneda: el nombre es gratis y sin turno; acuñar da oro a cambio de inflacion ---
 const reglasMoneda = computed(() => props.constantes.moneda || { largoNombre: 20, largoSimbolo: 3 })
 const acunacion = computed(() => props.constantes.acunacion || null)
@@ -94,7 +124,18 @@ const ventajas = (grupo) => {
   <div v-if="yo" class="gobierno-panel">
     <section>
       <h4>Gobierno actual</h4>
-      <p class="actual">{{ nombreGobierno(yo.gobierno) }}</p>
+      <p class="actual">{{ nombreDelGobierno }}</p>
+      <small v-if="yo.nombreGobierno">{{ nombreGobierno(yo.gobierno) }}</small>
+      <div class="fila-botones">
+        <input
+          v-model="nombreGobiernoNuevo"
+          class="entrada-oro ancha-media"
+          :maxlength="largoNombreGobierno"
+          placeholder="Nombre propio (vacío: el del tipo)"
+          @keyup.enter="nombrarGobierno"
+        >
+        <button class="btn-secundario" @click="nombrarGobierno"><strong>Nombrar</strong></button>
+      </div>
       <small>Para cambiarlo: {{ QUIEN_APRUEBA[electoradoActual] }}.</small>
       <em v-if="!enPoder" class="alerta">
         Perdiste el poder: la máquina juega tus turnos. Podés dar ventajas para ganar apoyo y recuperarlo.
@@ -151,6 +192,40 @@ const ventajas = (grupo) => {
         <strong>{{ g.nombre }}</strong>
       </button>
       <em v-if="motivoProponer">{{ motivoProponer }}</em>
+    </section>
+
+    <section v-if="Object.keys(impuestos).length">
+      <h4>Impuestos</h4>
+      <div class="fila-botones">
+        <button
+          v-for="(etiqueta, nivel) in NIVELES_IMPUESTOS"
+          :key="nivel"
+          class="btn-secundario"
+          :class="{ activo: (yo.impuestos || 'normales') === nivel }"
+          :disabled="!enPoder || (yo.impuestos || 'normales') === nivel"
+          @click="emit('impuestos', nivel)"
+        >
+          <strong>{{ etiqueta }}</strong><small>{{ efectoImpuestos(nivel) }}</small>
+        </button>
+      </div>
+    </section>
+
+    <section v-if="esRepublica">
+      <h4>Mandato</h4>
+      <small>Hay elecciones cada {{ yo.mandato }} rondas.</small>
+      <div class="fila-botones">
+        <input
+          v-model.number="mandatoNuevo"
+          class="entrada-oro"
+          type="number"
+          :min="limitesMandato.min"
+          :max="limitesMandato.max"
+        >
+        <button class="btn-secundario" :disabled="!enPoder || motivoMandato !== null" @click="fijarMandato">
+          <strong>Fijar mandato</strong>
+        </button>
+      </div>
+      <em v-if="motivoMandato">{{ motivoMandato }}</em>
     </section>
 
     <section>
