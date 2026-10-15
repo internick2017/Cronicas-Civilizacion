@@ -3,7 +3,7 @@ import { crearEstado, tileEn } from '../../src/domain/mapa/MapGame.js';
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { atacar } from '../../src/domain/mapa/reglas/combate.js';
-import { produccionConResto, producirParaJugador } from '../../src/domain/mapa/reglas/turnos.js';
+import { produccionConResto, producirParaJugador, produccionBruta } from '../../src/domain/mapa/reglas/turnos.js';
 import { radioVision } from '../../src/domain/mapa/reglas/cultura.js';
 import {
   validarRaza, bonoAtaquePorRaza, bonoDefensaUnidadPorRaza, visionExtraPorRaza,
@@ -77,13 +77,13 @@ describe('producción', () => {
   beforeEach(() => { e = crearPartida(); });
 
   it('humanos: +15% de oro sobre el mismo mapa y la misma semilla', () => {
-    const base = producirParaJugador(e, 'p1').gold;
+    const base = produccionBruta(e, 'p1').gold;
     const conRaza = crearPartida('humanos');
     expect(producirParaJugador(conRaza, 'p1').gold).toBe(Math.floor(base * 1.15 + 1e-9));
   });
 
   it('orcos: -25% de ciencia, y el decimal que se pierde queda de resto para el turno siguiente', () => {
-    const base = producirParaJugador(e, 'p1').science;
+    const base = produccionBruta(e, 'p1').science;
     const orcos = crearPartida('orcos');
     const { produccion, resto } = produccionConResto(orcos, 'p1');
     expect(produccion.science).toBe(Math.floor(base * 0.75 + 1e-9));

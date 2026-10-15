@@ -68,6 +68,11 @@ La pieza que produce recursos, alberga edificios y sostiene la frontera a su alr
 todas es quedar eliminado.
 _Avoid_: asentamiento, poblado, urbe
 
+**Capital**:
+La ciudad que rinde y se defiende más. Es la primera que se funda hasta que el jugador la muda
+(pagando oro); si se la capturan, pasa sola a su ciudad de mayor nivel.
+_Avoid_: sede, ciudad principal
+
 **Ejército**:
 La pieza militar que ocupa una casilla. Contiene exactamente una unidad, nunca varias.
 _Avoid_: tropa, contingente, stack

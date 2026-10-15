@@ -9,9 +9,13 @@ import { problemasParaLaVista, senalesDe } from './problemas.js';
 import { multiplicadorCostos } from './efectosProblemas.js';
 import { reglasDelModo } from './modo.js';
 import { gobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo } from './gobierno.js';
+import { capitalDe } from './capital.js';
 
 // `videntes`: el jugador y sus aliados, que comparten lo que descubren.
-function vistaTile(tile, videntes) {
+// `capitales`: claves "x,y" de la capital de cada jugador. Viajan marcadas EN la
+// ciudad y no como coordenadas sueltas, asi la capital de un rival solo se ve si
+// esa casilla ya esta descubierta.
+function vistaTile(tile, videntes, capitales) {
   if (!videntes.some(id => tile.descubiertoPor.includes(id))) {
     return { x: tile.x, y: tile.y, descubierto: false };
   }
@@ -20,6 +24,7 @@ function vistaTile(tile, videntes) {
   if (resto.ciudad) {
     resto.ciudad.salud = saludDeCiudad(resto.ciudad);
     resto.ciudad.saludMax = saludMaximaCiudad(resto.ciudad.nivel);
+    resto.ciudad.capital = capitales.has(`${tile.x},${tile.y}`);
   }
   return { ...resto, descubierto: true };
 }
@@ -79,6 +84,7 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       senales: senalesDe(estado, jugador),
       // Cada una con su nivel (derivado del tipo) para que la interfaz arme el arbol.
       subdivisiones: subdivisionesDe(jugador).map(s => ({ ...s, nivel: nivelDe(s) })),
+      capital: capitalDe(estado, jugador),
     };
   }
   // esBot y dificultadIA no son informacion sensible (a diferencia de
@@ -98,6 +104,8 @@ export function vistaJugador(estado, jugadorId) {
     throw new ReglaError('JUGADOR_DESCONOCIDO', `Jugador desconocido: ${jugadorId}`);
   }
   const videntes = [jugadorId, ...aliadosDe(estado, jugadorId)];
+  const capitales = new Set(estado.jugadores
+    .map(j => capitalDe(estado, j)).filter(Boolean).map(c => `${c.x},${c.y}`));
   return {
     id: estado.id,
     nombre: estado.nombre,
@@ -113,7 +121,7 @@ export function vistaJugador(estado, jugadorId) {
     reglas: reglasDelModo(estado),
     ganador: estado.ganador,
     jugadores: estado.jugadores.map(j => vistaJugadorPublica(j, jugadorId, estado)),
-    mapa: estado.mapa.map(t => vistaTile(t, videntes)),
+    mapa: estado.mapa.map(t => vistaTile(t, videntes, capitales)),
     // Quien esta aliado con quien es publico: hay que saber contra quien se juega.
     alianzas: alianzasDe(estado).map(a => ({ miembros: [...a.miembros] })),
     // Las propuestas solo las ven quien propone y quien tiene que responder.

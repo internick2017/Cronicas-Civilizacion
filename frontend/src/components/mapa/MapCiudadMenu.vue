@@ -9,7 +9,7 @@ const props = defineProps({
   posicion: { type: Object, required: true },
   constantes: { type: Object, required: true } // {edificios: [...], unidades: [...], tecnologias: [...]}
 })
-const emit = defineEmits(['construir', 'reclutar', 'mejorar', 'renombrar', 'cerrar'])
+const emit = defineEmits(['construir', 'reclutar', 'mejorar', 'renombrar', 'hacerCapital', 'cerrar'])
 
 // Los costos NO se copian del backend: llegan por prop desde MapSession, que
 // los pide a GET /api/map/constantes. Una sola fuente de verdad.
@@ -146,6 +146,15 @@ const vidaCiudad = computed(() => {
 const renombrar = () => {
   if (puedeRenombrar.value) emit('renombrar', nombreLimpio.value)
 }
+
+const esCapital = computed(() => Boolean(tile.value?.ciudad?.capital))
+const instalandoseHasta = computed(() => {
+  const hasta = tile.value?.ciudad?.mudanzaHasta ?? 0
+  return hasta > props.vista.turno ? hasta : null
+})
+const capital = computed(() => props.constantes.capital || null)
+const costoCapital = computed(() => escalar(capital.value?.costoMover || {}))
+const motivoCapital = computed(() => (puedePagar(costoCapital.value) ? null : 'sin recursos'))
 </script>
 
 <template>
@@ -169,6 +178,24 @@ const renombrar = () => {
     <section v-if="vidaCiudad">
       <h4>Vida de la ciudad</h4>
       <p class="vida-ciudad">❤️ {{ vidaCiudad }}</p>
+    </section>
+
+    <section v-if="capital">
+      <h4>Capital</h4>
+      <p v-if="esCapital" class="capital">
+        👑 Es tu capital: +{{ Math.round(capital.bonoProduccion * 100) }}% de producción y +{{ capital.bonoDefensa }} de defensa.
+      </p>
+      <button
+        v-else
+        class="btn-secundario"
+        :disabled="motivoCapital !== null"
+        @click="pedir('Hacer capital esta ciudad', costoCapital, () => emit('hacerCapital'))"
+      >
+        <strong>Hacer capital ({{ textoCosto(costoCapital) }})</strong>
+        <small>Rinde +{{ Math.round(capital.bonoProduccion * 100) }}% y defiende mejor, pero no produce nada la primera ronda.</small>
+        <em v-if="motivoCapital">{{ motivoCapital }}</em>
+      </button>
+      <em v-if="instalandoseHasta">La capital se está instalando: vuelve a producir en la ronda {{ instalandoseHasta }}.</em>
     </section>
 
     <section v-if="reglas.mejorasCiudad">
@@ -250,6 +277,7 @@ em { color: #e67e22; font-size: 0.72rem; font-style: normal; }
   border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.25); color: #ecf0f1;
 }
 .bono-cuartel { color: #2ecc71; }
+.capital { margin: 0; font-size: 0.85rem; }
 .confirmar {
   position: sticky; bottom: -1.5rem; z-index: 1;
   margin: 0 -0.5rem; padding: 0.75rem;

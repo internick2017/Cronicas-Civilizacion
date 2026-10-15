@@ -1,4 +1,6 @@
-import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_VICTORIA_DOMINACION } from '../constantes.js';
+import {
+  PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, PORCENTAJE_VICTORIA_DOMINACION, BONO_PRODUCCION_CAPITAL,
+} from '../constantes.js';
 import { tileEn } from '../MapGame.js';
 import { recursoApagado } from './modo.js';
 import { validarTurno, evento, esSimultaneo, listosDe } from './comun.js';
@@ -8,6 +10,7 @@ import { controlTerritorial } from './dominacion.js';
 import { bandosDe } from './bandos.js';
 import { recuperarFronteras } from './fronteras.js';
 import { estaSaqueada } from './saqueo.js';
+import { capitalDe, estaEnMudanza } from './capital.js';
 import { crearRng } from '../rng.js';
 import { aplicar } from '../aplicar.js';
 import { cerrarRondaGobierno, multiplicadorProduccion } from './gobierno.js';
@@ -30,10 +33,10 @@ function ciudadesDe(estado, jugadorId) {
   return estado.mapa.filter(t => t.ciudad && t.dueno === jugadorId);
 }
 
-// Exportada para que la vista pueda MOSTRAR el rendimiento por turno sin
-// duplicar la formula: el numero que ve el jugador sale del mismo calculo que
-// despues le suma los recursos (ver visibilidad.js#vistaJugadorPublica).
-function produccionBruta(estado, jugadorId) {
+// Lo que rinde cada recurso ANTES del multiplicador del gobierno y del redondeo,
+// con decimales (la capital rinde un 20% mas). Exportada para medir los bonos
+// porcentuales sin que el redondeo de un turno los tape.
+export function produccionBruta(estado, jugadorId) {
   const produccion = {};
   const acumular = (recurso, cantidad) => {
     if (recursoApagado(estado, recurso)) return;
@@ -43,14 +46,16 @@ function produccionBruta(estado, jugadorId) {
   // edificios: valen para las ciudades que ya tenias y para las que fundes.
   const jugador = estado.jugadores.find(j => j.id === jugadorId);
   const porRasgos = produccionPorRasgos(jugador);
+  const capital = capitalDe(estado, jugador);
   for (const tile of ciudadesDe(estado, jugadorId)) {
+    const bonoCiudad = 1 + (capital?.x === tile.x && capital?.y === tile.y ? BONO_PRODUCCION_CAPITAL : 0);
     // Los problemas sociales activos (federal) bajan lo que rinde ESTA ciudad.
     const acumularEn = (recurso, cantidad) =>
-      acumular(recurso, cantidad * factorProduccionCiudad(jugador, tile.x, tile.y, recurso));
+      acumular(recurso, cantidad * bonoCiudad * factorProduccionCiudad(jugador, tile.x, tile.y, recurso));
     // Una ciudad saqueada no produce nada hasta que se le pasa el cerco (ver
-    // reglas/saqueo.js). Sigue contando como ciudad: no se pierde ni deja de
-    // sostener al jugador en pie.
-    if (estaSaqueada(tile.ciudad, estado.turno)) continue;
+    // reglas/saqueo.js), y la capital recien mudada tampoco hasta instalarse.
+    // Sigue contando como ciudad: no se pierde ni deja de sostener al jugador.
+    if (estaSaqueada(tile.ciudad, estado.turno) || estaEnMudanza(tile.ciudad, estado.turno)) continue;
     for (const [recurso, cantidad] of Object.entries(PRODUCCION_BASE_CIUDAD)) acumularEn(recurso, cantidad);
     for (const [recurso, cantidad] of Object.entries(porRasgos)) acumularEn(recurso, cantidad);
     const bono = BONO_TERRENO_PRODUCCION[tile.terreno] ?? {};

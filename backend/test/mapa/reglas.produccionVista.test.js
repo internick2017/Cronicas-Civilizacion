@@ -4,7 +4,7 @@ import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { terminarTurno } from '../../src/domain/mapa/reglas/turnos.js';
 import { vistaJugador } from '../../src/domain/mapa/reglas/visibilidad.js';
-import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION } from '../../src/domain/mapa/constantes.js';
+import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, BONO_PRODUCCION_CAPITAL } from '../../src/domain/mapa/constantes.js';
 
 const j = (n) => ({ id: `p${n}`, nombre: `J${n}`, civilizacion: `Civ${n}` });
 
@@ -17,15 +17,18 @@ function partidaIniciada() {
 }
 
 describe('produccion por turno en la vista', () => {
-  it('la expone al jugador propio y la calcula con base + terreno de su capital', () => {
+  it('la expone al jugador propio y la calcula con base + terreno de su capital, mas el bono de capital', () => {
     const e = partidaIniciada();
     const capital = e.mapa.find(t => t.ciudad && t.dueno === 'p1');
     const bono = BONO_TERRENO_PRODUCCION[capital.terreno] ?? {};
 
-    const esperada = { ...PRODUCCION_BASE_CIUDAD };
+    const sumada = { ...PRODUCCION_BASE_CIUDAD };
     for (const [recurso, cantidad] of Object.entries(bono)) {
-      esperada[recurso] = (esperada[recurso] ?? 0) + cantidad;
+      sumada[recurso] = (sumada[recurso] ?? 0) + cantidad;
     }
+    // El decimal del bono queda de resto para la ronda siguiente: se ve la parte entera.
+    const esperada = Object.fromEntries(Object.entries(sumada)
+      .map(([r, c]) => [r, Math.floor(c * (1 + BONO_PRODUCCION_CAPITAL) + 1e-9)]));
 
     expect(vistaJugador(e, 'p1').jugadores.find(x => x.id === 'p1').produccion).toEqual(esperada);
   });

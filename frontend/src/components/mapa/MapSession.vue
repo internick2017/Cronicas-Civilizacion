@@ -505,6 +505,13 @@ const renombrarCiudad = (nombre) => {
   ejecutarAccion({ tipo: 'renombrarCiudad', x, y, nombre })
 }
 
+const moverCapital = () => {
+  if (!edificioMenuAbierto.value) return
+  const { x, y } = edificioMenuAbierto.value
+  edificioMenuAbierto.value = null
+  ejecutarAccion({ tipo: 'moverCapital', x, y })
+}
+
 // Las acciones de gobierno cierran el panel igual que las de ciudad: el
 // resultado (aprobada o rechazada la votacion) se lee en la vista nueva.
 const proponerGobierno = (gobierno, oro) => {
@@ -796,6 +803,7 @@ onUnmounted(() => {
         @reclutar="reclutar"
         @mejorar="mejorarCiudad"
         @renombrar="renombrarCiudad"
+        @hacer-capital="moverCapital"
         @cerrar="cerrarMenuEdificio"
       />
     </MapDialogo>

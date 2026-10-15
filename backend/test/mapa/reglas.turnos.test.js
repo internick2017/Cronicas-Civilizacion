@@ -3,7 +3,7 @@ import { crearEstado, jugadorPorId } from '../../src/domain/mapa/MapGame.js';
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { terminarTurno } from '../../src/domain/mapa/reglas/turnos.js';
-import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS } from '../../src/domain/mapa/constantes.js';
+import { PRODUCCION_BASE_CIUDAD, BONO_TERRENO_PRODUCCION, EDIFICIOS, BONO_PRODUCCION_CAPITAL } from '../../src/domain/mapa/constantes.js';
 
 // Mapa chico 3x3 armado a mano: tile (0,0) plains con ciudad de p1 (con granary),
 // tile (1,0) forest sin dueno, resto plains sin dueno/ciudad.
@@ -58,19 +58,21 @@ describe('terminarTurno', () => {
     ]);
     expect(evs[0].datos).toEqual({ indiceJugadorActual: 0, turno: 2 });
 
-    // Produccion exacta de p1: base + bono de forest + produccion de granary.
+    // Produccion exacta de p1: base + bono de forest + produccion de granary, por el
+    // bono de capital (su unica ciudad), sin el decimal que queda de resto.
+    const conCapital = (n) => Math.floor(n * (1 + BONO_PRODUCCION_CAPITAL) + 1e-9);
     const producidoP1 = evs.find(ev => ev.tipo === 'RecursosProducidos' && ev.datos.jugadorId === 'p1').datos.produccion;
-    const esperadoP1 = {};
-    for (const [r, c] of Object.entries(PRODUCCION_BASE_CIUDAD)) esperadoP1[r] = (esperadoP1[r] ?? 0) + c;
-    for (const [r, c] of Object.entries(BONO_TERRENO_PRODUCCION.forest)) esperadoP1[r] = (esperadoP1[r] ?? 0) + c;
-    for (const [r, c] of Object.entries(EDIFICIOS.granary.produccion)) esperadoP1[r] = (esperadoP1[r] ?? 0) + c;
-    expect(producidoP1).toEqual(esperadoP1);
+    const sumadoP1 = {};
+    for (const [r, c] of Object.entries(PRODUCCION_BASE_CIUDAD)) sumadoP1[r] = (sumadoP1[r] ?? 0) + c;
+    for (const [r, c] of Object.entries(BONO_TERRENO_PRODUCCION.forest)) sumadoP1[r] = (sumadoP1[r] ?? 0) + c;
+    for (const [r, c] of Object.entries(EDIFICIOS.granary.produccion)) sumadoP1[r] = (sumadoP1[r] ?? 0) + c;
+    expect(producidoP1).toEqual(Object.fromEntries(Object.entries(sumadoP1).map(([r, c]) => [r, conCapital(c)])));
     // Verificacion concreta contra las constantes reales del proyecto.
-    expect(producidoP1).toEqual({ food: 5 + 1 + 3, gold: 3, culture: 2, science: 2, wood: 3 });
+    expect(producidoP1).toEqual({ food: 10, gold: 3, culture: 2, science: 2, wood: 3 });
 
     // Produccion exacta de p2: base + bono de plains, sin edificios.
     const producidoP2 = evs.find(ev => ev.tipo === 'RecursosProducidos' && ev.datos.jugadorId === 'p2').datos.produccion;
-    expect(producidoP2).toEqual({ food: 5 + 2, gold: 3 + 1, culture: 2, science: 2 });
+    expect(producidoP2).toEqual({ food: conCapital(5 + 2), gold: conCapital(3 + 1), culture: 2, science: 2 });
   });
 
   it('jugador sin ciudades queda eliminado al cierre y el orden de turnos lo saltea', () => {

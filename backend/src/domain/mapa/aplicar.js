@@ -46,6 +46,13 @@ export function aplicar(estado, eventos) {
 
       case 'CiudadFundada': {
         const t = tileEn(estado, datos.x, datos.y);
+        // La primera ciudad queda anotada como capital. Sin esto la capital se
+        // deduce (ver reglas/capital.js) y una ciudad nueva de igual nivel, fundada
+        // mas arriba en el mapa, se la llevaria sin que nadie la mude.
+        const jugador = jugadorPorId(estado, jugadorId);
+        if (jugador && !estado.mapa.some(c => c.ciudad && c.dueno === jugadorId)) {
+          jugador.capital = { x: datos.x, y: datos.y };
+        }
         t.ciudad = { nombre: datos.nombre, nivel: 1, poblacion: 500, edificios: [], salud: saludMaximaCiudad(1) };
         t.dueno = jugadorId;
         break;
@@ -374,6 +381,13 @@ export function aplicar(estado, eventos) {
         if (asaltante) asaltante.recursos.gold += datos.oro;
         const ciudad = tileEn(estado, datos.x, datos.y)?.ciudad;
         if (ciudad) ciudad.saqueadaHasta = Math.max(ciudad.saqueadaHasta ?? 0, datos.saqueadaHasta);
+        break;
+      }
+
+      case 'CapitalMovida': {
+        jugadorPorId(estado, jugadorId).capital = { x: datos.x, y: datos.y };
+        const ciudad = tileEn(estado, datos.x, datos.y)?.ciudad;
+        if (ciudad) ciudad.mudanzaHasta = Math.max(ciudad.mudanzaHasta ?? 0, datos.sinProducirHasta);
         break;
       }
 

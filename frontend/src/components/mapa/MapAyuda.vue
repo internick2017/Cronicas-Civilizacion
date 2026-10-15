@@ -245,6 +245,21 @@ const umbralAviso = computed(() =>
       </p>
     </section>
 
+    <section v-if="constantes.capital">
+      <h4>Capital</h4>
+      <p>
+        Tu primera ciudad es la <strong>capital</strong> (👑 en el mapa). Rinde
+        +{{ Math.round(constantes.capital.bonoProduccion * 100) }}% de todo y se defiende con
+        +{{ constantes.capital.bonoDefensa }} de defensa.
+      </p>
+      <p>
+        Desde el menú de cualquier otra ciudad tuya podés mudarla por {{ costo(constantes.capital.costoMover) }}
+        (la inflación lo encarece). La nueva capital no produce nada durante
+        {{ constantes.capital.rondasSinProducir }} ronda{{ constantes.capital.rondasSinProducir === 1 ? '' : 's' }}
+        mientras se instala. Si te capturan la capital, pasa sola a tu ciudad de mayor nivel.
+      </p>
+    </section>
+
     <section v-if="constantes.rasgosCulturales?.length && !guerraPura">
       <h4>Cultura</h4>
       <p>

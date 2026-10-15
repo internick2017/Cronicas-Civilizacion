@@ -1,9 +1,11 @@
 import { tileEn } from '../MapGame.js';
 import {
   UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, CUARTEL,
-  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, esNaval, puedeAtacar, saludDeCiudad
+  DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, esNaval, puedeAtacar, saludDeCiudad,
+  BONO_DEFENSA_CAPITAL
 } from '../constantes.js';
 import { penalizacionDefensa } from './efectosProblemas.js';
+import { esCapital } from './capital.js';
 import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
 import { botinDe, saqueadaHasta } from './saqueo.js';
@@ -15,13 +17,15 @@ import {
   bonoAtaquePorRaza, bonoDefensaUnidadPorRaza, multiplicadorDefensaCiudadPorRaza
 } from './razas.js';
 
-// La defensa PLANA de una ciudad: su nivel, mas el cuartel, menos lo que le quitan los
-// problemas sociales activos de su dueño (inseguridad, infraestructura). Nunca baja de 1.
-// Exportada para poder probarla sin armar un combate entero.
+// La defensa PLANA de una ciudad: su nivel, mas el cuartel y el bono de capital, menos lo
+// que le quitan los problemas sociales activos de su dueño (inseguridad, infraestructura).
+// Nunca baja de 1. Exportada para poder probarla sin armar un combate entero.
 export function defensaDeCiudad(estado, tile) {
   const bonoCuartel = tile.ciudad.edificios.includes('barracks') ? CUARTEL.bonoDefensaCiudad : 0;
   const duenoJugador = estado.jugadores.find(j => j.id === tile.dueno);
-  return Math.max(1, defensaCiudad(tile.ciudad.nivel) + bonoCuartel - penalizacionDefensa(duenoJugador, tile.x, tile.y));
+  const bonoCapital = esCapital(estado, duenoJugador, tile.x, tile.y) ? BONO_DEFENSA_CAPITAL : 0;
+  return Math.max(1, defensaCiudad(tile.ciudad.nivel) + bonoCuartel + bonoCapital
+    - penalizacionDefensa(duenoJugador, tile.x, tile.y));
 }
 
 export function atacar(estado, jugadorId, { desde, hasta }, rng) {

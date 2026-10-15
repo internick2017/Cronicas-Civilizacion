@@ -300,6 +300,13 @@ function colorVida(fraccion) {
   if (fraccion > 0.25) return 0xf1c40f
   return 0xe74c3c
 }
+// Debajo de la barra de vida, en la esquina: no tapa el sprite de la ciudad.
+function coronaCapital(tile) {
+  const corona = new Text({ text: '👑', style: { fontSize: 13 } })
+  corona.x = tile.x * TILE + 2
+  corona.y = tile.y * TILE + 14
+  return corona
+}
 function barraVidaCiudad(tile) {
   return barraVida(tile, tile.ciudad.salud, tile.ciudad.saludMax, 2)
 }
@@ -353,6 +360,7 @@ function dibujarPiezas() {
       spritesCiudad.set(`${tile.x}:${tile.y}`, sprite)
       const vida = barraVidaCiudad(tile)
       if (vida) capaPiezas.addChild(vida)
+      if (tile.ciudad.capital) carteles.push(coronaCapital(tile))
     }
 
     if (tile.ejercito) {
@@ -703,8 +711,7 @@ function reencuadrarZonaDescubierta() {
 // y recentrar), porque "no hay capital todavia" y "la capital esta en el
 // centro" son cosas distintas y conviene no confundirlas.
 function capitalPropia() {
-  const tile = props.vista.mapa.find(t => t.descubierto && t.ciudad && t.dueno === props.jugadorId)
-  return tile ? { x: tile.x, y: tile.y } : null
+  return props.vista.jugadores.find(j => j.id === props.jugadorId)?.capital ?? null
 }
 
 // Centra la camara en la capital propia la PRIMERA VEZ que aparece (por
@@ -722,13 +729,14 @@ function centrarEnCapitalSiCorresponde() {
   yaSeCentroEnCapital = true
 }
 
-// Recentrado manual (boton "Ir a mi capital"): siempre reencuadra, sin
-// importar si ya se centro antes. Si todavia no hay nada descubierto
-// (partida 'esperando'), reencuadrarZonaDescubierta() cae al centro del
-// mapa, para que el boton nunca quede sin efecto visible.
+// Recentrado manual (boton "Mi capital"): centra en la capital sin tocar el
+// zoom. Sin capital todavia (partida 'esperando') reencuadra lo descubierto, que
+// cae al centro del mapa, para que el boton nunca quede sin efecto visible.
 function recentrar() {
   if (!app) return
-  reencuadrarZonaDescubierta()
+  const capital = capitalPropia()
+  if (capital) centrarEn(capital.x + 0.5, capital.y + 0.5)
+  else reencuadrarZonaDescubierta()
   yaSeCentroEnCapital = true
 }
 
@@ -741,7 +749,7 @@ function claveTerritorio(vista) {
 function clavePiezas(vista) {
   return vista.mapa.map(t => {
     if (!t.descubierto || (!t.ciudad && !t.ejercito)) return ''
-    const c = t.ciudad ? `c${t.dueno || ''}:${t.ciudad.salud}` : ''
+    const c = t.ciudad ? `c${t.dueno || ''}:${t.ciudad.salud}${t.ciudad.capital ? 'K' : ''}` : ''
     const e = t.ejercito ? `e${t.ejercito.tipo}${t.ejercito.dueno || ''}:${t.ejercito.salud}` : ''
     return `${t.x}:${t.y}:${c}${e}`
   }).join('|') + `#${aliadosDe(vista, props.jugadorId).join(',')}`

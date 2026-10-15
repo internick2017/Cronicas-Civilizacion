@@ -5,6 +5,7 @@ import { PRIORIDADES } from '../domain/mapa/reglas/subdivisiones.js';
 import {
   TIPOS_SUBDIVISION, PROBLEMAS, RESOLUCION_POR_NIVEL, LIMITE_SENAL, LIMITE_PROBLEMA, GRAVEDAD_MAXIMA,
   EFECTOS_PROBLEMAS, ESCALA_GRAVEDAD, CAPACIDAD_CIUDADES_POR_NIVEL,
+  BONO_PRODUCCION_CAPITAL, BONO_DEFENSA_CAPITAL, COSTO_MOVER_CAPITAL, RONDAS_SIN_PRODUCIR_MUDANZA,
 } from '../domain/mapa/constantes.js';
 import {
   GOBIERNOS, GRUPOS_DE_APOYO, ENFRIAMIENTO_VOTO, ESPERANZA_DE_VIDA_TURNOS, ORO_POR_PUNTO_APOYO,
@@ -199,7 +200,11 @@ export function crearMapRoutes(servicio) {
       },
       bonoDefensaCiudad: BONO_DEFENSA_CIUDAD,
       porcentajeVictoriaDominacion: PORCENTAJE_VICTORIA_DOMINACION,
-      umbralAvisoDominacion: UMBRAL_AVISO_DOMINACION
+      umbralAvisoDominacion: UMBRAL_AVISO_DOMINACION,
+      capital: {
+        bonoProduccion: BONO_PRODUCCION_CAPITAL, bonoDefensa: BONO_DEFENSA_CAPITAL,
+        costoMover: COSTO_MOVER_CAPITAL, rondasSinProducir: RONDAS_SIN_PRODUCIR_MUDANZA,
+      },
     });
   });
 

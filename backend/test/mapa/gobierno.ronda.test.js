@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { crearEstado, jugadorPorId } from '../../src/domain/mapa/MapGame.js';
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
-import { terminarTurno, producirParaJugador, produccionConResto } from '../../src/domain/mapa/reglas/turnos.js';
+import { terminarTurno, producirParaJugador, produccionConResto, produccionBruta } from '../../src/domain/mapa/reglas/turnos.js';
 import { cerrarRondaGobierno, multiplicadorProduccion } from '../../src/domain/mapa/reglas/gobierno.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
 
@@ -191,29 +191,35 @@ describe('bono de producción por gobierno', () => {
     return total;
   };
 
+  // La base es la produccion bruta (con los decimales de la capital), no la ya
+  // redondeada: el bono se calcula sobre lo exacto.
   it('el bono NO se pierde con producciones chicas: en 10 rondas suma el porcentaje exacto', () => {
-    const base = producirParaJugador(e, 'p1').gold; // 3 de oro por ciudad, bajo el umbral del redondeo
+    const base = produccionBruta(e, 'p1').gold;
     p1.gobierno = 'republica_directa';
     expect(jugarRondas(10).gold).toBe(Math.floor(10 * base * 1.1 + 1e-9));
   });
 
   it('monarquía rinde un 20% más de oro y no toca la comida', () => {
-    const base = producirParaJugador(e, 'p1');
+    const base = produccionBruta(e, 'p1');
     p1.gobierno = 'monarquia';
     const total = jugarRondas(10);
     expect(total.gold).toBe(Math.floor(10 * base.gold * 1.2 + 1e-9));
-    expect(total.food).toBe(10 * base.food);
+    expect(total.food).toBe(Math.floor(10 * base.food + 1e-9));
   });
 
-  it('despotismo no guarda resto y su producción no cambia', () => {
+  it('despotismo: lo que se ve es lo que se cobra, y el decimal de la capital queda de resto', () => {
     const { produccion, resto } = produccionConResto(e, 'p1');
-    expect(resto).toEqual({});
     expect(produccion).toEqual(producirParaJugador(e, 'p1'));
+    const bruta = produccionBruta(e, 'p1');
+    for (const [r, v] of Object.entries(resto)) expect(v).toBeCloseTo(bruta[r] - produccion[r]);
   });
 
   it('el evento de producción solo lleva `resto` si hay uno', () => {
+    // Con todas las ciudades saqueadas nadie produce, asi que no hay decimales.
+    for (const t of e.mapa) if (t.ciudad) t.ciudad.saqueadaHasta = 99;
     aplicar(e, terminarTurno(e, 'p1'));
-    const ev = terminarTurno(e, 'p2').find(x => x.tipo === 'RecursosProducidos' && x.jugadorId === 'p2');
-    expect(ev.datos.resto).toBeUndefined();
+    const evs = terminarTurno(e, 'p2').filter(x => x.tipo === 'RecursosProducidos');
+    expect(evs).toHaveLength(2);
+    for (const ev of evs) expect(ev.datos.resto).toBeUndefined();
   });
 });

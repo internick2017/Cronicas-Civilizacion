@@ -3,7 +3,7 @@ import { crearEstado, jugadorPorId, tileEn } from '../../src/domain/mapa/MapGame
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { cambiarFormaEstado, cerrarRondaGobierno } from '../../src/domain/mapa/reglas/gobierno.js';
-import { producirParaJugador } from '../../src/domain/mapa/reglas/turnos.js';
+import { producirParaJugador, produccionBruta } from '../../src/domain/mapa/reglas/turnos.js';
 import { construir, mejorarCiudad } from '../../src/domain/mapa/reglas/ciudades.js';
 import { reclutar } from '../../src/domain/mapa/reglas/militar.js';
 import { vistaJugador } from '../../src/domain/mapa/reglas/visibilidad.js';
@@ -56,11 +56,12 @@ describe('sin problemas todo es la identidad', () => {
 
 describe('producción', () => {
   it('desempleo baja la producción de la ciudad afectada y no la de las otras', () => {
-    const base = producirParaJugador(e, 'p1');
+    // Bruta: el redondeo de una sola ronda puede tapar una baja chica.
+    const base = produccionBruta(e, 'p1');
     problema('desempleo', [A]);
-    const uno = producirParaJugador(e, 'p1');
+    const uno = produccionBruta(e, 'p1');
     problema('desempleo', [B]);
-    const dos = producirParaJugador(e, 'p1');
+    const dos = produccionBruta(e, 'p1');
     for (const r of ['food', 'gold']) {
       expect(uno[r]).toBeLessThan(base[r]);
       expect(dos[r]).toBeLessThan(uno[r]);

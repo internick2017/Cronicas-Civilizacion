@@ -9,7 +9,7 @@ import {
 import { construir, mejorarCiudad } from '../../src/domain/mapa/reglas/ciudades.js';
 import { reclutar } from '../../src/domain/mapa/reglas/militar.js';
 import { atacar } from '../../src/domain/mapa/reglas/combate.js';
-import { producirParaJugador } from '../../src/domain/mapa/reglas/turnos.js';
+import { producirParaJugador, produccionBruta } from '../../src/domain/mapa/reglas/turnos.js';
 import { vistaJugador } from '../../src/domain/mapa/reglas/visibilidad.js';
 import { evento } from '../../src/domain/mapa/reglas/comun.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
@@ -68,7 +68,7 @@ describe('investigar tecnologías', () => {
 describe('efectos de las tecnologías', () => {
   it('irrigación suma 20% a la producción TOTAL de comida (no solo a la base)', () => {
     darCiencia('p1', 100);
-    const antes = producirParaJugador(e, 'p1').food;
+    const antes = produccionBruta(e, 'p1').food;
     aplicar(e, investigar(e, 'p1', { tecnologia: 'irrigacion' }));
     const despues = producirParaJugador(e, 'p1').food;
     expect(despues).toBe(Math.round(antes * 1.2));

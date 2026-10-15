@@ -719,3 +719,11 @@ export const IA_ORGANIZA_SUBDIVISIONES = true;
 // rapido (cobertura total al menor nivel) y el arbol no importaria. El nivel 2 no tiene tope.
 // AJUSTABLE.
 export const CAPACIDAD_CIUDADES_POR_NIVEL = { 3: 81, 4: 27, 5: 9, 6: 3 };
+
+// --- Capital -----------------------------------------------------------------
+// Una ciudad por jugador (ver reglas/capital.js): rinde mas y se defiende mejor, y
+// mudarla cuesta oro y deja a la nueva sin producir. AJUSTABLE.
+export const BONO_PRODUCCION_CAPITAL = 0.2;   // +20% de todo lo que produce la ciudad
+export const BONO_DEFENSA_CAPITAL = 1;        // defensa plana extra
+export const COSTO_MOVER_CAPITAL = { gold: 60 };
+export const RONDAS_SIN_PRODUCIR_MUDANZA = 1;

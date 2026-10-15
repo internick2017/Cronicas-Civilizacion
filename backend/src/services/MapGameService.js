@@ -13,6 +13,7 @@ import { investigar } from '../domain/mapa/reglas/tecnologia.js';
 import { abandonar } from '../domain/mapa/reglas/abandono.js';
 import { proponerAlianza, responderAlianza, romperAlianza, regalarRecursos } from '../domain/mapa/reglas/alianzas.js';
 import { renombrarPais } from '../domain/mapa/reglas/pais.js';
+import { moverCapital } from '../domain/mapa/reglas/capital.js';
 import { jugarTurnoIA } from '../domain/mapa/ia.js';
 import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, RAZAS } from '../domain/mapa/constantes.js';
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
@@ -73,9 +74,11 @@ const ACCIONES_SIN_PODER = new Set(['darVentajas', 'terminarTurno', 'abandonar',
 
 // El apoyo y la administracion de subdivisiones de un jugador son privados,
 // igual que sus recursos (ver visibilidad.js): un humano no los recibe dentro de
-// la lista de eventos de la accion de otro.
+// la lista de eventos de la accion de otro. La capital nueva tampoco: sus
+// coordenadas revelarian una ciudad que el rival quizas no descubrio.
 const EVENTOS_PRIVADOS_DE_GOBIERNO = new Set(['ApoyoActualizado', 'SubdivisionCreada', 'SubdivisionQuitada', 'SubdivisionRenombrada', 'CiudadesAsignadas', 'CiudadesDesasignadas',
-  'MedidoresActualizados', 'ProblemaSurgido', 'ProblemaAgravado', 'ProblemaResuelto', 'ProblemasDescartados', 'PoblacionAjustada']);
+  'MedidoresActualizados', 'ProblemaSurgido', 'ProblemaAgravado', 'ProblemaResuelto', 'ProblemasDescartados', 'PoblacionAjustada',
+  'CapitalMovida']);
 const eventosVisiblesPara = (eventos, jugadorId) =>
   eventos.filter(e => !EVENTOS_PRIVADOS_DE_GOBIERNO.has(e.tipo) || e.jugadorId === jugadorId);
 
@@ -96,6 +99,7 @@ const REGLAS_POR_TIPO = {
   investigar: (estado, jugadorId, accion) => investigar(estado, jugadorId, accion),
   mejorarCiudad: (estado, jugadorId, accion) => mejorarCiudad(estado, jugadorId, accion),
   renombrarCiudad: (estado, jugadorId, accion) => renombrarCiudad(estado, jugadorId, accion),
+  moverCapital: (estado, jugadorId, accion) => moverCapital(estado, jugadorId, accion),
   proponerGobierno: (estado, jugadorId, accion) => proponerGobierno(estado, jugadorId, accion),
   cambiarFormaEstado: (estado, jugadorId, accion) => cambiarFormaEstado(estado, jugadorId, accion),
   darVentajas: (estado, jugadorId, accion) => darVentajas(estado, jugadorId, accion),
