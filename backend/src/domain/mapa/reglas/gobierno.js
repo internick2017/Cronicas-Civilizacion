@@ -12,7 +12,7 @@ import { controlTerritorial } from './dominacion.js';
 import { caidaApoyoPueblo } from './efectosProblemas.js';
 import { produccionPorcentualDeRaza } from './razas.js';
 import { jugadorQueNombra } from './pais.js';
-import { exigirMecanica } from './modo.js';
+import { exigirMecanica, mecanicaActiva } from './modo.js';
 
 // Toda lectura de los campos de gobierno pasa por estos accesores: una partida
 // guardada antes de que existieran no los trae, y se cae al valor por defecto
@@ -213,6 +213,8 @@ const probabilidadDeCrisis = (jugador) =>
 // no tienen gobierno que perder). Puro: el azar viene por parametro. Devuelve
 // eventos; terminarTurno los empuja antes de RondaCompletada.
 export function cerrarRondaGobierno(estado, rng) {
+  // Sin la mecanica nadie tiene apoyo ni puede perder el poder.
+  if (!mecanicaActiva(estado, 'gobierno')) return [];
   const eventos = [];
   // Quien no tiene ciudades se elimina en este mismo cierre (ver terminarTurno):
   // no cuenta para el promedio ni recibe cambios de gobierno.

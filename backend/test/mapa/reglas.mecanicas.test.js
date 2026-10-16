@@ -22,7 +22,14 @@ import {
 } from '../../src/domain/mapa/reglas/subdivisiones.js';
 import {
   cambiarFormaEstado, proponerGobierno, darVentajas, fijarImpuestos, fijarMandato, nombrarGobierno,
+  cerrarRondaGobierno, estaEnPoder, formaEstadoDe, multiplicadorProduccion,
 } from '../../src/domain/mapa/reglas/gobierno.js';
+import { subdivisionesDe } from '../../src/domain/mapa/reglas/subdivisiones.js';
+import { problemasDe } from '../../src/domain/mapa/reglas/problemas.js';
+import { produccionPorcentualDeRaza } from '../../src/domain/mapa/reglas/razas.js';
+import { organizarSubdivisionesIA } from '../../src/domain/mapa/iaSubdivisiones.js';
+import { terminarTurno } from '../../src/domain/mapa/reglas/turnos.js';
+import { RECURSOS } from '../../src/domain/mapa/constantes.js';
 
 function partida(config = {}, { bot = false } = {}) {
   const e = crearEstado({ nombre: 'T', semilla: 'gp-1', config });
@@ -368,5 +375,78 @@ describe('mecanicas: gobierno, las acciones', () => {
 
   it('sin gobierno la moneda sigue andando', () => {
     expect(nombrarMoneda(sinGobierno(), 'a', { nombre: 'Sol', simbolo: 'S' }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('mecanicas: gobierno, lo pasivo', () => {
+  // Una segunda ciudad para 'a' en el primer tile libre de tierra: con dos, la maquina pasa a federal.
+  const segundaCiudad = (e) => {
+    const t = e.mapa.find(x => x.terreno !== 'water' && !x.ciudad && !x.dueno && !x.ejercito);
+    t.terreno = 'plains';
+    t.ciudad = { nombre: 'Segunda', nivel: 1, poblacion: 500, edificios: [] };
+    t.dueno = 'a';
+  };
+
+  it('sin gobierno, el cierre de ronda de gobierno no hace nada', () => {
+    const preparar = (config) => {
+      const e = partida(config);
+      const a = e.jugadores.find(j => j.id === 'a');
+      a.gobierno = 'monarquia';
+      a.apoyo = { pueblo: 0, lideres: 0, militares: 0 };
+      return e;
+    };
+    expect(cerrarRondaGobierno(preparar({ mecanicas: { gobierno: false } }), () => 0)).toEqual([]);
+    expect(cerrarRondaGobierno(preparar({}), () => 0).map(ev => ev.tipo)).toContain('PoderPerdido');
+  });
+
+  it('sin gobierno, la maquina no se vuelve federal', () => {
+    const conDosCiudades = (config) => {
+      const e = partida(config, { bot: true });
+      segundaCiudad(e);
+      return e;
+    };
+    expect(organizarSubdivisionesIA(conDosCiudades({ mecanicas: { gobierno: false } }), 'a', { activa: true })).toEqual([]);
+    expect(organizarSubdivisionesIA(conDosCiudades({}), 'a', { activa: true }).map(ev => ev.tipo)).toContain('FormaEstadoCambiada');
+  });
+
+  // 'a' es maquina (orcos: rinden -25% de ciencia) y 'b' un humano que solo termina el turno,
+  // asi las rondas cierran de verdad y corren el cierre de gobierno y el de problemas.
+  function jugarRondas(config, rondas = 40) {
+    const e = partida(config, { bot: true });
+    e.jugadores.find(j => j.id === 'a').raza = 'orcos';
+    segundaCiudad(e);
+    const tipos = new Set();
+    for (let i = 0; i < rondas * 4 && e.estado === 'jugando' && e.turno <= rondas; i++) {
+      const id = e.jugadores[e.indiceJugadorActual].id;
+      // jugarTurnoIA ya aplica sus eventos sobre el estado; terminarTurno solo los devuelve.
+      const eventos = id === 'a' ? jugarTurnoIA(e, 'a', crearRng(`gob-${i}`)) : terminarTurno(e, id);
+      eventos.forEach(ev => tipos.add(ev.tipo));
+      if (id !== 'a') aplicar(e, eventos);
+    }
+    return { e, tipos };
+  }
+
+  it('sin gobierno, una partida jugada no deja rastros de gobierno', () => {
+    const { e, tipos } = jugarRondas({ mecanicas: { gobierno: false } });
+    // La maquina le gana por dominacion al humano quieto hacia la ronda 9: alcanza, porque
+    // en esas mismas rondas la partida de control ya pasa a federal y mide problemas.
+    expect(e.turno).toBeGreaterThan(5);
+    for (const j of e.jugadores) {
+      expect(estaEnPoder(j)).toBe(true);
+      expect(formaEstadoDe(j)).toBe('unitario');
+      expect(subdivisionesDe(j)).toEqual([]);
+      expect(problemasDe(j)).toEqual([]);
+      for (const r of RECURSOS) expect(multiplicadorProduccion(j, r)).toBe(1 + produccionPorcentualDeRaza(j, r));
+    }
+    expect(multiplicadorProduccion(e.jugadores.find(j => j.id === 'a'), 'science')).toBe(0.75);
+    for (const tipo of ['PoderPerdido', 'ApoyoActualizado', 'FormaEstadoCambiada', 'SubdivisionCreada', 'ProblemaSurgido', 'MedidoresActualizados']) {
+      expect(tipos.has(tipo)).toBe(false);
+    }
+  });
+
+  it('con gobierno prendido, la misma partida si tiene gobierno (control)', () => {
+    const { tipos } = jugarRondas({});
+    expect(tipos.has('FormaEstadoCambiada')).toBe(true);
+    expect(tipos.has('MedidoresActualizados')).toBe(true);
   });
 });

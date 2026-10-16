@@ -2,6 +2,7 @@ import { jugadorPorId, tileEn } from './MapGame.js';
 import { aplicar } from './aplicar.js';
 import { evento } from './reglas/comun.js';
 import { formaEstadoDe } from './reglas/gobierno.js';
+import { mecanicaActiva } from './reglas/modo.js';
 import {
   crearSubdivision, asignarCiudades, quitarSubdivision, subdivisionesDe, subdivisionDeCiudad, territorioDe,
   cabeceraDe, elegirCabecera,
@@ -62,6 +63,8 @@ function hayEnemigoCerca(estado, ciudades, jugadorId) {
 
 export function organizarSubdivisionesIA(estado, jugadorId, { activa = IA_ORGANIZA_SUBDIVISIONES } = {}) {
   if (!activa) return [];
+  // Sin gobierno no hay Estado federal: la maquina se queda unitaria, como todos.
+  if (!mecanicaActiva(estado, 'gobierno')) return [];
   const original = jugadorPorId(estado, jugadorId);
   if (!original || !original.esBot) return [];
   const propias = (est) => est.mapa.filter(t => t.ciudad && t.dueno === jugadorId).map(t => ({ x: t.x, y: t.y }));
