@@ -17,6 +17,8 @@ import { produccionBruta } from '../../src/domain/mapa/reglas/turnos.js';
 import { defensaDeCiudad } from '../../src/domain/mapa/reglas/combate.js';
 import { moverCapital } from '../../src/domain/mapa/reglas/capital.js';
 import { BONO_PRODUCCION_CAPITAL, BONO_DEFENSA_CAPITAL } from '../../src/domain/mapa/constantes.js';
+import { crearSubdivision } from '../../src/domain/mapa/reglas/subdivisiones.js';
+import { cambiarFormaEstado } from '../../src/domain/mapa/reglas/gobierno.js';
 
 function partida(config = {}, { bot = false } = {}) {
   const e = crearEstado({ nombre: 'T', semilla: 'gp-1', config });
@@ -282,5 +284,28 @@ describe('mecanicas: capital', () => {
     libre.ciudad = structuredClone(cap.ciudad);
     libre.dueno = 'a';
     expect(moverCapital(e, 'a', { x: libre.x, y: libre.y }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('mecanicas: prioridad de subdivision "ciencia"', () => {
+  const federal = (config) => {
+    const e = partida(config);
+    aplicar(e, cambiarFormaEstado(e, 'a', { formaEstado: 'federal' }));
+    return e;
+  };
+
+  it('sin ciencia no se puede elegir la prioridad de ciencia', () => {
+    const e = federal({ mecanicas: { ciencia: false } });
+    expect(codigo(() => crearSubdivision(e, 'a', { nombre: 'X', prioridad: 'ciencia' }))).toBe('MECANICA_APAGADA');
+  });
+
+  it('sin ciencia las otras prioridades siguen andando', () => {
+    const e = federal({ mecanicas: { ciencia: false } });
+    expect(crearSubdivision(e, 'a', { nombre: 'X', prioridad: 'comida' }).length).toBe(1);
+  });
+
+  it('con ciencia prendida acepta la prioridad de ciencia', () => {
+    const e = federal({});
+    expect(crearSubdivision(e, 'a', { nombre: 'X', prioridad: 'ciencia' }).length).toBe(1);
   });
 });

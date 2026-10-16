@@ -13,7 +13,9 @@ const emit = defineEmits(['crear', 'renombrar', 'asignar', 'desasignar', 'quitar
 
 const NOMBRE_PRIORIDAD = { defensa: 'Defensa', comida: 'Comida', ciencia: 'Ciencia', economia: 'Economía' }
 const tipos = computed(() => props.constantes.tiposSubdivision || [])
-const prioridades = computed(() => props.constantes.prioridadesSubdivision || [])
+// "ciencia" es una prioridad solo si la ciencia existe en la partida (igual que en MapAyuda).
+const prioridades = computed(() =>
+  (props.constantes.prioridadesSubdivision || []).filter(p => p !== 'ciencia' || props.vista.reglas?.tecnologias !== false))
 const nombreTipo = (tipo) => tipos.value.find(t => t.tipo === tipo)?.nombre || tipo
 
 const yo = computed(() => props.vista.jugadores.find(j => j.id === props.jugadorId))

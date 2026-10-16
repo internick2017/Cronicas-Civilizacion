@@ -4,6 +4,7 @@ import { evento } from './comun.js';
 import { aplicar } from '../aplicar.js';
 import { construir, mejorarCiudad, LARGO_MAXIMO_NOMBRE_CIUDAD } from './ciudades.js';
 import { formaEstadoDe, estaEnPoder } from './gobierno.js';
+import { exigirMecanica } from './modo.js';
 import {
   NIVEL_MAXIMO_ADMINISTRADO, TIPOS_SUBDIVISION, TIPO_SUBDIVISION_LEGADO, CAPACIDAD_CIUDADES_POR_NIVEL,
 } from '../constantes.js';
@@ -188,6 +189,7 @@ export function crearSubdivision(estado, jugadorId, { nombre, tipoSubdivision = 
     }
   }
   if (prioridad !== null && !Object.hasOwn(PRIORIDADES, prioridad)) throw new ReglaError('PRIORIDAD_INVALIDA', 'Prioridad inválida');
+  if (prioridad === 'ciencia') exigirMecanica(estado, 'ciencia', 'prioridad de ciencia');
   const elegidas = ciudadesPropias(estado, jugadorId, ciudades);
   const padreCreacion = padreId !== null ? subdivisionPorId(jugador, padreId) : null;
   validarCapacidad(jugador, TIPOS_SUBDIVISION[tipoSubdivision].nivel, [], padreCreacion ? [padreCreacion, ...ancestros(jugador, padreCreacion)] : [], elegidas);
