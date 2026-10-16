@@ -14,7 +14,7 @@
 // hacer o se llega al tope de pasos. Al final siempre se termina el turno:
 // la IA nunca puede dejar la partida esperando a que ella actue.
 import { tileEn, jugadorPorId, puedePagar } from './MapGame.js';
-import { reglasDelModo, edificioApagado } from './reglas/modo.js';
+import { reglasDelModo, edificioApagado, mecanicaActiva } from './reglas/modo.js';
 import {
   EDIFICIOS, UNIDADES, COSTO_CIUDAD, BONO_TERRENO_PRODUCCION, TECNOLOGIAS, COSTO_MEJORA_CIUDAD,
   bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, esNaval, esTransporte, CAPACIDAD_DE,
@@ -625,6 +625,7 @@ function decidirReclutamiento(estado, jugadorId, perfil) {
  * que la maquina se permite antes de cerrar el turno.
  */
 function decidirReclutamientoNaval(estado, jugadorId, perfil) {
+  if (!mecanicaActiva(estado, 'armada')) return null;
   if (!perfil.topeBuques) return null;
 
   // Cuenta BUQUES DE GUERRA, no "todo lo naval": mientras conto lo naval, un

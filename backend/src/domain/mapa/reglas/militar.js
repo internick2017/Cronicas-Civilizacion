@@ -4,6 +4,7 @@ import { UNIDADES, CUARTEL, esNaval } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento, marAdyacente } from './comun.js';
 import { tieneTecnologiaRequerida } from './tecnologia.js';
+import { exigirMecanica } from './modo.js';
 
 // El objeto `accion` que llega desde MapGameService trae `tipo` como campo de
 // ENRUTAMIENTO ('reclutar', 'construir', ...) y se pasa completo, sin
@@ -25,6 +26,7 @@ export function reclutar(estado, jugadorId, { x, y, unidad }) {
 
   const definicion = UNIDADES[unidad];
   if (!definicion) throw new ReglaError('UNIDAD_DESCONOCIDA', `Unidad desconocida: ${unidad}`);
+  if (unidad === 'warship') exigirMecanica(estado, 'armada', 'buques de guerra');
   if (definicion.requiereBarracks && !tile.ciudad.edificios.includes('barracks')) {
     throw new ReglaError('REQUIERE_BARRACKS', 'Esa unidad requiere barracks en la ciudad');
   }

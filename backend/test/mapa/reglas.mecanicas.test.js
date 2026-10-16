@@ -169,3 +169,43 @@ describe('ciencia y cultura apagadas: la maquina', () => {
     expect(tipos.has('TurnoAvanzado')).toBe(true);
   });
 });
+
+// Capital con puerto y un tile de mar libre al lado (se pone a mano si la semilla no da costa).
+function partidaConPuerto(config, opciones) {
+  const e = partida(config, opciones);
+  const cap = capitalDe(e, 'a');
+  const vecino = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+    .map(([dx, dy]) => e.mapa.find(t => t.x === cap.x + dx && t.y === cap.y + dy))
+    .find(t => t && !t.ejercito && !t.ciudad);
+  vecino.terreno = 'water';
+  if (!cap.ciudad.edificios.includes('port')) cap.ciudad.edificios.push('port');
+  return { e, x: cap.x, y: cap.y };
+}
+
+describe('mecanicas: armada', () => {
+  it('sin armada no se recluta el buque de guerra', () => {
+    const { e, x, y } = partidaConPuerto({ mecanicas: { armada: false } });
+    expect(codigo(() => reclutar(e, 'a', { x, y, unidad: 'warship' }))).toBe('MECANICA_APAGADA');
+  });
+  it('sin armada el transporte se sigue reclutando', () => {
+    const { e, x, y } = partidaConPuerto({ mecanicas: { armada: false } });
+    expect(reclutar(e, 'a', { x, y, unidad: 'transport' }).length).toBeGreaterThan(0);
+  });
+  it('con armada el buque se recluta (control)', () => {
+    const { e, x, y } = partidaConPuerto({});
+    expect(reclutar(e, 'a', { x, y, unidad: 'warship' }).length).toBeGreaterThan(0);
+  });
+
+  function buquesQueReclutaLaMaquina(config) {
+    const { e } = partidaConPuerto(config, { bot: true });
+    e.jugadores.find(j => j.id === 'a').dificultadIA = 'dificil';
+    const eventos = jugarTurnoIA(e, 'a', crearRng('gp-ia-armada'));
+    return eventos.filter(ev => ev.tipo === 'UnidadReclutada' && ev.datos.tipo === 'warship');
+  }
+  it('la maquina con armada recluta buques (control)', () => {
+    expect(buquesQueReclutaLaMaquina({}).length).toBeGreaterThan(0);
+  });
+  it('la maquina sin armada no recluta buques', () => {
+    expect(buquesQueReclutaLaMaquina({ mecanicas: { armada: false } })).toHaveLength(0);
+  });
+});
