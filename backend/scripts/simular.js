@@ -37,7 +37,7 @@ import { unirse, iniciar } from '../src/domain/mapa/reglas/partida.js';
 import { jugarTurnoIA, PERFILES_DIFICULTAD } from '../src/domain/mapa/ia.js';
 import { esCostera } from '../src/domain/mapa/reglas/comun.js';
 import { crearRng } from '../src/domain/mapa/rng.js';
-import { RAZAS } from '../src/domain/mapa/constantes.js';
+import { RAZAS, MECANICAS } from '../src/domain/mapa/constantes.js';
 
 function leerArgs(argv) {
   const args = {
@@ -73,7 +73,7 @@ function leerArgs(argv) {
 
 function jugarPartida(semilla, { tamano, dificultad, turnoMaximo, islas, sinMecanicas = false, razaA = null, razaB = null }) {
   const mecanicas = sinMecanicas
-    ? { ciencia: false, cultura: false, armada: false, alianzas: false, moneda: false, capital: false }
+    ? Object.fromEntries(MECANICAS.map(m => [m, false]))
     : undefined;
   const e = crearEstado({ nombre: 'sim', semilla, config: { tamanoMapa: tamano, islas, ...(mecanicas && { mecanicas }) } });
   aplicar(e, unirse(e, { id: 'a', nombre: 'A', civilizacion: 'Incas', raza: razaA, esBot: true, dificultadIA: dificultad }));
