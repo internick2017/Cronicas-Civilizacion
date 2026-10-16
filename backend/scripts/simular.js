@@ -28,8 +28,9 @@
 // dificultades) sin tocar el mapa: es la comparacion que aisla el efecto de la
 // armada, porque generar mapas sin mar cambiaria todo lo demas a la vez.
 //
-// --sin-mecanicas apaga las seis casillas elegibles (ciencia, cultura, armada,
-// alianzas, moneda, capital) al crear la partida: es el modo "guerra pura".
+// --sin-mecanicas apaga las siete casillas elegibles (ciencia, cultura, armada,
+// alianzas, moneda, capital, gobierno) al crear la partida: el juego como era antes
+// de todas ellas.
 
 import { crearEstado } from '../src/domain/mapa/MapGame.js';
 import { aplicar } from '../src/domain/mapa/aplicar.js';
