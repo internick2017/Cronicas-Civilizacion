@@ -1,7 +1,8 @@
 <!-- frontend/src/components/mapa/MapLobby.vue -->
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useMapApi } from '../../composables/useMapApi.js'
+import MapMecanicas from './MapMecanicas.vue'
 
 const emit = defineEmits(['partida-unida'])
 
@@ -36,17 +37,14 @@ const limiteRondas = ref(null)
 // Apagado por defecto: un mapa de islas es otro juego (mitad del mundo es mar y
 // hay que cruzarlo en transporte), asi que se elige, no se hereda.
 const islas = ref(false)
-// Las seis casillas de la partida, todas prendidas: quien quiera otro juego apaga
-// las que no le interesan. El backend completa con true lo que falte.
-const MECANICAS = [
-  { clave: 'ciencia', nombre: 'Ciencia', ayuda: 'Tecnologías, biblioteca, universidad y subir de nivel las ciudades.' },
-  { clave: 'cultura', nombre: 'Cultura', ayuda: 'Rasgos culturales.' },
-  { clave: 'armada', nombre: 'Armada', ayuda: 'Buques de guerra (el transporte sigue).' },
-  { clave: 'alianzas', nombre: 'Alianzas', ayuda: 'Aliarse y regalarse recursos.' },
-  { clave: 'moneda', nombre: 'Moneda', ayuda: 'Nombre propio de la moneda y acuñar oro.' },
-  { clave: 'capital', nombre: 'Capital', ayuda: 'La capital rinde y defiende más, y se puede mudar.' },
-]
-const mecanicas = reactive(Object.fromEntries(MECANICAS.map((m) => [m.clave, true])))
+// Todas prendidas: quien quiera otro juego apaga las que no le interesan. Es un
+// solo estado para los dos paneles (Jugar solo y Crear partida).
+const mecanicas = ref({ ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true })
+const resumenMecanicas = computed(() => {
+  const valores = Object.values(mecanicas.value)
+  const prendidas = valores.filter(Boolean).length
+  return prendidas === valores.length ? 'todas' : `${prendidas} de ${valores.length}`
+})
 
 // Por defecto todos juegan a la vez; "por turnos" queda para quien lo prefiera.
 const MODOS_TURNO = [
@@ -69,7 +67,7 @@ const configElegida = () => ({
   tamanoMapa: tamanoMapa.value,
   limiteRondas: limiteRondas.value,
   islas: islas.value,
-  mecanicas: { ...mecanicas },
+  mecanicas: { ...mecanicas.value },
 })
 const nombreJugador = ref('')
 const codigoUnirse = ref('')
@@ -317,6 +315,11 @@ onMounted(() => {
           </label>
         </div>
 
+        <details class="mecanicas-solo">
+          <summary>Mecánicas de la partida ({{ resumenMecanicas }})</summary>
+          <MapMecanicas v-model="mecanicas" />
+        </details>
+
         <button class="btn-primary" :disabled="cargando" @click="jugarContraIA">
           Jugar contra la máquina
         </button>
@@ -386,13 +389,7 @@ onMounted(() => {
           semilla no da dos islas grandes, la partida arranca como una normal.
         </p>
         <h3 class="titulo-mecanicas">Mecánicas de la partida</h3>
-        <template v-for="m in MECANICAS" :key="m.clave">
-          <label class="field field-check">
-            <input v-model="mecanicas[m.clave]" type="checkbox" />
-            <span>{{ m.nombre }}</span>
-          </label>
-          <p class="ayuda-config">{{ m.ayuda }}</p>
-        </template>
+        <MapMecanicas v-model="mecanicas" />
         <button class="btn-primary" :disabled="cargando" @click="crear">Crear</button>
       </section>
 
@@ -487,6 +484,15 @@ onMounted(() => {
 
 .field-check { flex-direction: row; align-items: center; gap: 0.5rem; }
 .field-check input { width: auto; }
+.mecanicas-solo {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+.mecanicas-solo summary {
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
 .titulo-mecanicas {
   margin: 0.75rem 0 0.25rem;
   font-size: 1rem;
