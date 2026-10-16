@@ -25,7 +25,8 @@ const CONFIG_DEFAULT = {
   rondasEntreElecciones: 8,
   // Mecanicas que se pueden apagar al crear la partida (ver reglas/modo.js). Ciencia y
   // cultura apagadas: ni se producen ni se gastan, sin tecnologias, rasgos ni mejoras de
-  // ciudad. Todas prendidas por defecto: una partida sin tocar nada se juega como siempre.
+  // ciudad. Gobierno apagado: nadie tiene apoyo, elecciones, impuestos ni Estado federal.
+  // Todas prendidas por defecto: una partida sin tocar nada se juega como siempre.
   mecanicas: Object.fromEntries(MECANICAS.map(m => [m, true])),
 };
 

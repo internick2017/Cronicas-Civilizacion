@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { crearEstado } from '../../src/domain/mapa/MapGame.js';
 import { vistaJugador } from '../../src/domain/mapa/reglas/visibilidad.js';
-import { mecanicasDe, reglasDelModo } from '../../src/domain/mapa/reglas/modo.js';
+import { mecanicasDe, mecanicaActiva, reglasDelModo } from '../../src/domain/mapa/reglas/modo.js';
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { investigar } from '../../src/domain/mapa/reglas/tecnologia.js';
@@ -35,7 +35,7 @@ const codigo = (fn) => { try { fn(); } catch (err) { return err.codigo ?? err.co
 
 describe('mecanicas: la config', () => {
   it('por defecto todas prendidas', () => {
-    expect(mecanicasDe(partida())).toEqual({ ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true });
+    expect(mecanicasDe(partida())).toEqual({ ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true });
   });
   it('una config parcial completa lo que falta con true', () => {
     expect(mecanicasDe(partida({ mecanicas: { armada: false } })).ciencia).toBe(true);
@@ -43,7 +43,7 @@ describe('mecanicas: la config', () => {
   });
   it('rechaza claves desconocidas y valores no booleanos', () => {
     const crear = (mecanicas) => () => crearEstado({ nombre: 'T', semilla: 'x', config: { mecanicas } });
-    expect(crear({ gobierno: false })).toThrow(/mecanicas/);
+    expect(crear({ diplomacia: false })).toThrow(/mecanicas/);
     expect(crear({ ciencia: 'no' })).toThrow(/mecanicas/);
     expect(crear('todas')).toThrow(/mecanicas/);
   });
@@ -51,7 +51,7 @@ describe('mecanicas: la config', () => {
     const vieja = partida();
     delete vieja.config.mecanicas;
     vieja.config.guerraPura = true;
-    expect(mecanicasDe(vieja)).toEqual({ ciencia: false, cultura: false, armada: true, alianzas: true, moneda: true, capital: true });
+    expect(mecanicasDe(vieja)).toEqual({ ciencia: false, cultura: false, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true });
   });
   it('partida vieja sin ninguno de los dos campos: todo prendido', () => {
     const vieja = partida();
@@ -120,12 +120,12 @@ describe('ciencia y cultura apagadas: lo que le dice el modo a la interfaz', () 
     expect(reglasDelModo(partida())).toEqual({
       tecnologias: true, rasgos: true, mejorasCiudad: true,
       recursosActivos: ['food', 'gold', 'wood', 'stone', 'science', 'culture'],
-      armada: true, alianzas: true, moneda: true, capital: true,
+      armada: true, alianzas: true, moneda: true, capital: true, gobierno: true,
     });
     expect(reglasDelModo(partida({ mecanicas: { ciencia: false, cultura: false } }))).toEqual({
       tecnologias: false, rasgos: false, mejorasCiudad: false,
       recursosActivos: ['food', 'gold', 'wood', 'stone'],
-      armada: true, alianzas: true, moneda: true, capital: true,
+      armada: true, alianzas: true, moneda: true, capital: true, gobierno: true,
     });
   });
 
@@ -317,5 +317,19 @@ describe('mecanicas: cada partida tiene su propio objeto', () => {
     expect(a.config.mecanicas).not.toBe(b.config.mecanicas);
     a.config.mecanicas.ciencia = false;
     expect(crearEstado({ nombre: 'C', semilla: 's3' }).config.mecanicas.ciencia).toBe(true);
+  });
+});
+
+describe('mecanicas: gobierno en la config', () => {
+  it('por defecto prendido, y se puede apagar', () => {
+    expect(mecanicasDe(partida()).gobierno).toBe(true);
+    expect(mecanicasDe(partida({ mecanicas: { gobierno: false } })).gobierno).toBe(false);
+    expect(reglasDelModo(partida({ mecanicas: { gobierno: false } })).gobierno).toBe(false);
+  });
+  it('una partida guardada en la Parte 1 (seis claves, sin gobierno) lo tiene prendido', () => {
+    const vieja = partida();
+    vieja.config.mecanicas = { ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true };
+    expect(mecanicaActiva(vieja, 'gobierno')).toBe(true);
+    expect(vieja.config.mecanicas.gobierno).toBeUndefined(); // no se reescribe
   });
 });

@@ -22,7 +22,7 @@ export const RECURSOS_DE_TILE = ['food', 'gold', 'wood', 'stone'];
 export const RECURSOS_CIVILES = ['science', 'culture'];
 
 // Las mecanicas que se eligen al crear la partida (config.mecanicas). Todas prendidas por defecto.
-export const MECANICAS = ['ciencia', 'cultura', 'armada', 'alianzas', 'moneda', 'capital'];
+export const MECANICAS = ['ciencia', 'cultura', 'armada', 'alianzas', 'moneda', 'capital', 'gobierno'];
 
 export const RECURSOS_INICIALES = {
   food: 100,

@@ -53,5 +53,6 @@ export function reglasDelModo(estado) {
     alianzas: m.alianzas,
     moneda: m.moneda,
     capital: m.capital,
+    gobierno: m.gobierno,
   };
 }

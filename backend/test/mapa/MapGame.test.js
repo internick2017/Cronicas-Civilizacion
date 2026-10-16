@@ -21,7 +21,7 @@ describe('crearEstado', () => {
       tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial',
       porcentajeVictoria: 60, limiteRondas: null, islas: false,
       rondasEntreElecciones: 8, // se sumó con el gobierno: solo lo usan las repúblicas
-      mecanicas: { ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true }, // se apagan en el lobby; todas prendidas por defecto
+      mecanicas: { ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true }, // se apagan en el lobby; todas prendidas por defecto
     });
     expect(e.ganador).toBeNull();
   });
