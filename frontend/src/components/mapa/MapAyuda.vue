@@ -82,6 +82,14 @@ const edificios = computed(() => {
   return (props.constantes?.edificios || []).filter(e => Object.keys(e.produccion || {}).every(recursoActivo))
 })
 
+// "ciencia" es una prioridad de subdivision solo si la ciencia existe en la partida.
+const prioridades = computed(() =>
+  (props.constantes?.prioridadesSubdivision || []).filter(p => p !== 'ciencia' || prendida('tecnologias')))
+
+// Un problema social que castiga un recurso apagado no se genera (reglas/modo.js#problemaApagado).
+const problemas = computed(() =>
+  (props.constantes?.problemasSociales || []).filter(p => !p.recurso || recursoActivo(p.recurso)))
+
 const terrenosProductivos = computed(() =>
   (props.constantes?.terrenos || []).filter(t => Object.keys(soloActivos(t.produccion)).length > 0)
 )
@@ -231,7 +239,7 @@ const umbralAviso = computed(() =>
         </thead>
         <tbody>
           <tr v-for="e in edificios" :key="e.tipo">
-            <td>{{ e.nombre }}<small v-if="e.requiereTecnologia"> (necesita tecnología)</small></td>
+            <td>{{ e.nombre }}<small v-if="e.requiereTecnologia && prendida('tecnologias')"> (necesita tecnología)</small></td>
             <td>{{ costo(e.costo) }}</td>
             <td>{{ produccion(e.produccion) }}</td>
           </tr>
@@ -319,7 +327,7 @@ const umbralAviso = computed(() =>
               {{ u.nombre }}
               <small v-if="u.requiereBarracks"> (necesita cuartel)</small>
               <small v-if="u.requierePuerto"> (necesita puerto)</small>
-              <small v-if="u.requiereTecnologia"> (necesita tecnología)</small>
+              <small v-if="u.requiereTecnologia && prendida('tecnologias')"> (necesita tecnología)</small>
               <!-- Que solo navegue no es un detalle de reclutamiento sino la
                    regla central de la unidad: sin decirlo, el jugador la
                    compra esperando que camine. -->
@@ -432,7 +440,7 @@ const umbralAviso = computed(() =>
         <strong>federal</strong>, todas tus ciudades se administran solas al terminar tu turno: construyen según su
         prioridad (economía por defecto) y después se mejoran, hasta el nivel {{ constantes.nivelMaximoAdministrado }}.
         Creando <strong>subdivisiones</strong> agrupás ciudades y les elegís otra prioridad
-        ({{ (constantes.prioridadesSubdivision || []).join(', ') }}). Pasar de uno a otro es gratis.
+        ({{ prioridades.join(', ') }}). Pasar de uno a otro es gratis.
       </p>
       <p>
         Además, en el menú de cada ciudad propia podés <strong>renombrarla</strong> cuando quieras.
@@ -466,8 +474,8 @@ const umbralAviso = computed(() =>
         dentro de otra de nivel mayor. Si quitás una, sus hijas y sus ciudades pasan a la de arriba. Cada nivel abarca hasta un máximo de ciudades (contando las de sus hijas): {{ topes }}.
       </p>
       <p>
-        Cada ciudad acumula <strong>diez problemas sociales</strong>:
-        {{ (constantes.problemasSociales || []).map(p => p.nombre.toLowerCase()).join(', ') }}.
+        Cada ciudad acumula <strong>{{ problemas.length }} problemas sociales</strong>:
+        {{ problemas.map(p => p.nombre.toLowerCase()).join(', ') }}.
         Los medidores suben o bajan según lo que tengas construido (un cuartel contiene la inseguridad,
         <template v-if="prendida('tecnologias')">una biblioteca la mala educación, </template>un granero la pobreza y la mala salud, un aserradero o una cantera la falta
         de infraestructura, un mercado la corrupción).
