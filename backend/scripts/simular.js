@@ -27,6 +27,9 @@
 // --sin-armada apaga la flota de la maquina (topeBuques = 0 en las tres
 // dificultades) sin tocar el mapa: es la comparacion que aisla el efecto de la
 // armada, porque generar mapas sin mar cambiaria todo lo demas a la vez.
+//
+// --sin-mecanicas apaga las seis casillas elegibles (ciencia, cultura, armada,
+// alianzas, moneda, capital) al crear la partida: es el modo "guerra pura".
 
 import { crearEstado } from '../src/domain/mapa/MapGame.js';
 import { aplicar } from '../src/domain/mapa/aplicar.js';
@@ -44,6 +47,7 @@ function leerArgs(argv) {
     semilla: 'lote',
     turnoMaximo: 300,
     sinArmada: false,
+    sinMecanicas: false,
     islas: false,
     razaA: null,
     razaB: null,
@@ -52,6 +56,7 @@ function leerArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--sin-armada') { args.sinArmada = true; continue; }
+    if (a === '--sin-mecanicas') { args.sinMecanicas = true; continue; }
     if (a === '--islas') { args.islas = true; continue; }
     if (a === '--matriz') { args.matriz = true; continue; }
     const valor = argv[++i];
@@ -66,8 +71,11 @@ function leerArgs(argv) {
   return args;
 }
 
-function jugarPartida(semilla, { tamano, dificultad, turnoMaximo, islas, razaA = null, razaB = null }) {
-  const e = crearEstado({ nombre: 'sim', semilla, config: { tamanoMapa: tamano, islas } });
+function jugarPartida(semilla, { tamano, dificultad, turnoMaximo, islas, sinMecanicas = false, razaA = null, razaB = null }) {
+  const mecanicas = sinMecanicas
+    ? { ciencia: false, cultura: false, armada: false, alianzas: false, moneda: false, capital: false }
+    : undefined;
+  const e = crearEstado({ nombre: 'sim', semilla, config: { tamanoMapa: tamano, islas, ...(mecanicas && { mecanicas }) } });
   aplicar(e, unirse(e, { id: 'a', nombre: 'A', civilizacion: 'Incas', raza: razaA, esBot: true, dificultadIA: dificultad }));
   aplicar(e, unirse(e, { id: 'b', nombre: 'B', civilizacion: 'Mayas', raza: razaB, esBot: true, dificultadIA: dificultad }));
   aplicar(e, iniciar(e));
@@ -182,7 +190,7 @@ const terminadas = resultados.filter(r => r.termino);
 const suma = (f) => resultados.reduce((a, r) => a + f(r), 0);
 const promedio = (lista, f) => (lista.length ? lista.reduce((a, r) => a + f(r), 0) / lista.length : 0);
 
-console.log(`\n== ${args.partidas} partidas | tamano ${args.tamano} | dificultad ${args.dificultad} | semillas "${args.semilla}-*"${args.sinArmada ? ' | SIN ARMADA' : ''}`);
+console.log(`\n== ${args.partidas} partidas | tamano ${args.tamano} | dificultad ${args.dificultad} | semillas "${args.semilla}-*"${args.sinArmada ? ' | SIN ARMADA' : ''}${args.sinMecanicas ? ' | SIN MECANICAS' : ''}`);
 if (args.razaA || args.razaB) {
   const gana = (id) => resultados.filter(r => r.ganador === id).length;
   console.log(`razas                      A=${args.razaA ?? 'sin raza'} (asiento 1) vs B=${args.razaB ?? 'sin raza'} (asiento 2)`);
