@@ -13,6 +13,10 @@ import { reclutar } from '../../src/domain/mapa/reglas/militar.js';
 import { producirParaJugador } from '../../src/domain/mapa/reglas/turnos.js';
 import { jugarTurnoIA } from '../../src/domain/mapa/ia.js';
 import { crearRng } from '../../src/domain/mapa/rng.js';
+import { produccionBruta } from '../../src/domain/mapa/reglas/turnos.js';
+import { defensaDeCiudad } from '../../src/domain/mapa/reglas/combate.js';
+import { moverCapital } from '../../src/domain/mapa/reglas/capital.js';
+import { BONO_PRODUCCION_CAPITAL, BONO_DEFENSA_CAPITAL } from '../../src/domain/mapa/constantes.js';
 
 function partida(config = {}, { bot = false } = {}) {
   const e = crearEstado({ nombre: 'T', semilla: 'gp-1', config });
@@ -240,5 +244,43 @@ describe('mecanicas: moneda', () => {
     const e = partida();
     expect(nombrarMoneda(e, 'a', { nombre: 'Sol', simbolo: 'S' }).length).toBeGreaterThan(0);
     expect(acunarMoneda(e, 'a', { oro: 10 }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('mecanicas: capital', () => {
+  it('sin capital la ciudad no produce el bono (todo sale igual salvo ese bono)', () => {
+    const on = partida();
+    const off = partida({ mecanicas: { capital: false } });
+    const pOn = produccionBruta(on, 'a');
+    const pOff = produccionBruta(off, 'a');
+    expect(Object.keys(pOn).length).toBeGreaterThan(0);
+    for (const r of Object.keys(pOn)) {
+      expect(pOff[r]).toBeCloseTo(pOn[r] / (1 + BONO_PRODUCCION_CAPITAL), 5);
+    }
+  });
+  it('sin capital la defensa no suma el bono', () => {
+    const on = partida();
+    const off = partida({ mecanicas: { capital: false } });
+    const dOn = defensaDeCiudad(on, capitalDe(on, 'a'));
+    const dOff = defensaDeCiudad(off, capitalDe(off, 'a'));
+    expect(dOff).toBe(dOn - BONO_DEFENSA_CAPITAL);
+  });
+  it('sin capital no se muda, pero la capital sigue existiendo para la vista', () => {
+    const e = partida({ mecanicas: { capital: false } });
+    const cap = capitalDe(e, 'a');
+    const libre = e.mapa.find(t => !t.ciudad && !t.dueno && t.terreno !== 'water');
+    libre.ciudad = structuredClone(cap.ciudad);
+    libre.dueno = 'a';
+    expect(codigo(() => moverCapital(e, 'a', { x: libre.x, y: libre.y }))).toBe('MECANICA_APAGADA');
+    const yo = vistaJugador(e, 'a').jugadores.find(j => j.id === 'a');
+    expect(yo.capital).not.toBeNull();
+  });
+  it('con capital prendida se muda (control)', () => {
+    const e = partida();
+    const cap = capitalDe(e, 'a');
+    const libre = e.mapa.find(t => !t.ciudad && !t.dueno && t.terreno !== 'water');
+    libre.ciudad = structuredClone(cap.ciudad);
+    libre.dueno = 'a';
+    expect(moverCapital(e, 'a', { x: libre.x, y: libre.y }).length).toBeGreaterThan(0);
   });
 });

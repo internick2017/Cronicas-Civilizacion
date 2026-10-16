@@ -2,6 +2,7 @@ import { jugadorPorId, tileEn, puedePagar } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
 import { COSTO_MOVER_CAPITAL, RONDAS_SIN_PRODUCIR_MUDANZA } from '../constantes.js';
 import { validarTurno, evento } from './comun.js';
+import { exigirMecanica } from './modo.js';
 import { escalarCosto, multiplicadorCostos } from './efectosProblemas.js';
 
 // La capital elegida si sigue siendo suya; si no (partida vieja, nunca la movio,
@@ -30,6 +31,7 @@ export const estaEnMudanza = (ciudad, turno) => (ciudad.mudanzaHasta ?? 0) > tur
 
 export function moverCapital(estado, jugadorId, { x, y }) {
   validarTurno(estado, jugadorId);
+  exigirMecanica(estado, 'capital', 'mudanza de capital');
   const tile = tileEn(estado, x, y);
   if (!tile?.ciudad) throw new ReglaError('SIN_CIUDAD', 'No hay una ciudad ahí');
   if (tile.dueno !== jugadorId) throw new ReglaError('CIUDAD_AJENA', 'Solo podés mudar la capital a una ciudad tuya');

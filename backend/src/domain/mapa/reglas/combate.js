@@ -6,6 +6,7 @@ import {
 } from '../constantes.js';
 import { penalizacionDefensa } from './efectosProblemas.js';
 import { esCapital } from './capital.js';
+import { mecanicaActiva } from './modo.js';
 import { ReglaError } from '../errores.js';
 import { tirada } from '../rng.js';
 import { botinDe, saqueadaHasta } from './saqueo.js';
@@ -23,7 +24,8 @@ import {
 export function defensaDeCiudad(estado, tile) {
   const bonoCuartel = tile.ciudad.edificios.includes('barracks') ? CUARTEL.bonoDefensaCiudad : 0;
   const duenoJugador = estado.jugadores.find(j => j.id === tile.dueno);
-  const bonoCapital = esCapital(estado, duenoJugador, tile.x, tile.y) ? BONO_DEFENSA_CAPITAL : 0;
+  const bonoCapital = mecanicaActiva(estado, 'capital') && esCapital(estado, duenoJugador, tile.x, tile.y)
+    ? BONO_DEFENSA_CAPITAL : 0;
   return Math.max(1, defensaCiudad(tile.ciudad.nivel) + bonoCuartel + bonoCapital
     - penalizacionDefensa(duenoJugador, tile.x, tile.y));
 }

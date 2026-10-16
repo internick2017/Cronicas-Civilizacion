@@ -3,7 +3,7 @@ import {
   BONO_PRODUCCION_CABECERA,
 } from '../constantes.js';
 import { tileEn } from '../MapGame.js';
-import { recursoApagado } from './modo.js';
+import { recursoApagado, mecanicaActiva } from './modo.js';
 import { validarTurno, evento, esSimultaneo, listosDe } from './comun.js';
 import { produccionPorRasgos } from './cultura.js';
 import { aplicarBonosPorcentuales } from './tecnologia.js';
@@ -47,7 +47,7 @@ export function produccionBruta(estado, jugadorId) {
   // edificios: valen para las ciudades que ya tenias y para las que fundes.
   const jugador = estado.jugadores.find(j => j.id === jugadorId);
   const porRasgos = produccionPorRasgos(jugador);
-  const capital = capitalDe(estado, jugador);
+  const capital = mecanicaActiva(estado, 'capital') ? capitalDe(estado, jugador) : null;
   const conCabecera = ciudadesConBonoCabecera(estado, jugador);
   for (const tile of ciudadesDe(estado, jugadorId)) {
     const bonoCiudad = 1
