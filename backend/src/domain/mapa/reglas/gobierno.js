@@ -12,6 +12,7 @@ import { controlTerritorial } from './dominacion.js';
 import { caidaApoyoPueblo } from './efectosProblemas.js';
 import { produccionPorcentualDeRaza } from './razas.js';
 import { jugadorQueNombra } from './pais.js';
+import { exigirMecanica } from './modo.js';
 
 // Toda lectura de los campos de gobierno pasa por estos accesores: una partida
 // guardada antes de que existieran no los trae, y se cae al valor por defecto
@@ -56,6 +57,7 @@ function jugadorDeGobierno(estado, jugadorId) {
   if (estado.estado !== 'jugando') throw new ReglaError('PARTIDA_NO_ACTIVA', 'La partida no está activa');
   const jugador = jugadorPorId(estado, jugadorId);
   if (!jugador) throw new ReglaError('JUGADOR_DESCONOCIDO', `Jugador desconocido: ${jugadorId}`);
+  exigirMecanica(estado, 'gobierno', 'gobierno');
   return jugador;
 }
 
@@ -163,6 +165,7 @@ export function fijarMandato(estado, jugadorId, { rondas }) {
 
 // Vacio vuelve al nombre por defecto del tipo de gobierno.
 export function nombrarGobierno(estado, jugadorId, { nombre }) {
+  exigirMecanica(estado, 'gobierno', 'gobierno');
   jugadorQueNombra(estado, jugadorId);
   if (typeof nombre !== 'string') throw new ReglaError('NOMBRE_INVALIDO', 'El nombre tiene que ser un texto');
   const limpio = nombre.trim();

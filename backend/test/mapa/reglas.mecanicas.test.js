@@ -17,8 +17,12 @@ import { produccionBruta } from '../../src/domain/mapa/reglas/turnos.js';
 import { defensaDeCiudad } from '../../src/domain/mapa/reglas/combate.js';
 import { moverCapital } from '../../src/domain/mapa/reglas/capital.js';
 import { BONO_PRODUCCION_CAPITAL, BONO_DEFENSA_CAPITAL } from '../../src/domain/mapa/constantes.js';
-import { crearSubdivision } from '../../src/domain/mapa/reglas/subdivisiones.js';
-import { cambiarFormaEstado } from '../../src/domain/mapa/reglas/gobierno.js';
+import {
+  crearSubdivision, renombrarSubdivision, asignarCiudades, desasignarCiudades, quitarSubdivision, elegirCabecera,
+} from '../../src/domain/mapa/reglas/subdivisiones.js';
+import {
+  cambiarFormaEstado, proponerGobierno, darVentajas, fijarImpuestos, fijarMandato, nombrarGobierno,
+} from '../../src/domain/mapa/reglas/gobierno.js';
 
 function partida(config = {}, { bot = false } = {}) {
   const e = crearEstado({ nombre: 'T', semilla: 'gp-1', config });
@@ -331,5 +335,38 @@ describe('mecanicas: gobierno en la config', () => {
     vieja.config.mecanicas = { ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true };
     expect(mecanicaActiva(vieja, 'gobierno')).toBe(true);
     expect(vieja.config.mecanicas.gobierno).toBeUndefined(); // no se reescribe
+  });
+});
+
+describe('mecanicas: gobierno, las acciones', () => {
+  const sinGobierno = () => partida({ mecanicas: { gobierno: false } });
+  const acciones = {
+    proponerGobierno: (e) => proponerGobierno(e, 'a', { gobierno: 'monarquia' }),
+    cambiarFormaEstado: (e) => cambiarFormaEstado(e, 'a', { formaEstado: 'federal' }),
+    darVentajas: (e) => darVentajas(e, 'a', { grupo: 'pueblo', oro: 100 }),
+    fijarImpuestos: (e) => fijarImpuestos(e, 'a', { nivel: 'altos' }),
+    fijarMandato: (e) => fijarMandato(e, 'a', { rondas: 5 }),
+    nombrarGobierno: (e) => nombrarGobierno(e, 'a', { nombre: 'Junta' }),
+    crearSubdivision: (e) => crearSubdivision(e, 'a', { nombre: 'X' }),
+    renombrarSubdivision: (e) => renombrarSubdivision(e, 'a', { id: 'sub1', nombre: 'Y' }),
+    asignarCiudades: (e) => asignarCiudades(e, 'a', { id: 'sub1', ciudades: [] }),
+    desasignarCiudades: (e) => desasignarCiudades(e, 'a', { id: 'sub1', ciudades: [] }),
+    quitarSubdivision: (e) => quitarSubdivision(e, 'a', { id: 'sub1' }),
+    elegirCabecera: (e) => elegirCabecera(e, 'a', { subdivisionId: 'sub1', x: null, y: null }),
+  };
+
+  for (const [nombre, accion] of Object.entries(acciones)) {
+    it(`sin gobierno, ${nombre} rechaza`, () => {
+      expect(codigo(() => accion(sinGobierno()))).toBe('MECANICA_APAGADA');
+    });
+  }
+
+  it('con gobierno prendido, impuestos y forma de Estado andan (control)', () => {
+    expect(acciones.fijarImpuestos(partida()).length).toBe(1);
+    expect(acciones.cambiarFormaEstado(partida()).length).toBe(1);
+  });
+
+  it('sin gobierno la moneda sigue andando', () => {
+    expect(nombrarMoneda(sinGobierno(), 'a', { nombre: 'Sol', simbolo: 'S' }).length).toBeGreaterThan(0);
   });
 });

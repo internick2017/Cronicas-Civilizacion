@@ -127,6 +127,7 @@ function jugadorFederal(estado, jugadorId) {
   if (estado.estado !== 'jugando') throw new ReglaError('PARTIDA_NO_ACTIVA', 'La partida no está activa');
   const jugador = jugadorPorId(estado, jugadorId);
   if (!jugador) throw new ReglaError('JUGADOR_DESCONOCIDO', `Jugador desconocido: ${jugadorId}`);
+  exigirMecanica(estado, 'gobierno', 'subdivisiones');
   if (!estaEnPoder(jugador)) throw new ReglaError('SIN_PODER', 'No tenés el poder para organizar el Estado');
   if (formaEstadoDe(jugador) !== 'federal') throw new ReglaError('NO_ES_FEDERAL', 'Solo un Estado federal tiene subdivisiones');
   return jugador;
