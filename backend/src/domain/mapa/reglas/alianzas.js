@@ -2,7 +2,7 @@ import { jugadorPorId } from '../MapGame.js';
 import { RECURSOS } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { evento } from './comun.js';
-import { recursoApagado } from './modo.js';
+import { exigirMecanica, recursoApagado } from './modo.js';
 import { controlTerritorial } from './dominacion.js';
 import { alianzaDe, aliadosDe, sonAliados, propuestasDe } from './bandos.js';
 
@@ -15,6 +15,7 @@ import { alianzaDe, aliadosDe, sonAliados, propuestasDe } from './bandos.js';
 
 function jugadorActivo(estado, jugadorId) {
   if (estado.estado !== 'jugando') throw new ReglaError('PARTIDA_NO_ACTIVA', 'La partida no está activa');
+  exigirMecanica(estado, 'alianzas', 'alianzas');
   const jugador = jugadorPorId(estado, jugadorId);
   if (!jugador) throw new ReglaError('JUGADOR_DESCONOCIDO', `Jugador desconocido: ${jugadorId}`);
   if (!jugador.activo) throw new ReglaError('JUGADOR_INACTIVO', 'Ya no estás en la partida');

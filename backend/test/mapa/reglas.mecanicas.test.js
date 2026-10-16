@@ -7,6 +7,7 @@ import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { investigar } from '../../src/domain/mapa/reglas/tecnologia.js';
 import { adoptarRasgo } from '../../src/domain/mapa/reglas/cultura.js';
 import { construir, mejorarCiudad } from '../../src/domain/mapa/reglas/ciudades.js';
+import { proponerAlianza, romperAlianza, regalarRecursos } from '../../src/domain/mapa/reglas/alianzas.js';
 import { reclutar } from '../../src/domain/mapa/reglas/militar.js';
 import { producirParaJugador } from '../../src/domain/mapa/reglas/turnos.js';
 import { jugarTurnoIA } from '../../src/domain/mapa/ia.js';
@@ -207,5 +208,23 @@ describe('mecanicas: armada', () => {
   });
   it('la maquina sin armada no recluta buques', () => {
     expect(buquesQueReclutaLaMaquina({ mecanicas: { armada: false } })).toHaveLength(0);
+  });
+});
+
+describe('mecanicas: alianzas', () => {
+  it('sin alianzas no se propone, rompe ni regala', () => {
+    const e = partida({ mecanicas: { alianzas: false } });
+    expect(codigo(() => proponerAlianza(e, 'a', { para: 'b' }))).toBe('MECANICA_APAGADA');
+    expect(codigo(() => romperAlianza(e, 'a'))).toBe('MECANICA_APAGADA');
+    expect(codigo(() => regalarRecursos(e, 'a', { para: 'b', recurso: 'gold', cantidad: 1 }))).toBe('MECANICA_APAGADA');
+  });
+  it('con alianzas prendidas se puede proponer (control)', () => {
+    // Con tres jugadores: entre dos la alianza seria total y no se permite.
+    const e = crearEstado({ nombre: 'T', semilla: 'gp-1', config: {} });
+    for (const [id, civ] of [['a', 'Uno'], ['b', 'Dos'], ['c', 'Tres']]) {
+      aplicar(e, unirse(e, { id, nombre: id.toUpperCase(), civilizacion: civ }));
+    }
+    aplicar(e, iniciar(e));
+    expect(proponerAlianza(e, 'a', { para: 'b' }).length).toBeGreaterThan(0);
   });
 });
