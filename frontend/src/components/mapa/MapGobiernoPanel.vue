@@ -85,6 +85,9 @@ const fijarMandato = () => {
   if (!motivoMandato.value) emit('mandato', Number(mandatoNuevo.value))
 }
 
+// Sin la mecanica Gobierno el panel muestra solo la moneda (si esa sigue prendida).
+const hayGobierno = computed(() => props.vista.reglas?.gobierno !== false)
+
 // --- Moneda: el nombre es gratis y sin turno; acuñar da oro a cambio de inflacion ---
 const reglasMoneda = computed(() => props.constantes.moneda || { largoNombre: 20, largoSimbolo: 3 })
 const acunacion = computed(() => props.constantes.acunacion || null)
@@ -122,7 +125,7 @@ const ventajas = (grupo) => {
 
 <template>
   <div v-if="yo" class="gobierno-panel">
-    <section>
+    <section v-if="hayGobierno">
       <h4>Gobierno actual</h4>
       <p class="actual">{{ nombreDelGobierno }}</p>
       <small v-if="yo.nombreGobierno">{{ nombreGobierno(yo.gobierno) }}</small>
@@ -148,7 +151,7 @@ const ventajas = (grupo) => {
       </em>
     </section>
 
-    <section>
+    <section v-if="hayGobierno">
       <h4>Apoyo</h4>
       <div v-for="g in grupos" :key="g" class="barra-fila">
         <span>{{ NOMBRE_GRUPO[g] }}</span>
@@ -157,7 +160,7 @@ const ventajas = (grupo) => {
       </div>
     </section>
 
-    <section>
+    <section v-if="hayGobierno">
       <h4>Conquistar apoyo (dar ventajas)</h4>
       <small>Cada {{ oroPorPunto }} de oro suben 1 punto el apoyo de un grupo. Se queda.</small>
       <input v-model.number="oroVentajas" class="entrada-oro" type="number" min="5" step="5">
@@ -175,7 +178,7 @@ const ventajas = (grupo) => {
       <em v-if="motivoVentajas">{{ motivoVentajas }}</em>
     </section>
 
-    <section>
+    <section v-if="hayGobierno">
       <h4>Proponer otro gobierno</h4>
       <template v-if="hayVotacion">
         <small>Oro para comprar votos (se pierde aunque la votación falle): tenés {{ oroDisponible }}.</small>
@@ -194,7 +197,7 @@ const ventajas = (grupo) => {
       <em v-if="motivoProponer">{{ motivoProponer }}</em>
     </section>
 
-    <section v-if="Object.keys(impuestos).length">
+    <section v-if="hayGobierno && Object.keys(impuestos).length">
       <h4>Impuestos</h4>
       <div class="fila-botones">
         <button
@@ -210,7 +213,7 @@ const ventajas = (grupo) => {
       </div>
     </section>
 
-    <section v-if="esRepublica">
+    <section v-if="hayGobierno && esRepublica">
       <h4>Mandato</h4>
       <small>Hay elecciones cada {{ yo.mandato }} rondas.</small>
       <div class="fila-botones">
@@ -253,7 +256,7 @@ const ventajas = (grupo) => {
       </template>
     </section>
 
-    <section>
+    <section v-if="hayGobierno">
       <h4>Forma de Estado</h4>
       <div class="fila-botones">
         <button
@@ -275,12 +278,12 @@ const ventajas = (grupo) => {
       </div>
     </section>
 
-    <section v-if="yo.formaEstado === 'federal'">
+    <section v-if="hayGobierno && yo.formaEstado === 'federal'">
       <h4>Problemas sociales</h4>
       <MapProblemas :vista="vista" :jugador-id="jugadorId" :constantes="constantes" />
     </section>
 
-    <section v-if="yo.formaEstado === 'federal'">
+    <section v-if="hayGobierno && yo.formaEstado === 'federal'">
       <h4>Subdivisiones</h4>
       <MapSubdivisiones
         :vista="vista"

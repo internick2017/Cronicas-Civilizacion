@@ -366,7 +366,7 @@ const umbralAviso = computed(() =>
       </table>
     </section>
 
-    <section v-if="constantes.gobiernos?.length">
+    <section v-if="constantes.gobiernos?.length && prendida('gobierno')">
       <h4>Gobierno y forma de Estado</h4>
       <p>
         Con el botón <strong>🏛️ Gobierno</strong> elegís <strong>quién decide</strong> en tu civilización.
@@ -454,18 +454,22 @@ const umbralAviso = computed(() =>
         {{ constantes.limitesMandato?.min }} a {{ constantes.limitesMandato?.max }} rondas entre elecciones). Y
         cualquier gobierno puede llevar un <strong>nombre propio</strong> (gratis, aunque hayas perdido el poder).
       </p>
-      <p v-if="constantes.acunacion && prendida('moneda')">
-        <strong>Moneda.</strong> Tu oro puede llevar el nombre y el símbolo que quieras (gratis, en cualquier
-        momento, desde el panel de Gobierno). En tu turno también podés <strong>acuñar</strong>: hasta
+    </section>
+
+    <section v-if="constantes.acunacion && prendida('moneda')">
+      <h4>Moneda</h4>
+      <p>
+        Tu oro puede llevar el nombre y el símbolo que quieras (gratis, en cualquier
+        momento, desde el botón <template v-if="prendida('gobierno')"><strong>🏛️ Gobierno</strong></template><template v-else><strong>💰 Moneda</strong></template>). En tu turno también podés <strong>acuñar</strong>: hasta
         {{ constantes.acunacion.maximoPorRonda }} de oro por ronda, al instante, a cambio de inflación. Cada
         {{ Math.round(1 / constantes.acunacion.puntosPorOro) }} de oro acuñados suben 1% lo que cuesta construir,
-        reclutar<template v-if="prendida('capital')">, mejorar y mudar la capital</template><template v-else> y mejorar</template> (con cualquier forma de Estado), hasta un techo de
+        reclutar<template v-if="prendida('capital')">, mejorar y mudar la capital</template><template v-else> y mejorar</template><template v-if="prendida('gobierno')"> (con cualquier forma de Estado)</template>, hasta un techo de
         {{ constantes.acunacion.techo }}%. La inflación acuñada baja {{ constantes.acunacion.bajadaPorRonda }}
         puntos al cerrar cada ronda.
       </p>
     </section>
 
-    <section v-if="constantes.tiposSubdivision?.length">
+    <section v-if="constantes.tiposSubdivision?.length && prendida('gobierno')">
       <h4>Subdivisiones y problemas sociales</h4>
       <p>
         En el Estado federal armás un <strong>árbol de subdivisiones</strong> dentro del País, de mayor a menor:

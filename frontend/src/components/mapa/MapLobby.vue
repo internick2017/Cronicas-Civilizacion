@@ -39,7 +39,7 @@ const limiteRondas = ref(null)
 const islas = ref(false)
 // Todas prendidas: quien quiera otro juego apaga las que no le interesan. Es un
 // solo estado para los dos paneles (Jugar solo y Crear partida).
-const mecanicas = ref({ ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true })
+const mecanicas = ref({ ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true })
 const resumenMecanicas = computed(() => {
   const valores = Object.values(mecanicas.value)
   const prendidas = valores.filter(Boolean).length

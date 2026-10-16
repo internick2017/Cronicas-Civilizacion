@@ -72,6 +72,9 @@ const avisoAlianza = ref('')
 // deja atacarlos ni entrar a lo que ocupan, asi que aca tampoco se ofrece.
 const amigos = computed(() => amigosDe(vista.value, jugadorId))
 const propuestasRecibidas = computed(() => propuestasPara(vista.value, jugadorId).length)
+// Sin la mecanica Gobierno, el mismo panel queda solo con la moneda (si sigue prendida)
+// y el boton pasa a llamarse Moneda.
+const hayGobierno = computed(() => vista.value?.reglas?.gobierno !== false)
 // Cuantos problemas activos o señales de aviso hay: el boton Gobierno lo muestra
 // para que no haga falta abrirlo a mirar.
 const avisosGobierno = computed(() => {
@@ -675,8 +678,11 @@ onUnmounted(() => {
         <button v-if="vista.reglas?.tecnologias !== false" class="btn-panel" title="Tecnologías" @click="cienciaAbierta = true">
           🔬 Ciencia
         </button>
-        <button class="btn-panel" title="Gobierno" @click="gobiernoAbierto = true">
+        <button v-if="hayGobierno" class="btn-panel" title="Gobierno" @click="gobiernoAbierto = true">
           🏛️ Gobierno<span v-if="avisosGobierno" class="insignia-aviso">{{ avisosGobierno }}</span>
+        </button>
+        <button v-else-if="vista.reglas?.moneda !== false" class="btn-panel" title="Moneda" @click="gobiernoAbierto = true">
+          💰 Moneda
         </button>
         <button v-if="vista.reglas?.alianzas !== false" class="btn-panel" title="Alianzas" @click="alianzasAbierto = true">
           🤝 Alianzas<span v-if="propuestasRecibidas" class="insignia-aviso">{{ propuestasRecibidas }}</span>
@@ -755,7 +761,7 @@ onUnmounted(() => {
       />
     </MapDialogo>
 
-    <MapDialogo :abierto="gobiernoAbierto" titulo="Gobierno" @cerrar="gobiernoAbierto = false">
+    <MapDialogo :abierto="gobiernoAbierto" :titulo="hayGobierno ? 'Gobierno' : 'Moneda'" @cerrar="gobiernoAbierto = false">
       <MapGobiernoPanel
         v-if="gobiernoAbierto"
         :vista="vista"

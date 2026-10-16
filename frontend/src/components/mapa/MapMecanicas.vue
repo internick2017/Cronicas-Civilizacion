@@ -7,6 +7,7 @@ const MECANICAS = [
   { clave: 'alianzas', nombre: 'Alianzas', ayuda: 'Aliarse y regalarse recursos.' },
   { clave: 'moneda', nombre: 'Moneda', ayuda: 'Nombre propio de la moneda y acuñar oro.' },
   { clave: 'capital', nombre: 'Capital', ayuda: 'La capital rinde y defiende más, y se puede mudar.' },
+  { clave: 'gobierno', nombre: 'Gobierno', ayuda: 'Tipos de gobierno, apoyo, elecciones, impuestos, Estado federal, subdivisiones y problemas sociales.' },
 ]
 
 const mecanicas = defineModel({ type: Object, required: true })
