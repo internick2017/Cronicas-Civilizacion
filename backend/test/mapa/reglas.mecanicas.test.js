@@ -8,6 +8,7 @@ import { investigar } from '../../src/domain/mapa/reglas/tecnologia.js';
 import { adoptarRasgo } from '../../src/domain/mapa/reglas/cultura.js';
 import { construir, mejorarCiudad } from '../../src/domain/mapa/reglas/ciudades.js';
 import { proponerAlianza, romperAlianza, regalarRecursos } from '../../src/domain/mapa/reglas/alianzas.js';
+import { nombrarMoneda, acunarMoneda } from '../../src/domain/mapa/reglas/moneda.js';
 import { reclutar } from '../../src/domain/mapa/reglas/militar.js';
 import { producirParaJugador } from '../../src/domain/mapa/reglas/turnos.js';
 import { jugarTurnoIA } from '../../src/domain/mapa/ia.js';
@@ -226,5 +227,18 @@ describe('mecanicas: alianzas', () => {
     }
     aplicar(e, iniciar(e));
     expect(proponerAlianza(e, 'a', { para: 'b' }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('mecanicas: moneda', () => {
+  it('sin moneda no se nombra ni se acuña', () => {
+    const e = partida({ mecanicas: { moneda: false } });
+    expect(codigo(() => nombrarMoneda(e, 'a', { nombre: 'Sol', simbolo: 'S' }))).toBe('MECANICA_APAGADA');
+    expect(codigo(() => acunarMoneda(e, 'a', { oro: 10 }))).toBe('MECANICA_APAGADA');
+  });
+  it('con moneda prendida se nombra y se acuña (control)', () => {
+    const e = partida();
+    expect(nombrarMoneda(e, 'a', { nombre: 'Sol', simbolo: 'S' }).length).toBeGreaterThan(0);
+    expect(acunarMoneda(e, 'a', { oro: 10 }).length).toBeGreaterThan(0);
   });
 });

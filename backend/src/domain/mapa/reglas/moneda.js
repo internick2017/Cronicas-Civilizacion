@@ -5,6 +5,7 @@ import {
 } from '../constantes.js';
 import { validarTurno, evento } from './comun.js';
 import { jugadorQueNombra } from './pais.js';
+import { exigirMecanica } from './modo.js';
 
 // Accesores con valor por defecto: una partida guardada antes de la moneda no
 // trae ninguno de estos campos.
@@ -21,6 +22,7 @@ const conDosDecimales = (n) => Math.round(n * 100) / 100;
 const graficos = (texto) => [...new Intl.Segmenter('es', { granularity: 'grapheme' }).segment(texto)].length;
 
 export function nombrarMoneda(estado, jugadorId, { nombre, simbolo }) {
+  exigirMecanica(estado, 'moneda', 'moneda propia');
   jugadorQueNombra(estado, jugadorId);
   const limpio = typeof nombre === 'string' ? nombre.trim() : '';
   if (!limpio) throw new ReglaError('NOMBRE_INVALIDO', 'El nombre no puede estar vacío');
@@ -37,6 +39,7 @@ export function nombrarMoneda(estado, jugadorId, { nombre, simbolo }) {
 // El techo se respeta rechazando, no recortando: si la inflacion se recortara al
 // techo, en el techo acuñar daria oro sin costo alguno.
 export function acunarMoneda(estado, jugadorId, { oro }) {
+  exigirMecanica(estado, 'moneda', 'moneda propia');
   validarTurno(estado, jugadorId);
   const jugador = jugadorPorId(estado, jugadorId);
   const { maximoPorRonda, puntosPorOro, techo } = ACUNACION;
