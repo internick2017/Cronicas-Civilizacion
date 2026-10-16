@@ -459,7 +459,7 @@ const umbralAviso = computed(() =>
         momento, desde el panel de Gobierno). En tu turno también podés <strong>acuñar</strong>: hasta
         {{ constantes.acunacion.maximoPorRonda }} de oro por ronda, al instante, a cambio de inflación. Cada
         {{ Math.round(1 / constantes.acunacion.puntosPorOro) }} de oro acuñados suben 1% lo que cuesta construir,
-        reclutar, mejorar y mudar la capital (con cualquier forma de Estado), hasta un techo de
+        reclutar<template v-if="prendida('capital')">, mejorar y mudar la capital</template><template v-else> y mejorar</template> (con cualquier forma de Estado), hasta un techo de
         {{ constantes.acunacion.techo }}%. La inflación acuñada baja {{ constantes.acunacion.bajadaPorRonda }}
         puntos al cerrar cada ronda.
       </p>
