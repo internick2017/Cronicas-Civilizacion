@@ -21,17 +21,22 @@ const NOMBRE_RECURSO = {
   stone: 'piedra', science: 'ciencia', culture: 'cultura'
 }
 
+// Un recurso apagado (ciencia, cultura) no se nombra en el manual. Sin `recursosActivos`
+// (backend viejo) todo cuenta como activo.
+const recursoActivo = (recurso) => !props.reglas?.recursosActivos || props.reglas.recursosActivos.includes(recurso)
+const soloActivos = (obj) => Object.fromEntries(Object.entries(obj || {}).filter(([r]) => recursoActivo(r)))
+
 const listaRecursos = (obj) =>
-  Object.entries(obj || {})
+  Object.entries(soloActivos(obj))
     .map(([recurso, cantidad]) => `${cantidad} ${NOMBRE_RECURSO[recurso] || recurso}`)
     .join(', ')
 
 const costo = (obj) => listaRecursos(obj) || 'gratis'
 const produccion = (obj) =>
-  Object.keys(obj || {}).length ? `+${listaRecursos(obj).replace(/, /g, ', +')}` : 'nada'
+  Object.keys(soloActivos(obj)).length ? `+${listaRecursos(obj).replace(/, /g, ', +')}` : 'nada'
 
 const efectoRasgo = (rasgo) => {
-  const partes = Object.entries(rasgo.produccionCiudad || {})
+  const partes = Object.entries(soloActivos(rasgo.produccionCiudad))
     .map(([recurso, cantidad]) => `+${cantidad} ${NOMBRE_RECURSO[recurso] || recurso} por ciudad`)
   if (rasgo.visionExtra) partes.push(`+${rasgo.visionExtra} de alcance al explorar`)
   if (rasgo.bonoDefensaCiudad) partes.push(`+${Math.round(rasgo.bonoDefensaCiudad * 100)}% de defensa en tus ciudades`)
@@ -42,7 +47,7 @@ const efectoRasgo = (rasgo) => {
 // son los mismos campos con signo negativo: no hay una tabla aparte.
 const efectoRaza = (raza) => {
   const partes = []
-  for (const [recurso, fraccion] of Object.entries(raza.produccionPorcentual || {})) {
+  for (const [recurso, fraccion] of Object.entries(soloActivos(raza.produccionPorcentual))) {
     const p = Math.round(fraccion * 100)
     partes.push({ texto: `${p > 0 ? '+' : ''}${p}% de ${NOMBRE_RECURSO[recurso] || recurso}`, bueno: p > 0 })
   }
@@ -74,13 +79,11 @@ const unidades = computed(() =>
 
 // Un edificio que produce un recurso apagado (biblioteca sin ciencia) no existe en la partida.
 const edificios = computed(() => {
-  const activos = props.reglas?.recursosActivos
-  return (props.constantes?.edificios || []).filter(e =>
-    !activos || Object.keys(e.produccion || {}).every(r => activos.includes(r)))
+  return (props.constantes?.edificios || []).filter(e => Object.keys(e.produccion || {}).every(recursoActivo))
 })
 
 const terrenosProductivos = computed(() =>
-  (props.constantes?.terrenos || []).filter(t => Object.keys(t.produccion || {}).length > 0)
+  (props.constantes?.terrenos || []).filter(t => Object.keys(soloActivos(t.produccion)).length > 0)
 )
 
 // El objetivo y la duracion son de ESTA partida (se eligen al crearla), no del
@@ -289,7 +292,7 @@ const umbralAviso = computed(() =>
       <h4>Razas</h4>
       <p>
         Cada jugador elige una raza al entrar y la conserva toda la partida. Cada una
-        gana algo y paga algo, y se suma a lo que ya te dan los rasgos y las tecnologías.
+        gana algo y paga algo, y se suma a lo que ya te dan {{ [prendida('rasgos') && 'los rasgos', prendida('tecnologias') && 'las tecnologías'].filter(Boolean).join(' y ') || 'el resto de las reglas' }}.
       </p>
       <table>
         <thead>
@@ -491,8 +494,8 @@ const umbralAviso = computed(() =>
       <p class="aviso">
         Si no hay oro, el problema <strong>empeora</strong> (hasta gravedad {{ constantes.limitesProblemas?.gravedadMaxima }})
         y su castigo crece. Un árbol bien repartido resuelve barato: muchas Freguesias chicas cuestan menos que mandar
-        todo al País. Mientras dura, cada problema castiga: desempleo baja la producción de la ciudad, mala
-        educación la ciencia, la crisis climática la comida, la corrupción se lleva oro, la inmigración consume
+        todo al País. Mientras dura, cada problema castiga: desempleo baja la producción de la ciudad,
+        <template v-if="prendida('tecnologias')">mala educación la ciencia, </template>la crisis climática la comida, la corrupción se lleva oro, la inmigración consume
         comida, la inseguridad y la falta de infraestructura bajan su defensa, la inflación encarece construir y
         reclutar, la mala salud baja la población y la pobreza baja el apoyo del pueblo. El botón
         <strong>🏛️ Gobierno</strong> muestra un número naranja cuando hay avisos o problemas.
