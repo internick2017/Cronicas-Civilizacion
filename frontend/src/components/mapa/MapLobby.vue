@@ -1,6 +1,6 @@
 <!-- frontend/src/components/mapa/MapLobby.vue -->
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useMapApi } from '../../composables/useMapApi.js'
 
 const emit = defineEmits(['partida-unida'])
@@ -36,8 +36,17 @@ const limiteRondas = ref(null)
 // Apagado por defecto: un mapa de islas es otro juego (mitad del mundo es mar y
 // hay que cruzarlo en transporte), asi que se elige, no se hereda.
 const islas = ref(false)
-// Apagado por defecto: sin ciencia ni cultura es otro juego, asi que se elige.
-const guerraPura = ref(false)
+// Las seis casillas de la partida, todas prendidas: quien quiera otro juego apaga
+// las que no le interesan. El backend completa con true lo que falte.
+const MECANICAS = [
+  { clave: 'ciencia', nombre: 'Ciencia', ayuda: 'Tecnologías, biblioteca, universidad y subir de nivel las ciudades.' },
+  { clave: 'cultura', nombre: 'Cultura', ayuda: 'Rasgos culturales.' },
+  { clave: 'armada', nombre: 'Armada', ayuda: 'Buques de guerra (el transporte sigue).' },
+  { clave: 'alianzas', nombre: 'Alianzas', ayuda: 'Aliarse y regalarse recursos.' },
+  { clave: 'moneda', nombre: 'Moneda', ayuda: 'Nombre propio de la moneda y acuñar oro.' },
+  { clave: 'capital', nombre: 'Capital', ayuda: 'La capital rinde y defiende más, y se puede mudar.' },
+]
+const mecanicas = reactive(Object.fromEntries(MECANICAS.map((m) => [m.clave, true])))
 
 // Por defecto todos juegan a la vez; "por turnos" queda para quien lo prefiera.
 const MODOS_TURNO = [
@@ -60,7 +69,7 @@ const configElegida = () => ({
   tamanoMapa: tamanoMapa.value,
   limiteRondas: limiteRondas.value,
   islas: islas.value,
-  guerraPura: guerraPura.value,
+  mecanicas: { ...mecanicas },
 })
 const nombreJugador = ref('')
 const codigoUnirse = ref('')
@@ -376,14 +385,14 @@ onMounted(() => {
           tocar al rival hay que construir un puerto y cruzar en transporte. Si la
           semilla no da dos islas grandes, la partida arranca como una normal.
         </p>
-        <label class="field field-check">
-          <input v-model="guerraPura" type="checkbox" />
-          <span>Guerra pura</span>
-        </label>
-        <p class="ayuda-config">
-          Sin ciencia ni cultura: no hay tecnologías, rasgos ni mejoras de ciudad.
-          Todo es territorio y ejércitos, con comida, oro, madera y piedra.
-        </p>
+        <h3 class="titulo-mecanicas">Mecánicas de la partida</h3>
+        <template v-for="m in MECANICAS" :key="m.clave">
+          <label class="field field-check">
+            <input v-model="mecanicas[m.clave]" type="checkbox" />
+            <span>{{ m.nombre }}</span>
+          </label>
+          <p class="ayuda-config">{{ m.ayuda }}</p>
+        </template>
         <button class="btn-primary" :disabled="cargando" @click="crear">Crear</button>
       </section>
 
@@ -478,6 +487,11 @@ onMounted(() => {
 
 .field-check { flex-direction: row; align-items: center; gap: 0.5rem; }
 .field-check input { width: auto; }
+.titulo-mecanicas {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1rem;
+}
+
 .ayuda-config {
   margin: 0.25rem 0 0.75rem;
   font-size: 0.8rem;
