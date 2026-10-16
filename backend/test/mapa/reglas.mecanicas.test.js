@@ -309,3 +309,13 @@ describe('mecanicas: prioridad de subdivision "ciencia"', () => {
     expect(crearSubdivision(e, 'a', { nombre: 'X', prioridad: 'ciencia' }).length).toBe(1);
   });
 });
+
+describe('mecanicas: cada partida tiene su propio objeto', () => {
+  it('dos partidas sin mecanicas no comparten el objeto', () => {
+    const a = crearEstado({ nombre: 'A', semilla: 's1' });
+    const b = crearEstado({ nombre: 'B', semilla: 's2' });
+    expect(a.config.mecanicas).not.toBe(b.config.mecanicas);
+    a.config.mecanicas.ciencia = false;
+    expect(crearEstado({ nombre: 'C', semilla: 's3' }).config.mecanicas.ciencia).toBe(true);
+  });
+});

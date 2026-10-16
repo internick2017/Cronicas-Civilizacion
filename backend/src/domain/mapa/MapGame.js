@@ -98,7 +98,9 @@ export function validarConfig(cfg) {
 export function crearEstado({ nombre, semilla, config = {} }) {
   const cfg = { ...CONFIG_DEFAULT, ...(config ?? {}) };
   // El spread de arriba pisaria el objeto entero: lo que falte se completa con true.
+  // Cada partida con su propio objeto: nunca se comparte el de CONFIG_DEFAULT.
   if (esObjetoPlano(config?.mecanicas)) cfg.mecanicas = { ...CONFIG_DEFAULT.mecanicas, ...config.mecanicas };
+  else if (config?.mecanicas === undefined) cfg.mecanicas = { ...CONFIG_DEFAULT.mecanicas };
   validarConfig(cfg); // antes de generarMapa: nunca asignamos nada sin cota
   return {
     id: randomUUID(),
