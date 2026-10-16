@@ -2,14 +2,14 @@ import { jugadorPorId, puedePagar } from '../MapGame.js';
 import { RASGOS_CULTURALES } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento } from './comun.js';
-import { exigirCivil } from './modo.js';
+import { exigirMecanica } from './modo.js';
 import { visionExtraPorRaza } from './razas.js';
 
 // Los rasgos son de la CIVILIZACION, no de una ciudad: se adoptan una vez y
 // valen para todo lo que tengas y para todo lo que fundes despues.
 export function adoptarRasgo(estado, jugadorId, { rasgo }) {
   validarTurno(estado, jugadorId);
-  exigirCivil(estado, 'rasgos culturales');
+  exigirMecanica(estado, 'cultura', 'rasgos culturales');
 
   const definicion = RASGOS_CULTURALES[rasgo];
   if (!definicion) throw new ReglaError('RASGO_DESCONOCIDO', `Rasgo desconocido: ${rasgo}`);

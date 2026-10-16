@@ -2,7 +2,7 @@ import { jugadorPorId, puedePagar } from '../MapGame.js';
 import { TECNOLOGIAS } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento } from './comun.js';
-import { reglasDelModo, exigirCivil } from './modo.js';
+import { reglasDelModo, exigirMecanica } from './modo.js';
 
 // Las tecnologias son de la CIVILIZACION (como los rasgos culturales): se
 // investigan una vez y valen para siempre, sin requisitos entre ellas (nada
@@ -10,7 +10,7 @@ import { reglasDelModo, exigirCivil } from './modo.js';
 // unidades o desbloquean cosas.
 export function investigar(estado, jugadorId, { tecnologia }) {
   validarTurno(estado, jugadorId);
-  exigirCivil(estado, 'tecnologías');
+  exigirMecanica(estado, 'ciencia', 'tecnologías');
 
   const definicion = TECNOLOGIAS[tecnologia];
   if (!definicion) throw new ReglaError('TECNOLOGIA_DESCONOCIDA', `Tecnología desconocida: ${tecnologia}`);

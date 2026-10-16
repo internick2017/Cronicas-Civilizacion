@@ -17,8 +17,12 @@ export const RECURSOS = ['food', 'gold', 'wood', 'stone', 'science', 'culture'];
 
 export const RECURSOS_DE_TILE = ['food', 'gold', 'wood', 'stone'];
 
-// Los dos recursos que la guerra pura (config.guerraPura) apaga: no se producen ni se gastan.
+// Los dos recursos que se apagan con las mecanicas Ciencia y Cultura (config.mecanicas):
+// apagados, no se producen ni se gastan.
 export const RECURSOS_CIVILES = ['science', 'culture'];
+
+// Las mecanicas que se eligen al crear la partida (config.mecanicas). Todas prendidas por defecto.
+export const MECANICAS = ['ciencia', 'cultura', 'armada', 'alianzas', 'moneda', 'capital'];
 
 export const RECURSOS_INICIALES = {
   food: 100,
@@ -99,12 +103,6 @@ export const EDIFICIOS = {
     produccion: { gold: 3 },
     requiereCosta: true
   }
-};
-
-// Un edificio civil rinde solo ciencia o cultura: en guerra pura no tiene para que existir.
-export const esEdificioCivil = (definicion) => {
-  const recursos = Object.keys(definicion?.produccion ?? {});
-  return recursos.length > 0 && recursos.every(r => RECURSOS_CIVILES.includes(r));
 };
 
 export const UNIDADES = {

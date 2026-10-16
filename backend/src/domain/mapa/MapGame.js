@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { generarMapa } from './generarMapa.js';
-import { RECURSOS } from './constantes.js';
+import { RECURSOS, MECANICAS } from './constantes.js';
 import { ReglaError } from './errores.js';
 
 const CONFIG_DEFAULT = {
@@ -23,9 +23,10 @@ const CONFIG_DEFAULT = {
   islas: false,
   // Cada cuantas rondas hay elecciones en las republicas (ver reglas/gobierno.js).
   rondasEntreElecciones: 8,
-  // Guerra pura: sin ciencia ni cultura (no se producen ni se gastan), sin
-  // tecnologias, rasgos ni mejoras de ciudad. Todo es territorio y ejercitos.
-  guerraPura: false,
+  // Mecanicas que se pueden apagar al crear la partida (ver reglas/modo.js). Ciencia y
+  // cultura apagadas: ni se producen ni se gastan, sin tecnologias, rasgos ni mejoras de
+  // ciudad. Todas prendidas por defecto: una partida sin tocar nada se juega como siempre.
+  mecanicas: Object.fromEntries(MECANICAS.map(m => [m, true])),
 };
 
 // Limites duros de la config. Viven en el DOMINIO (no solo en el borde HTTP)
@@ -57,6 +58,20 @@ function validarEntero(cfg, clave) {
   }
 }
 
+const esObjetoPlano = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+function validarMecanicas(mecanicas) {
+  const invalida = (detalle) => new ReglaError(
+    'CONFIG_INVALIDA',
+    `config.mecanicas ${detalle} (recibido: ${JSON.stringify(mecanicas)})`
+  );
+  if (!esObjetoPlano(mecanicas)) throw invalida('debe ser un objeto');
+  for (const [clave, valor] of Object.entries(mecanicas)) {
+    if (!MECANICAS.includes(clave)) throw invalida(`no admite la clave ${clave}`);
+    if (typeof valor !== 'boolean') throw invalida(`.${clave} debe ser booleano`);
+  }
+}
+
 export function validarConfig(cfg) {
   validarEntero(cfg, 'tamanoMapa');
   validarEntero(cfg, 'maxJugadores');
@@ -70,9 +85,7 @@ export function validarConfig(cfg) {
   if (typeof cfg.islas !== 'boolean') {
     throw new ReglaError('CONFIG_INVALIDA', `config.islas debe ser booleano (recibido: ${JSON.stringify(cfg.islas)})`);
   }
-  if (typeof cfg.guerraPura !== 'boolean') {
-    throw new ReglaError('CONFIG_INVALIDA', `config.guerraPura debe ser booleano (recibido: ${JSON.stringify(cfg.guerraPura)})`);
-  }
+  validarMecanicas(cfg.mecanicas);
   if (!MODOS_TURNO.includes(cfg.modoTurno)) {
     throw new ReglaError(
       'CONFIG_INVALIDA',
@@ -84,6 +97,8 @@ export function validarConfig(cfg) {
 
 export function crearEstado({ nombre, semilla, config = {} }) {
   const cfg = { ...CONFIG_DEFAULT, ...(config ?? {}) };
+  // El spread de arriba pisaria el objeto entero: lo que falte se completa con true.
+  if (esObjetoPlano(config?.mecanicas)) cfg.mecanicas = { ...CONFIG_DEFAULT.mecanicas, ...config.mecanicas };
   validarConfig(cfg); // antes de generarMapa: nunca asignamos nada sin cota
   return {
     id: randomUUID(),

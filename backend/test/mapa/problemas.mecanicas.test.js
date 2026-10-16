@@ -26,20 +26,20 @@ function problemasQueSurgen(config, rondas = 60) {
   return { tipos, medidores: medidoresDe(p1) };
 }
 
-describe('problemas sociales en guerra pura', () => {
+describe('problemas sociales con ciencia apagada', () => {
   it('control: en una partida normal, sin biblioteca, el problema de educacion surge', () => {
     expect(problemasQueSurgen({}).tipos.has('educacion')).toBe(true);
   });
 
   it('educacion no surge ni lleva medidor: su unico efecto es sobre una ciencia que no existe', () => {
-    const { tipos, medidores } = problemasQueSurgen({ guerraPura: true });
+    const { tipos, medidores } = problemasQueSurgen({ mecanicas: { ciencia: false } });
     expect(tipos.has('educacion')).toBe(false);
     const claves = Object.values(medidores).flatMap(m => Object.keys(m));
     expect(claves).not.toContain('educacion');
   });
 
   it('los demas problemas siguen existiendo', () => {
-    const { medidores } = problemasQueSurgen({ guerraPura: true }, 3);
+    const { medidores } = problemasQueSurgen({ mecanicas: { ciencia: false } }, 3);
     const claves = new Set(Object.values(medidores).flatMap(m => Object.keys(m)));
     expect(claves.has('inseguridad')).toBe(true);
     expect(claves.has('corrupcion')).toBe(true);

@@ -3,7 +3,7 @@ import { COSTO_CIUDAD, EDIFICIOS, COSTO_MEJORA_CIUDAD } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento, radio1, esCostera } from './comun.js';
 import { tieneTecnologiaRequerida } from './tecnologia.js';
-import { edificioApagado, exigirCivil } from './modo.js';
+import { edificioApagado, exigirMecanica } from './modo.js';
 import { escalarCosto, multiplicadorCostos } from './efectosProblemas.js';
 
 export function fundarCiudad(estado, jugadorId, { x, y, nombre }) {
@@ -68,7 +68,7 @@ export function construir(estado, jugadorId, { x, y, edificio }) {
   }
 
   if (edificioApagado(estado, definicion)) {
-    throw new ReglaError('GUERRA_PURA', 'En guerra pura no hay edificios de ciencia ni de cultura');
+    throw new ReglaError('MECANICA_APAGADA', 'En esta partida no hay ese edificio');
   }
   const jugador = jugadorPorId(estado, jugadorId);
   if (!tieneTecnologiaRequerida(estado, jugador, definicion.requiereTecnologia)) {
@@ -92,7 +92,7 @@ export function construir(estado, jugadorId, { x, y, edificio }) {
 // nada permitia subir `nivel` mas alla de 1 hasta ahora).
 export function mejorarCiudad(estado, jugadorId, { x, y }) {
   validarTurno(estado, jugadorId);
-  exigirCivil(estado, 'mejoras de ciudad');
+  exigirMecanica(estado, 'ciencia', 'mejoras de ciudad');
 
   const tile = tileEn(estado, x, y);
   if (!tile) throw new ReglaError('POSICION_INVALIDA', 'Posición inválida');

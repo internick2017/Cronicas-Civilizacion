@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { crearEstado } from '../../src/domain/mapa/MapGame.js';
 import { vistaJugador } from '../../src/domain/mapa/reglas/visibilidad.js';
-import { esGuerraPura, reglasDelModo } from '../../src/domain/mapa/reglas/modo.js';
+import { mecanicasDe, reglasDelModo } from '../../src/domain/mapa/reglas/modo.js';
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
 import { investigar } from '../../src/domain/mapa/reglas/tecnologia.js';
@@ -25,27 +25,58 @@ function partida(config = {}, { bot = false } = {}) {
 const capitalDe = (e, id) => e.mapa.find(t => t.ciudad && t.dueno === id);
 const codigo = (fn) => { try { fn(); } catch (err) { return err.codigo ?? err.code ?? err.message; } return null; };
 
-describe('guerra pura: la opcion de partida', () => {
-  it('arranca apagada y las partidas viejas sin el campo se leen como apagadas', () => {
-    expect(esGuerraPura(partida())).toBe(false);
-    const vieja = partida();
-    delete vieja.config.guerraPura;
-    expect(esGuerraPura(vieja)).toBe(false);
+describe('mecanicas: la config', () => {
+  it('por defecto todas prendidas', () => {
+    expect(mecanicasDe(partida())).toEqual({ ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true });
   });
-
-  it('se puede encender y rechaza valores que no son booleanos', () => {
-    expect(esGuerraPura(partida({ guerraPura: true }))).toBe(true);
-    expect(() => crearEstado({ nombre: 'T', semilla: 'x', config: { guerraPura: 'si' } })).toThrow(/guerraPura/);
+  it('una config parcial completa lo que falta con true', () => {
+    expect(mecanicasDe(partida({ mecanicas: { armada: false } })).ciencia).toBe(true);
+    expect(mecanicasDe(partida({ mecanicas: { armada: false } })).armada).toBe(false);
+  });
+  it('rechaza claves desconocidas y valores no booleanos', () => {
+    const crear = (mecanicas) => () => crearEstado({ nombre: 'T', semilla: 'x', config: { mecanicas } });
+    expect(crear({ gobierno: false })).toThrow(/mecanicas/);
+    expect(crear({ ciencia: 'no' })).toThrow(/mecanicas/);
+    expect(crear('todas')).toThrow(/mecanicas/);
+  });
+  it('partida vieja con guerraPura: ciencia y cultura apagadas, lo demas prendido', () => {
+    const vieja = partida();
+    delete vieja.config.mecanicas;
+    vieja.config.guerraPura = true;
+    expect(mecanicasDe(vieja)).toEqual({ ciencia: false, cultura: false, armada: true, alianzas: true, moneda: true, capital: true });
+  });
+  it('partida vieja sin ninguno de los dos campos: todo prendido', () => {
+    const vieja = partida();
+    delete vieja.config.mecanicas;
+    expect(Object.values(mecanicasDe(vieja)).every(Boolean)).toBe(true);
   });
 });
 
-describe('guerra pura: lo que se apaga', () => {
-  it('no se puede investigar, adoptar rasgos ni mejorar una ciudad', () => {
-    const e = partida({ guerraPura: true });
+describe('mecanicas: ciencia y cultura por separado', () => {
+  it('sin ciencia, la cultura se produce y los rasgos se adoptan', () => {
+    const e = partida({ mecanicas: { ciencia: false } });
+    expect(producirParaJugador(e, 'a').science ?? 0).toBe(0);
+    expect(producirParaJugador(e, 'a').culture).toBeGreaterThan(0);
+    expect(adoptarRasgo(e, 'a', { rasgo: 'arte' }).length).toBeGreaterThan(0);
+    expect(codigo(() => investigar(e, 'a', { tecnologia: 'irrigacion' }))).toBe('MECANICA_APAGADA');
+  });
+  it('sin cultura, la ciencia se produce, se investiga y se mejoran ciudades', () => {
+    const e = partida({ mecanicas: { cultura: false } });
     const { x, y } = capitalDe(e, 'a');
-    expect(codigo(() => investigar(e, 'a', { tecnologia: 'irrigacion' }))).toBe('GUERRA_PURA');
-    expect(codigo(() => adoptarRasgo(e, 'a', { rasgo: 'arte' }))).toBe('GUERRA_PURA');
-    expect(codigo(() => mejorarCiudad(e, 'a', { x, y }))).toBe('GUERRA_PURA');
+    expect(producirParaJugador(e, 'a').culture ?? 0).toBe(0);
+    expect(producirParaJugador(e, 'a').science).toBeGreaterThan(0);
+    expect(mejorarCiudad(e, 'a', { x, y }).length).toBeGreaterThan(0);
+    expect(codigo(() => adoptarRasgo(e, 'a', { rasgo: 'arte' }))).toBe('MECANICA_APAGADA');
+  });
+});
+
+describe('ciencia y cultura apagadas: lo que se apaga', () => {
+  it('no se puede investigar, adoptar rasgos ni mejorar una ciudad', () => {
+    const e = partida({ mecanicas: { ciencia: false, cultura: false } });
+    const { x, y } = capitalDe(e, 'a');
+    expect(codigo(() => investigar(e, 'a', { tecnologia: 'irrigacion' }))).toBe('MECANICA_APAGADA');
+    expect(codigo(() => adoptarRasgo(e, 'a', { rasgo: 'arte' }))).toBe('MECANICA_APAGADA');
+    expect(codigo(() => mejorarCiudad(e, 'a', { x, y }))).toBe('MECANICA_APAGADA');
   });
 
   it('la misma accion en una partida normal si funciona', () => {
@@ -57,16 +88,16 @@ describe('guerra pura: lo que se apaga', () => {
   });
 
   it('no se construyen los edificios de ciencia ni de cultura, pero si los demas', () => {
-    const e = partida({ guerraPura: true });
+    const e = partida({ mecanicas: { ciencia: false, cultura: false } });
     const { x, y } = capitalDe(e, 'a');
-    expect(codigo(() => construir(e, 'a', { x, y, edificio: 'library' }))).toBe('GUERRA_PURA');
-    expect(codigo(() => construir(e, 'a', { x, y, edificio: 'university' }))).toBe('GUERRA_PURA');
+    expect(codigo(() => construir(e, 'a', { x, y, edificio: 'library' }))).toBe('MECANICA_APAGADA');
+    expect(codigo(() => construir(e, 'a', { x, y, edificio: 'university' }))).toBe('MECANICA_APAGADA');
     expect(construir(e, 'a', { x, y, edificio: 'granary' }).length).toBeGreaterThan(0);
   });
 
   it('la ciencia y la cultura no se producen, el resto si', () => {
     const normal = producirParaJugador(partida(), 'a');
-    const pura = producirParaJugador(partida({ guerraPura: true }), 'a');
+    const pura = producirParaJugador(partida({ mecanicas: { ciencia: false, cultura: false } }), 'a');
     expect(normal.science).toBeGreaterThan(0);
     expect(normal.culture).toBeGreaterThan(0);
     expect(pura.science ?? 0).toBe(0);
@@ -76,30 +107,32 @@ describe('guerra pura: lo que se apaga', () => {
   });
 });
 
-describe('guerra pura: lo que le dice el modo a la interfaz', () => {
-  it('una partida normal tiene todo y una de guerra pura no tiene ciencia ni cultura', () => {
+describe('ciencia y cultura apagadas: lo que le dice el modo a la interfaz', () => {
+  it('una partida normal tiene todo y una de ciencia y cultura apagadas no tiene ciencia ni cultura', () => {
     expect(reglasDelModo(partida())).toEqual({
       tecnologias: true, rasgos: true, mejorasCiudad: true,
       recursosActivos: ['food', 'gold', 'wood', 'stone', 'science', 'culture'],
+      armada: true, alianzas: true, moneda: true, capital: true,
     });
-    expect(reglasDelModo(partida({ guerraPura: true }))).toEqual({
+    expect(reglasDelModo(partida({ mecanicas: { ciencia: false, cultura: false } }))).toEqual({
       tecnologias: false, rasgos: false, mejorasCiudad: false,
       recursosActivos: ['food', 'gold', 'wood', 'stone'],
+      armada: true, alianzas: true, moneda: true, capital: true,
     });
   });
 
   it('la vista del jugador lo incluye', () => {
-    expect(vistaJugador(partida({ guerraPura: true }), 'a').reglas.tecnologias).toBe(false);
+    expect(vistaJugador(partida({ mecanicas: { ciencia: false, cultura: false } }), 'a').reglas.tecnologias).toBe(false);
     expect(vistaJugador(partida(), 'a').reglas.tecnologias).toBe(true);
   });
 });
 
-describe('guerra pura: lo que se desbloquea', () => {
+describe('ciencia y cultura apagadas: lo que se desbloquea', () => {
   it('el legionario se recluta desde el inicio, sin la tecnologia', () => {
     const { x, y } = capitalDe(partida(), 'a');
     const normal = partida();
     expect(codigo(() => reclutar(normal, 'a', { x, y, unidad: 'legionary' }))).toBe('REQUIERE_TECNOLOGIA');
-    const pura = partida({ guerraPura: true });
+    const pura = partida({ mecanicas: { ciencia: false, cultura: false } });
     expect(reclutar(pura, 'a', { x, y, unidad: 'legionary' }).length).toBeGreaterThan(0);
   });
 });
@@ -121,13 +154,13 @@ function tiposQueHaceLaMaquina(config) {
   return tipos;
 }
 
-describe('guerra pura: la maquina', () => {
+describe('ciencia y cultura apagadas: la maquina', () => {
   it('sin el modo, con ciencia de sobra, si investiga (control del test de abajo)', () => {
     expect(tiposQueHaceLaMaquina({}).has('TecnologiaInvestigada')).toBe(true);
   });
 
-  it('en guerra pura no investiga, no mejora ni construye edificios civiles, pero sigue jugando', () => {
-    const tipos = tiposQueHaceLaMaquina({ guerraPura: true });
+  it('en ciencia y cultura apagadas no investiga, no mejora ni construye edificios civiles, pero sigue jugando', () => {
+    const tipos = tiposQueHaceLaMaquina({ mecanicas: { ciencia: false, cultura: false } });
     expect(tipos.has('TecnologiaInvestigada')).toBe(false);
     expect(tipos.has('RasgoAdoptado')).toBe(false);
     expect(tipos.has('CiudadMejorada')).toBe(false);
