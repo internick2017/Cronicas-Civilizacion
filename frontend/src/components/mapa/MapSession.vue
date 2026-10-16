@@ -678,7 +678,7 @@ onUnmounted(() => {
         <button class="btn-panel" title="Gobierno" @click="gobiernoAbierto = true">
           🏛️ Gobierno<span v-if="avisosGobierno" class="insignia-aviso">{{ avisosGobierno }}</span>
         </button>
-        <button class="btn-panel" title="Alianzas" @click="alianzasAbierto = true">
+        <button v-if="vista.reglas?.alianzas !== false" class="btn-panel" title="Alianzas" @click="alianzasAbierto = true">
           🤝 Alianzas<span v-if="propuestasRecibidas" class="insignia-aviso">{{ propuestasRecibidas }}</span>
         </button>
         <button class="btn-panel" title="Manual de Instrucciones" @click="ayudaAbierta = true">
@@ -793,12 +793,12 @@ onUnmounted(() => {
       <button class="btn-primario" @click="sumarMaquina">Sumar</button>
     </MapDialogo>
 
-    <MapDialogo :abierto="alianzasAbierto" titulo="Alianzas" @cerrar="alianzasAbierto = false; avisoAlianza = ''">
+    <MapDialogo v-if="vista?.reglas?.alianzas !== false" :abierto="alianzasAbierto" titulo="Alianzas" @cerrar="alianzasAbierto = false; avisoAlianza = ''">
       <MapAlianzas :vista="vista" :jugador-id="jugadorId" :aviso="avisoAlianza" @accion="onAccionAlianza" />
     </MapDialogo>
 
     <MapDialogo :abierto="ayudaAbierta" titulo="Manual de Instrucciones" @cerrar="ayudaAbierta = false">
-      <MapAyuda :constantes="constantes" :config="vista?.config" />
+      <MapAyuda :constantes="constantes" :config="vista?.config" :reglas="vista?.reglas" />
     </MapDialogo>
 
     <MapDialogo :abierto="edificioMenuAbierto !== null" titulo="Ciudad" @cerrar="cerrarMenuEdificio">

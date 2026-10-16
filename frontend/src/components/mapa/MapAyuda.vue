@@ -9,8 +9,12 @@ import { computed } from 'vue'
 const props = defineProps({
   constantes: { type: Object, default: null },
   // Config de la partida en curso (objetivo de territorio, limite de rondas).
-  config: { type: Object, default: null }
+  config: { type: Object, default: null },
+  // Lo que la partida dejo prendido (vista.reglas). Sin la clave (backend viejo) cuenta como prendido.
+  reglas: { type: Object, default: null }
 })
+
+const prendida = (clave) => props.reglas?.[clave] !== false
 
 const NOMBRE_RECURSO = {
   food: 'comida', gold: 'oro', wood: 'madera',
@@ -64,6 +68,17 @@ const efectoTecnologia = (tec) => {
   return partes.join(' · ')
 }
 
+const unidades = computed(() =>
+  (props.constantes?.unidades || []).filter(u => prendida('armada') || u.tipo !== 'warship')
+)
+
+// Un edificio que produce un recurso apagado (biblioteca sin ciencia) no existe en la partida.
+const edificios = computed(() => {
+  const activos = props.reglas?.recursosActivos
+  return (props.constantes?.edificios || []).filter(e =>
+    !activos || Object.keys(e.produccion || {}).every(r => activos.includes(r)))
+})
+
 const terrenosProductivos = computed(() =>
   (props.constantes?.terrenos || []).filter(t => Object.keys(t.produccion || {}).length > 0)
 )
@@ -77,7 +92,6 @@ const porcentajeDominacion = computed(() =>
 )
 
 const limiteRondas = computed(() => props.config?.limiteRondas ?? null)
-const guerraPura = computed(() => props.config?.guerraPura === true)
 
 // --- Gobierno -----------------------------------------------------------
 // Los NUMEROS salen de las constantes; solo la explicacion esta escrita aca.
@@ -129,7 +143,7 @@ const umbralAviso = computed(() =>
         La máquina juega cuando terminó el último jugador.
       </p>
     </section>
-    <section>
+    <section v-if="prendida('alianzas')">
       <h4>Alianzas</h4>
       <p>
         Desde el botón <strong>🤝 Alianzas</strong> le podés proponer una alianza a otro jugador, y él la
@@ -148,16 +162,6 @@ const umbralAviso = computed(() =>
       <p>
         La <strong>máquina</strong> nunca propone una alianza. Si se la proponés contesta en el momento, y
         solo acepta cuando va perdiendo (alguien tiene más territorio que ella). Dos máquinas nunca se alían.
-      </p>
-    </section>
-
-    <section v-if="guerraPura">
-      <h4>Guerra pura</h4>
-      <p>
-        Esta partida es de <strong>guerra pura</strong>: no existen la ciencia ni la cultura.
-        No se producen, no hay tecnologías, rasgos culturales, biblioteca ni universidad, y las
-        ciudades no suben de nivel. Todo se juega con comida, oro, madera y piedra. Las unidades
-        que pedían una tecnología (como el legionario) están disponibles desde el inicio.
       </p>
     </section>
 
@@ -223,14 +227,14 @@ const umbralAviso = computed(() =>
           <tr><th>Edificio</th><th>Cuesta</th><th>Produce por turno</th></tr>
         </thead>
         <tbody>
-          <tr v-for="e in constantes.edificios" :key="e.tipo">
+          <tr v-for="e in edificios" :key="e.tipo">
             <td>{{ e.nombre }}<small v-if="e.requiereTecnologia"> (necesita tecnología)</small></td>
             <td>{{ costo(e.costo) }}</td>
             <td>{{ produccion(e.produccion) }}</td>
           </tr>
         </tbody>
       </table>
-      <p class="aviso">
+      <p v-if="prendida('tecnologias')" class="aviso">
         Además de construir, una ciudad se puede <strong>mejorar de nivel</strong>
         (con ciencia y oro, cada vez más caro): sube su defensa. Es por ciudad,
         no una tecnología de toda la civilización.
@@ -245,7 +249,7 @@ const umbralAviso = computed(() =>
       </p>
     </section>
 
-    <section v-if="constantes.capital">
+    <section v-if="constantes.capital && prendida('capital')">
       <h4>Capital</h4>
       <p>
         Tu primera ciudad es la <strong>capital</strong> (👑 en el mapa). Rinde
@@ -260,7 +264,7 @@ const umbralAviso = computed(() =>
       </p>
     </section>
 
-    <section v-if="constantes.rasgosCulturales?.length && !guerraPura">
+    <section v-if="constantes.rasgosCulturales?.length && prendida('rasgos')">
       <h4>Cultura</h4>
       <p>
         La cultura se gasta en <strong>rasgos</strong> que tu civilización adopta
@@ -307,7 +311,7 @@ const umbralAviso = computed(() =>
           <tr><th>Unidad</th><th>Atq</th><th>Def</th><th>Vida</th><th>Mov</th><th>Cuesta</th></tr>
         </thead>
         <tbody>
-          <tr v-for="u in constantes.unidades" :key="u.tipo">
+          <tr v-for="u in unidades" :key="u.tipo">
             <td>
               {{ u.nombre }}
               <small v-if="u.requiereBarracks"> (necesita cuartel)</small>
@@ -330,7 +334,7 @@ const umbralAviso = computed(() =>
       </table>
     </section>
 
-    <section v-if="constantes.tecnologias?.length && !guerraPura">
+    <section v-if="constantes.tecnologias?.length && prendida('tecnologias')">
       <h4>Ciencia</h4>
       <p>
         La ciencia se gasta en <strong>tecnologías</strong>: se investigan una
@@ -439,7 +443,7 @@ const umbralAviso = computed(() =>
         {{ constantes.limitesMandato?.min }} a {{ constantes.limitesMandato?.max }} rondas entre elecciones). Y
         cualquier gobierno puede llevar un <strong>nombre propio</strong> (gratis, aunque hayas perdido el poder).
       </p>
-      <p v-if="constantes.acunacion">
+      <p v-if="constantes.acunacion && prendida('moneda')">
         <strong>Moneda.</strong> Tu oro puede llevar el nombre y el símbolo que quieras (gratis, en cualquier
         momento, desde el panel de Gobierno). En tu turno también podés <strong>acuñar</strong>: hasta
         {{ constantes.acunacion.maximoPorRonda }} de oro por ronda, al instante, a cambio de inflación. Cada
@@ -461,8 +465,8 @@ const umbralAviso = computed(() =>
       <p>
         Cada ciudad acumula <strong>diez problemas sociales</strong>:
         {{ (constantes.problemasSociales || []).map(p => p.nombre.toLowerCase()).join(', ') }}.
-        Los medidores suben o bajan según lo que tengas construido (un cuartel contiene la inseguridad, una
-        biblioteca la mala educación, un granero la pobreza y la mala salud, un aserradero o una cantera la falta
+        Los medidores suben o bajan según lo que tengas construido (un cuartel contiene la inseguridad,
+        <template v-if="prendida('tecnologias')">una biblioteca la mala educación, </template>un granero la pobreza y la mala salud, un aserradero o una cantera la falta
         de infraestructura, un mercado la corrupción).
       </p>
       <p>

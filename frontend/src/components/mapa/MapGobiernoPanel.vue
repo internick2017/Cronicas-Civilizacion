@@ -228,7 +228,7 @@ const ventajas = (grupo) => {
       <em v-if="motivoMandato">{{ motivoMandato }}</em>
     </section>
 
-    <section>
+    <section v-if="vista.reglas?.moneda !== false">
       <h4>Moneda</h4>
       <div class="fila-botones">
         <input v-model="nombreMoneda" class="entrada-oro ancha-media" :maxlength="reglasMoneda.largoNombre" placeholder="Nombre">

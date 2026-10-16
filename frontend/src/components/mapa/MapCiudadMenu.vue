@@ -20,7 +20,7 @@ const reglas = computed(() => props.vista.reglas ?? { tecnologias: true, mejoras
 const existe = (recurso) => !reglas.value.recursosActivos || reglas.value.recursosActivos.includes(recurso)
 const EDIFICIOS = computed(() =>
   (props.constantes.edificios || []).filter(e => Object.keys(e.produccion || {}).every(existe)))
-const UNIDADES = computed(() => props.constantes.unidades || [])
+const UNIDADES = computed(() => (props.constantes.unidades || []).filter(u => reglas.value.armada !== false || u.tipo !== 'warship'))
 
 const tile = computed(() =>
   props.vista.mapa[props.posicion.y * props.vista.config.tamanoMapa + props.posicion.x]
@@ -183,7 +183,7 @@ const motivoCapital = computed(() => (puedePagar(costoCapital.value) ? null : 's
       <p class="vida-ciudad">❤️ {{ vidaCiudad }}</p>
     </section>
 
-    <section v-if="capital">
+    <section v-if="capital && reglas.capital !== false">
       <h4>Capital</h4>
       <p v-if="esCapital" class="capital">
         👑 Es tu capital: +{{ Math.round(capital.bonoProduccion * 100) }}% de producción y +{{ capital.bonoDefensa }} de defensa.
