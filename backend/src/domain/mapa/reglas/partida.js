@@ -5,6 +5,7 @@ import { ReglaError } from '../errores.js';
 import { evento, radio1 } from './comun.js';
 import { MIN_JUGADORES } from '../constantes.js';
 import { validarRaza } from './razas.js';
+import { validarCargos } from './cargos.js';
 
 // esBot marca al jugador manejado por la IA (ver domain/mapa/ia.js).
 // dificultadIA solo tiene sentido junto con esBot; se acepta igual para
@@ -16,12 +17,15 @@ import { validarRaza } from './razas.js';
 // `raza` es opcional: sin ella el jugador no tiene bonos ni penalizaciones (el
 // comportamiento de antes de que existieran las razas). Si viene, tiene que
 // existir en RAZAS (ver reglas/razas.js).
-export function unirse(estado, { id, nombre, civilizacion, raza = null, esBot = false, dificultadIA = null }) {
+//
+// `cargos` (reglas/cargos.js): que mitad del pais lleva el jugador. Sin ellos, los dos.
+export function unirse(estado, { id, nombre, civilizacion, raza = null, cargos = null, esBot = false, dificultadIA = null }) {
   if (estado.estado !== 'esperando') throw new ReglaError('PARTIDA_YA_INICIADA', 'La partida ya inició');
   if (estado.jugadores.length >= estado.config.maxJugadores) throw new ReglaError('PARTIDA_LLENA', 'La partida está llena');
   if (jugadorPorId(estado, id)) throw new ReglaError('JUGADOR_DUPLICADO', 'Ese jugador ya está en la partida');
   const razaValida = validarRaza(raza);
-  return [evento('JugadorUnido', estado, null, { id, nombre, civilizacion, raza: razaValida, esBot, dificultadIA })];
+  const cargosValidos = validarCargos(cargos);
+  return [evento('JugadorUnido', estado, null, { id, nombre, civilizacion, raza: razaValida, cargos: cargosValidos, esBot, dificultadIA })];
 }
 
 export function iniciar(estado) {

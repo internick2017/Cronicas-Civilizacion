@@ -12,6 +12,7 @@ import {
   gobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo, impuestosDe, mandatoDe, nombreGobiernoDe,
 } from './gobierno.js';
 import { capitalDe } from './capital.js';
+import { cargosDe } from './cargos.js';
 import { monedaDe, inflacionAcunadaDe, acunadoEnRonda } from './moneda.js';
 
 // `videntes`: el jugador y sus aliados, que comparten lo que descubren.
@@ -61,6 +62,7 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
   if (jugador.id === jugadorId) {
     return {
       id, nombre, civilizacion, raza, activo, esBot: Boolean(esBot),
+      cargos: cargosDe(jugador),
       recursos: { ...jugador.recursos },
       rasgos: [...(jugador.rasgos ?? [])],
       tecnologias: [...(jugador.tecnologias ?? [])],
@@ -104,6 +106,7 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
   // "🤖" al rival y con que dificultad esta jugando.
   return {
     id, nombre, civilizacion, raza, activo, esBot: Boolean(esBot),
+    cargos: cargosDe(jugador),
     gobierno: gobiernoDe(jugador),
     nombreGobierno: nombreGobiernoDe(jugador),
     formaEstado: formaEstadoDe(jugador),

@@ -434,7 +434,7 @@ const umbralAviso = computed(() =>
           <tr>
             <td>Dictadura</td>
             <td>Vos</td>
-            <td>{{ listaBono(bonosGobierno.ditadura) }} y más respeto del ejército, pero el pueblo te quiere menos. Se sostiene por la fuerza: te echan los militares.</td>
+            <td>{{ listaBono(bonosGobierno.dictadura) }} y más respeto del ejército, pero el pueblo te quiere menos. Se sostiene por la fuerza: te echan los militares.</td>
           </tr>
           <tr>
             <td>Absolutismo</td>

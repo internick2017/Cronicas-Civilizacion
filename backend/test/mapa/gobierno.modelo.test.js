@@ -35,7 +35,7 @@ describe('modelo de gobierno', () => {
 
   it('GOBIERNOS tiene exactamente los dieciocho gobiernos', () => {
     expect(Object.keys(GOBIERNOS).sort()).toEqual([
-      'absolutismo', 'aristocracia', 'autoritarismo', 'despotismo', 'ditadura', 'estratocracia', 'monarquia', 'oligarquia', 'parlamentarismo', 'presidencialismo', 'regencia',
+      'absolutismo', 'aristocracia', 'autoritarismo', 'despotismo', 'dictadura', 'estratocracia', 'monarquia', 'oligarquia', 'parlamentarismo', 'presidencialismo', 'regencia',
       'republica_directa', 'republica_indirecta', 'republica_semidirecta',
       'tecnocracia', 'teocracia', 'tirania', 'totalitarismo',
     ]);

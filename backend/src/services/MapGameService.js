@@ -19,7 +19,8 @@ import { proponerAlianza, responderAlianza, romperAlianza, regalarRecursos } fro
 import { renombrarPais } from '../domain/mapa/reglas/pais.js';
 import { moverCapital } from '../domain/mapa/reglas/capital.js';
 import { nombrarMoneda, acunarMoneda } from '../domain/mapa/reglas/moneda.js';
-import { jugarTurnoIA } from '../domain/mapa/ia.js';
+import { jugarTurnoIA, jugarCargosIA } from '../domain/mapa/ia.js';
+import { cargoQueFalta, cargosQueFaltan } from '../domain/mapa/reglas/cargos.js';
 import { DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, RAZAS } from '../domain/mapa/constantes.js';
 import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
 import { embarcar, desembarcar } from '../domain/mapa/reglas/transporte.js';
@@ -333,6 +334,15 @@ export class MapGameService {
     };
   }
 
+  // El cargo que un humano no asumio (reglas/cargos.js) lo lleva la maquina al
+  // cerrar el turno del humano. Los eventos ya quedan aplicados al estado.
+  _delegarCargos(estado, actor) {
+    const faltan = cargosQueFaltan(actor);
+    if (faltan.length === 0) return [];
+    const rng = crearRng(`cargos:${estado.semilla}:${estado.turno}:${actor.id}`);
+    return jugarCargosIA(estado, actor.id, rng, faltan);
+  }
+
   _jugarPorLaMaquina(estado, jugadorId, vuelta = 0) {
     const rng = crearRng(`ia:${estado.semilla}:${estado.turno}:${jugadorId}:${vuelta}`);
     return jugarTurnoIA(estado, jugadorId, rng);
@@ -342,14 +352,14 @@ export class MapGameService {
     return this._conCandado(await this._idCanonico(idOCodigo), () => this._unirse(idOCodigo, jugador));
   }
 
-  async _unirse(idOCodigo, { id, nombre, civilizacion, raza }) {
+  async _unirse(idOCodigo, { id, nombre, civilizacion, raza, cargos }) {
     const original = await this._resolver(idOCodigo);
     if (!original) throw new ReglaError('PARTIDA_NO_ENCONTRADA', 'Partida no encontrada');
 
     // Se muta un CLON, nunca el objeto que vive en el cache: si la persistencia
     // falla mas abajo, el cache no debe quedar con un estado que la DB no tiene.
     const estado = structuredClone(original);
-    const eventos = unirseRegla(estado, { id, nombre, civilizacion, raza });
+    const eventos = unirseRegla(estado, { id, nombre, civilizacion, raza, cargos });
     aplicar(estado, eventos);
 
     // El bot se suma en la MISMA operacion que el primer humano se une (ver
@@ -430,6 +440,18 @@ export class MapGameService {
       throw new ReglaError('SIN_PODER', 'Perdiste el poder: no podés dar órdenes hasta recuperarlo');
     }
 
+    // Un humano solo da las ordenes de los cargos que asumio; el resto de su pais
+    // lo lleva la maquina, y lo hace al terminar su turno (aca mismo).
+    if (actor && !actor.esBot) {
+      const cargo = cargoQueFalta(actor, accion.tipo);
+      if (cargo) {
+        throw new ReglaError('CARGO_NO_ASUMIDO', `No asumiste el cargo de Jefe de ${cargo === 'estado' ? 'Estado' : 'Gobierno'}: esa orden la da la máquina`);
+      }
+    }
+    const delegados = (actor && !actor.esBot && accion.tipo === 'terminarTurno' && estaEnPoder(actor))
+      ? this._delegarCargos(estado, actor)
+      : [];
+
     let eventos;
     if (actor && !estaEnPoder(actor) && accion.tipo === 'terminarTurno') {
       // "Terminar turno" de quien no manda es PASAR: no se ejecuta la regla (no
@@ -455,6 +477,8 @@ export class MapGameService {
     // Si la regla tiro ReglaError, nunca llegamos aca: nada se aplico ni se persistio,
     // y el clon descartado no dejo rastro (el cache sigue apuntando al `original`).
     aplicar(estado, eventos);
+    // Lo que hizo la maquina por el humano ya esta aplicado: solo se suma al registro.
+    eventos.unshift(...delegados);
     // Turno simultaneo: no hay "cuando le toque" para quien perdio el poder, asi
     // que su pasar es jugar AHORA: la maquina hace su turno y lo deja listo.
     if (actor && !estaEnPoder(actor) && accion.tipo === 'terminarTurno' && esSimultaneo(estado)) {

@@ -246,8 +246,8 @@ export function crearMapRoutes(servicio) {
   // POST /api/map/:id/unirse
   router.post('/:id/unirse', async (req, res) => {
     try {
-      const { id, nombre, civilizacion, raza } = req.body ?? {};
-      const resultado = await servicio.unirse(req.params.id, { id, nombre, civilizacion, raza });
+      const { id, nombre, civilizacion, raza, cargos } = req.body ?? {};
+      const resultado = await servicio.unirse(req.params.id, { id, nombre, civilizacion, raza, cargos });
       res.status(200).json(resultado); // { vista, token }
     } catch (err) {
       manejarError(err, res);

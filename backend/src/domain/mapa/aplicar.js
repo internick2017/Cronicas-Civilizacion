@@ -30,6 +30,7 @@ export function aplicar(estado, eventos) {
           nombre: datos.nombre,
           civilizacion: datos.civilizacion,
           raza: datos.raza ?? null,
+          cargos: datos.cargos ?? ['estado', 'gobierno'],
           recursos: { ...RECURSOS_INICIALES },
           rasgos: [],
           tecnologias: [],

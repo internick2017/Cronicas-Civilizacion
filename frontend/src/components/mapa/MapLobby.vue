@@ -84,6 +84,21 @@ const dificultadIA = ref(null)
 
 // Razas: tambien salen del backend, con sus bonos, para no duplicar numeros que
 // cambian con el balance. Se elige al unirse (crear, jugar solo o unirse con codigo).
+// Cargos: el Jefe de Estado lleva las relaciones con otros paises; el Jefe de
+// Gobierno, lo interno. Se puede asumir uno o los dos; lo que no asumas lo lleva
+// la maquina. Siempre queda al menos uno marcado.
+const esJefeEstado = ref(true)
+const esJefeGobierno = ref(true)
+const cargosElegidos = () => [
+  ...(esJefeEstado.value ? ['estado'] : []),
+  ...(esJefeGobierno.value ? ['gobierno'] : [])
+]
+const alternarCargo = (cargo) => {
+  const [uno, otro] = cargo === 'estado' ? [esJefeEstado, esJefeGobierno] : [esJefeGobierno, esJefeEstado]
+  if (uno.value && !otro.value) return
+  uno.value = !uno.value
+}
+
 const razas = ref([])
 const raza = ref(null)
 
@@ -134,7 +149,8 @@ const unirseAPartida = async (idOCodigo, codigoConocido = null) => {
     id: jugadorId,
     nombre: nombreJugador.value,
     civilizacion: nombreJugador.value,
-    raza: raza.value
+    raza: raza.value,
+    cargos: cargosElegidos()
   })
   return { id: vista.id, codigo: codigoConocido ?? idOCodigo, jugadorId, token, vista }
 }
@@ -266,6 +282,23 @@ onMounted(() => {
         Tu nombre / civilización
         <input v-model="nombreJugador" type="text" placeholder="Incas" />
       </label>
+
+      <section class="panel">
+        <h2>Tu cargo</h2>
+        <div class="cargo-lista">
+          <label class="cargo-opcion" :class="{ elegida: esJefeEstado }">
+            <input type="checkbox" :checked="esJefeEstado" @change="alternarCargo('estado')" />
+            <span class="raza-nombre">🌐 Jefe de Estado</span>
+            <small>Llevás las relaciones con otros países: guerra, ejércitos y alianzas.</small>
+          </label>
+          <label class="cargo-opcion" :class="{ elegida: esJefeGobierno }">
+            <input type="checkbox" :checked="esJefeGobierno" @change="alternarCargo('gobierno')" />
+            <span class="raza-nombre">🏛️ Jefe de Gobierno</span>
+            <small>Llevás lo interno: ciudades, edificios, ciencia, cultura, gobierno y moneda.</small>
+          </label>
+        </div>
+        <small class="cargo-nota">Lo que no asumas lo lleva la máquina por vos al terminar tu turno.</small>
+      </section>
 
       <!-- La raza vale para las tres formas de entrar (solo, crear, unirse). Cada
            una gana algo y paga algo: por eso se muestran las dos cosas. -->
@@ -532,6 +565,14 @@ onMounted(() => {
 .dificultad-nombre { font-weight: 600; }
 .dificultad-opcion small { grid-column: 2; opacity: 0.7; }
 
+.cargo-lista { display: flex; flex-direction: column; gap: 0.4rem; }
+.cargo-opcion {
+  display: grid; grid-template-columns: auto 1fr; column-gap: 0.5rem; align-items: center;
+  padding: 0.5rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.2); cursor: pointer;
+}
+.cargo-opcion.elegida { border-color: #2ecc71; background: rgba(46, 204, 113, 0.12); }
+.cargo-opcion small { grid-column: 2; opacity: 0.7; }
+.cargo-nota { opacity: 0.7; }
 .raza-lista {
   display: flex;
   flex-direction: column;

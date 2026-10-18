@@ -123,7 +123,7 @@ describe('cerrarRondaGobierno: pérdida y regreso del poder', () => {
       expect(de(cerrarRondaGobierno(e, nunca), 'PoderRecuperado').map(x => x.datos.motivo)).toEqual(['apoyo']);
       p1.enPoder = true;
     }
-    for (const g of ['ditadura', 'totalitarismo']) {
+    for (const g of ['dictadura', 'totalitarismo']) {
       p1.gobierno = g;
       p1.apoyo = { pueblo: 100, lideres: 100, militares: 5 };
       expect(de(cerrarRondaGobierno(e, nunca), 'PoderPerdido').map(x => x.datos.motivo)).toEqual(['expulsion']);

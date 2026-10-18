@@ -42,6 +42,39 @@ const enPeligro = computed(
   () => enPoder.value && yo.value?.gobierno !== 'despotismo' && apoyoQueExpulsa.value < 40
 )
 
+// El selector agrupa los gobiernos por familia: son demasiados para una lista plana.
+const FAMILIAS = [
+  { titulo: 'Un solo mando', tipos: ['despotismo', 'monarquia', 'absolutismo', 'autoritarismo', 'regencia'] },
+  { titulo: 'Por la fuerza', tipos: ['estratocracia', 'tirania', 'dictadura', 'totalitarismo'] },
+  { titulo: 'De una élite', tipos: ['teocracia', 'oligarquia', 'aristocracia', 'tecnocracia', 'parlamentarismo'] },
+  { titulo: 'Con elecciones', tipos: ['presidencialismo', 'republica_indirecta', 'republica_semidirecta', 'republica_directa'] }
+]
+const categorias = computed(() => {
+  const disponibles = gobiernos.value.filter(x => x.tipo !== yo.value?.gobierno)
+  const cats = FAMILIAS.map(f => ({
+    titulo: f.titulo, gobiernos: disponibles.filter(g => f.tipos.includes(g.tipo))
+  }))
+  // Un gobierno que el servidor agregue y esta lista no conozca igual se puede elegir.
+  const conocidos = FAMILIAS.flatMap(f => f.tipos)
+  const otros = disponibles.filter(g => !conocidos.includes(g.tipo))
+  if (otros.length) cats.push({ titulo: 'Otros', gobiernos: otros })
+  return cats.filter(c => c.gobiernos.length)
+})
+const elegido = ref('')
+const detalleElegido = computed(() => gobiernos.value.find(g => g.tipo === elegido.value) || null)
+const NOMBRE_RECURSO = { food: 'comida', gold: 'oro', wood: 'madera', stone: 'piedra', science: 'ciencia', culture: 'cultura' }
+const efectosElegido = computed(() => {
+  const tipo = elegido.value
+  if (!tipo) return ''
+  const bonos = tipo.startsWith('republica_')
+    ? { todo: props.constantes.bonoProduccionRepublica || 0 }
+    : (props.constantes.bonosProduccionGobierno?.[tipo] || {})
+  const partes = Object.entries(bonos).map(([r, f]) => `+${Math.round(f * 100)}% de ${r === 'todo' ? 'todo' : NOMBRE_RECURSO[r] || r}`)
+  const respeto = Object.entries(props.constantes.respetoGobierno?.[tipo] || {})
+    .map(([g, n]) => `${n > 0 ? '+' : ''}${n} respeto de ${NOMBRE_GRUPO[g].toLowerCase()}`)
+  return [...partes, ...respeto].join(', ') || 'Sin bonos.'
+})
+
 const oroOfrecido = ref(0)
 const oroVentajas = ref(10)
 
@@ -185,14 +218,18 @@ const ventajas = (grupo) => {
         <input v-model.number="oroOfrecido" class="entrada-oro" type="number" min="0" step="5">
       </template>
       <small v-else>Decidís vos: no hay votación ni oro que ofrecer.</small>
-      <button
-        v-for="g in gobiernos.filter(x => x.tipo !== yo.gobierno)"
-        :key="g.tipo"
-        class="btn-secundario"
-        :disabled="motivoProponer !== null"
-        @click="proponer(g.tipo)"
-      >
-        <strong>{{ g.nombre }}</strong>
+      <select v-model="elegido" class="selector-gobierno">
+        <option value="" disabled>Elegí un gobierno…</option>
+        <optgroup v-for="cat in categorias" :key="cat.titulo" :label="cat.titulo">
+          <option v-for="g in cat.gobiernos" :key="g.tipo" :value="g.tipo">{{ g.nombre }}</option>
+        </optgroup>
+      </select>
+      <div v-if="detalleElegido" class="detalle-gobierno">
+        <small>Para cambiarlo después: {{ QUIEN_APRUEBA[detalleElegido.electorado] }}.</small>
+        <small>{{ efectosElegido }}</small>
+      </div>
+      <button class="btn-secundario" :disabled="motivoProponer !== null || !elegido" @click="proponer(elegido)">
+        <strong>Proponer {{ detalleElegido?.nombre || '' }}</strong>
       </button>
       <em v-if="motivoProponer">{{ motivoProponer }}</em>
     </section>
@@ -309,6 +346,12 @@ section { display: flex; flex-direction: column; gap: 0.35rem; }
 .barra { height: 0.55rem; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 .barra-llena { height: 100%; background: #2ecc71; }
 .valor { text-align: right; opacity: 0.8; }
+.selector-gobierno {
+  width: 100%; padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1); color: inherit; font: inherit;
+}
+.selector-gobierno option, .selector-gobierno optgroup { color: #111; }
+.detalle-gobierno { display: flex; flex-direction: column; gap: 0.15rem; }
 .fila-botones { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .entrada-oro {
   width: 6rem; padding: 0.35rem 0.5rem; border-radius: 6px;

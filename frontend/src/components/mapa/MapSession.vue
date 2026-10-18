@@ -75,6 +75,14 @@ const propuestasRecibidas = computed(() => propuestasPara(vista.value, jugadorId
 // Sin la mecanica Gobierno, el mismo panel queda solo con la moneda (si sigue prendida)
 // y el boton pasa a llamarse Moneda.
 const hayGobierno = computed(() => vista.value?.reglas?.gobierno !== false)
+// Los cargos que asumio el jugador (ver backend reglas/cargos.js): lo que no lleva
+// lo hace la maquina por el, asi que sus botones no se ofrecen.
+const misCargos = computed(() => vista.value?.jugadores.find(j => j.id === jugadorId)?.cargos ?? ['estado', 'gobierno'])
+const esJefeEstado = computed(() => misCargos.value.includes('estado'))
+const esJefeGobierno = computed(() => misCargos.value.includes('gobierno'))
+const etiquetaCargos = computed(() => (esJefeEstado.value && esJefeGobierno.value
+  ? 'Jefe de Estado y de Gobierno'
+  : esJefeEstado.value ? 'Jefe de Estado (la máquina lleva el gobierno)' : 'Jefe de Gobierno (la máquina lleva el Estado)'))
 // Cuantos problemas activos o señales de aviso hay: el boton Gobierno lo muestra
 // para que no haga falta abrirlo a mirar.
 const avisosGobierno = computed(() => {
@@ -666,25 +674,26 @@ onUnmounted(() => {
       />
 
       <div class="botonera-paneles">
+        <span class="etiqueta-cargos" title="Tu cargo">🎖️ {{ etiquetaCargos }}</span>
         <button class="btn-panel" @click="ciudadesAbierto = !ciudadesAbierto">
           🏙️ Ciudades ({{ misCiudades.length }})
         </button>
         <button class="btn-panel" @click="cronicaAbierta = !cronicaAbierta">
           {{ cronicaAbierta ? '📖 Ocultar crónica' : '📖 Ver crónica' }}
         </button>
-        <button v-if="vista.reglas?.rasgos !== false" class="btn-panel" title="Rasgos culturales" @click="culturaAbierta = true">
+        <button v-if="esJefeGobierno && vista.reglas?.rasgos !== false" class="btn-panel" title="Rasgos culturales" @click="culturaAbierta = true">
           🎭 Cultura
         </button>
-        <button v-if="vista.reglas?.tecnologias !== false" class="btn-panel" title="Tecnologías" @click="cienciaAbierta = true">
+        <button v-if="esJefeGobierno && vista.reglas?.tecnologias !== false" class="btn-panel" title="Tecnologías" @click="cienciaAbierta = true">
           🔬 Ciencia
         </button>
-        <button v-if="hayGobierno" class="btn-panel" title="Gobierno" @click="gobiernoAbierto = true">
+        <button v-if="esJefeGobierno && hayGobierno" class="btn-panel" title="Gobierno" @click="gobiernoAbierto = true">
           🏛️ Gobierno<span v-if="avisosGobierno" class="insignia-aviso">{{ avisosGobierno }}</span>
         </button>
-        <button v-else-if="vista.reglas?.moneda !== false" class="btn-panel" title="Moneda" @click="gobiernoAbierto = true">
+        <button v-else-if="esJefeGobierno && vista.reglas?.moneda !== false" class="btn-panel" title="Moneda" @click="gobiernoAbierto = true">
           💰 Moneda
         </button>
-        <button v-if="vista.reglas?.alianzas !== false" class="btn-panel" title="Alianzas" @click="alianzasAbierto = true">
+        <button v-if="esJefeEstado && vista.reglas?.alianzas !== false" class="btn-panel" title="Alianzas" @click="alianzasAbierto = true">
           🤝 Alianzas<span v-if="propuestasRecibidas" class="insignia-aviso">{{ propuestasRecibidas }}</span>
         </button>
         <button class="btn-panel" title="Manual de Instrucciones" @click="ayudaAbierta = true">
@@ -930,6 +939,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+.etiqueta-cargos { font-size: 0.8rem; opacity: 0.85; align-self: center; }
 .btn-panel:hover { background: rgba(52, 152, 219, 0.35); }
 
 /* Salir es la unica accion de la botonera que no se puede deshacer: se separa

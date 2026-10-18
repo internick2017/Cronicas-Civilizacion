@@ -903,23 +903,32 @@ function decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) 
   return { tipo: 'fundarCiudad', x: elegida.x, y: elegida.y, nombre: `${jugador.civilizacion} ${numero}` };
 }
 
-function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujulas) {
+function decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujulas, cargos = null) {
   // Fundar va ANTES que reclutar: mientras fue lo ultimo, cualquier edificio o
   // unidad pagable se comia los recursos primero y la maquina casi nunca
   // llegaba a una segunda ciudad. Una ciudad nueva reclama casilla, produce, y
   // sube el tope de ejercitos (que es el que limita cuanto puede reclamar).
-  return decidirInvestigacion(estado, jugadorId, perfil) ??
-    decidirConstruccion(estado, jugadorId, perfil) ??
-    decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno) ??
-    decidirMejoraConTropaSuficiente(estado, jugadorId, perfil) ??
-    decidirReclutamiento(estado, jugadorId, perfil) ??
-    decidirReclutamientoNaval(estado, jugadorId, perfil) ??
-    decidirTransporte(estado, jugadorId, perfil, brujulas) ??
-    decidirDesembarco(estado, jugadorId, brujulas) ??
-    decidirEmbarque(estado, jugadorId, brujulas) ??
-    decidirMilitar(estado, jugadorId, rng, perfil, brujulas) ??
-    decidirMejoraCiudad(estado, jugadorId, perfil) ??
-    null;
+  // Cada decision pertenece a un cargo (reglas/cargos.js): una maquina que solo
+  // lleva un cargo por un jugador humano se salta las del otro.
+  const decisiones = [
+    ['gobierno', () => decidirInvestigacion(estado, jugadorId, perfil)],
+    ['gobierno', () => decidirConstruccion(estado, jugadorId, perfil)],
+    ['gobierno', () => decidirFundacion(estado, jugadorId, rng, perfil, fundacionesEsteTurno)],
+    ['gobierno', () => decidirMejoraConTropaSuficiente(estado, jugadorId, perfil)],
+    ['estado', () => decidirReclutamiento(estado, jugadorId, perfil)],
+    ['estado', () => decidirReclutamientoNaval(estado, jugadorId, perfil)],
+    ['estado', () => decidirTransporte(estado, jugadorId, perfil, brujulas)],
+    ['estado', () => decidirDesembarco(estado, jugadorId, brujulas)],
+    ['estado', () => decidirEmbarque(estado, jugadorId, brujulas)],
+    ['estado', () => decidirMilitar(estado, jugadorId, rng, perfil, brujulas)],
+    ['gobierno', () => decidirMejoraCiudad(estado, jugadorId, perfil)],
+  ];
+  for (const [cargo, decidir] of decisiones) {
+    if (cargos && !cargos.includes(cargo)) continue;
+    const decision = decidir();
+    if (decision) return decision;
+  }
+  return null;
 }
 
 const EJECUTORES = {
@@ -945,7 +954,7 @@ const EJECUTORES = {
  * lugar que ya tenga `estado` y un `jugadorId` puede llamar a esto sin tener
  * que acordarse de propagar la dificultad por separado.
  */
-export function jugarTurnoIA(estado, jugadorId, rng) {
+function jugarPasosIA(estado, jugadorId, rng, cargos) {
   const perfil = perfilDe(estado, jugadorId);
   const eventos = [];
   let fallosSeguidos = 0;
@@ -995,7 +1004,7 @@ export function jugarTurnoIA(estado, jugadorId, rng) {
       invasion: hayQueCruzar ? distanciaAInvasion(estado, jugadorId, inalcanzables) : null,
       embarque: hayQueCruzar ? distanciaAEmbarque(estado, jugadorId) : null,
     };
-    const decision = decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujulas);
+    const decision = decidirAccion(estado, jugadorId, rng, perfil, fundacionesEsteTurno, brujulas, cargos);
     if (!decision) break;
 
     try {
@@ -1014,16 +1023,34 @@ export function jugarTurnoIA(estado, jugadorId, rng) {
     }
   }
 
-  // Antes de cerrar el turno la maquina ordena su Estado federal (si esta prendido).
-  // Va ANTES de terminarTurno: ahi se administran las subdivisiones.
+  return eventos;
+}
+
+// Antes de cerrar el turno la maquina ordena su Estado federal (si esta prendido).
+// Va ANTES de terminarTurno: ahi se administran las subdivisiones.
+function organizarSubdivisiones(estado, jugadorId) {
   const organizacion = organizarSubdivisionesIA(estado, jugadorId, {
     activa: estado.config?.iaOrganizaSubdivisiones ?? IA_ORGANIZA_SUBDIVISIONES,
   });
   aplicar(estado, organizacion);
-  eventos.push(...organizacion);
+  return organizacion;
+}
 
+export function jugarTurnoIA(estado, jugadorId, rng) {
+  const eventos = jugarPasosIA(estado, jugadorId, rng, null);
+  eventos.push(...organizarSubdivisiones(estado, jugadorId));
   const cierre = terminarTurno(estado, jugadorId);
   aplicar(estado, cierre);
   eventos.push(...cierre);
+  return eventos;
+}
+
+/**
+ * La maquina lleva SOLO los cargos pedidos de un jugador humano que no los
+ * asumio (reglas/cargos.js), y no cierra el turno: eso lo hace el humano.
+ */
+export function jugarCargosIA(estado, jugadorId, rng, cargos) {
+  const eventos = jugarPasosIA(estado, jugadorId, rng, cargos);
+  if (cargos.includes('gobierno')) eventos.push(...organizarSubdivisiones(estado, jugadorId));
   return eventos;
 }
