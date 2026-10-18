@@ -36,7 +36,7 @@ const bloqueadoHasta = computed(() => yo.value?.cambioBloqueadoHasta ?? 0)
 const enEnfriamiento = computed(() => bloqueadoHasta.value > props.vista.turno)
 
 // Los grupos que pueden echarte: avisa ANTES de que ocurra.
-const grupoQueExpulsa = computed(() => (yo.value?.gobierno === 'estratocracia' ? 'militares' : 'lideres'))
+const grupoQueExpulsa = computed(() => (['estratocracia', 'tirania'].includes(yo.value?.gobierno) ? 'militares' : 'lideres'))
 const apoyoQueExpulsa = computed(() => yo.value?.apoyo?.[grupoQueExpulsa.value] ?? 100)
 const enPeligro = computed(
   () => enPoder.value && yo.value?.gobierno !== 'despotismo' && apoyoQueExpulsa.value < 40

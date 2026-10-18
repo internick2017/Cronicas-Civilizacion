@@ -397,6 +397,31 @@ const umbralAviso = computed(() =>
             <td>{{ listaBono(bonosGobierno.estratocracia) }} y más respeto del ejército. Para volver al poder necesitás apoyo militar de {{ constantes.umbralesGobierno?.regresoMilitar }}.</td>
           </tr>
           <tr>
+            <td>Teocracia</td>
+            <td>La mitad de los líderes (el clero)</td>
+            <td>{{ listaBono(bonosGobierno.teocracia) }} y más respeto de pueblo y líderes. Para volver al poder necesitás el apoyo de los líderes.</td>
+          </tr>
+          <tr>
+            <td>Oligarquía</td>
+            <td>La mitad de los líderes</td>
+            <td>{{ listaBono(bonosGobierno.oligarquia) }} y más respeto de los líderes. Para volver al poder necesitás su apoyo.</td>
+          </tr>
+          <tr>
+            <td>Tecnocracia</td>
+            <td>La mitad de los líderes (los sabios)</td>
+            <td>{{ listaBono(bonosGobierno.tecnocracia) }}. Para volver al poder necesitás el apoyo de los líderes.</td>
+          </tr>
+          <tr>
+            <td>Aristocracia</td>
+            <td>La mitad de los líderes (los nobles)</td>
+            <td>{{ listaBono(bonosGobierno.aristocracia) }} y mucho más respeto de los líderes. Para volver al poder necesitás su apoyo.</td>
+          </tr>
+          <tr>
+            <td>Tiranía</td>
+            <td>Vos</td>
+            <td>{{ listaBono(bonosGobierno.tirania) }} y más respeto del ejército, pero el pueblo te odia (menos respeto). Si los militares te abandonan te echan, y para volver necesitás su apoyo de {{ constantes.umbralesGobierno?.regresoMilitar }}.</td>
+          </tr>
+          <tr>
             <td>República representativa</td>
             <td>La mitad de los líderes</td>
             <td>+{{ pct(constantes.bonoProduccionRepublica) }} de producción en todo: los líderes elegidos mejoran el país.</td>
@@ -429,7 +454,7 @@ const umbralAviso = computed(() =>
       </p>
       <p class="aviso">
         <strong>Podés perder el poder</strong> (nunca la partida): por una crisis, por una expulsión si el apoyo de
-        los líderes (o de los militares, en estratocracia) cae por debajo de {{ constantes.umbralesGobierno?.expulsion }},
+        los líderes (o de los militares, en estratocracia y tiranía) cae por debajo de {{ constantes.umbralesGobierno?.expulsion }},
         por sucesión en la monarquía, o en las elecciones de las repúblicas, que son cada {{ rondasElecciones }} rondas
         salvo que fijes otro mandato.
         Sin poder, <strong>la máquina juega tus turnos</strong> y el botón pasa a "Esperar". Mientras tanto

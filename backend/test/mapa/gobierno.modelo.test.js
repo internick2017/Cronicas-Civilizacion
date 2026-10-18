@@ -33,10 +33,11 @@ describe('modelo de gobierno', () => {
     expect(probabilidadSucesion(100)).toBeCloseTo(0.01, 6);
   });
 
-  it('GOBIERNOS tiene exactamente los seis gobiernos', () => {
+  it('GOBIERNOS tiene exactamente los once gobiernos', () => {
     expect(Object.keys(GOBIERNOS).sort()).toEqual([
-      'despotismo', 'estratocracia', 'monarquia',
+      'aristocracia', 'despotismo', 'estratocracia', 'monarquia', 'oligarquia',
       'republica_directa', 'republica_indirecta', 'republica_semidirecta',
+      'tecnocracia', 'teocracia', 'tirania',
     ]);
   });
 

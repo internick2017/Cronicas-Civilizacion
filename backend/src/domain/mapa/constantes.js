@@ -578,6 +578,11 @@ export const GOBIERNOS = {
   despotismo: { nombre: 'Despotismo', electorado: 'jugador' },
   monarquia: { nombre: 'Monarquía', electorado: 'jugador' },
   estratocracia: { nombre: 'Estratocracia', electorado: 'militares' },
+  teocracia: { nombre: 'Teocracia', electorado: 'lideres' },
+  oligarquia: { nombre: 'Oligarquía', electorado: 'lideres' },
+  tecnocracia: { nombre: 'Tecnocracia', electorado: 'lideres' },
+  aristocracia: { nombre: 'Aristocracia', electorado: 'lideres' },
+  tirania: { nombre: 'Tiranía', electorado: 'jugador' },
   republica_indirecta: { nombre: 'República representativa', electorado: 'lideres' },
   republica_semidirecta: { nombre: 'República semidirecta', electorado: 'mixto' },
   republica_directa: { nombre: 'República directa', electorado: 'pueblo' },
@@ -598,13 +603,17 @@ export const APOYO_INICIAL = 50;
 export const RESPETO = {
   monarquia: { pueblo: 10, lideres: 10 },
   estratocracia: { militares: 10 },
+  teocracia: { pueblo: 10, lideres: 10 },
+  oligarquia: { lideres: 10 },
+  aristocracia: { lideres: 15 },
+  tirania: { pueblo: -15, militares: 10 },
 };
 // Que tanto prefiere cada grupo cada gobierno (0 a 100). En una votacion pesa
 // la DIFERENCIA entre el propuesto y el actual.
 export const PREFERENCIAS = {
-  pueblo: { despotismo: 20, monarquia: 30, estratocracia: 25, republica_indirecta: 60, republica_semidirecta: 70, republica_directa: 80 },
-  lideres: { despotismo: 40, monarquia: 70, estratocracia: 30, republica_indirecta: 75, republica_semidirecta: 65, republica_directa: 25 },
-  militares: { despotismo: 50, monarquia: 55, estratocracia: 90, republica_indirecta: 30, republica_semidirecta: 30, republica_directa: 30 },
+  pueblo: { despotismo: 20, monarquia: 30, estratocracia: 25, teocracia: 40, oligarquia: 20, tecnocracia: 45, aristocracia: 35, tirania: 10, republica_indirecta: 60, republica_semidirecta: 70, republica_directa: 80 },
+  lideres: { despotismo: 40, monarquia: 70, estratocracia: 30, teocracia: 85, oligarquia: 90, tecnocracia: 70, aristocracia: 95, tirania: 20, republica_indirecta: 75, republica_semidirecta: 65, republica_directa: 25 },
+  militares: { despotismo: 50, monarquia: 55, estratocracia: 90, teocracia: 40, oligarquia: 60, tecnocracia: 35, aristocracia: 55, tirania: 85, republica_indirecta: 30, republica_semidirecta: 30, republica_directa: 30 },
 };
 export const PESO_PREFERENCIA = 0.6; // "principalmente" lo que prefieren
 export const PESO_APOYO = 0.4;
@@ -618,10 +627,17 @@ export const UMBRAL_ELECCION = 50;
 export const BONO_PRODUCCION_REPUBLICA = 0.1; // a TODOS los recursos
 // Bonos concretos de los otros gobiernos (ademas del respeto de RESPETO), para
 // que no sean peores que el despotismo sin pagar nada: la monarquia cobra
-// tributos y la estratocracia arma sus arsenales con madera y piedra.
+// tributos, la estratocracia arma sus arsenales con madera y piedra, la teocracia
+// ordena la cultura, la oligarquia cobra menos tributos que la monarquia pero con
+// el respeto de los lideres, y la tecnocracia pone a los sabios a investigar.
 export const BONO_PRODUCCION_GOBIERNO = {
   monarquia: { gold: 0.2 },
   estratocracia: { wood: 0.2, stone: 0.2 },
+  teocracia: { culture: 0.2 },
+  oligarquia: { gold: 0.15 },
+  tecnocracia: { science: 0.2 },
+  aristocracia: { food: 0.2 },
+  tirania: { gold: 0.15, wood: 0.15 },
 };
 // Hasta que nivel mejora ciudades SOLA el Estado federal (el jugador puede
 // seguir subiendolas a mano): sin tope vaciaba la ciencia y el oro.

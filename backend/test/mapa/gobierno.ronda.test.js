@@ -79,6 +79,39 @@ describe('cerrarRondaGobierno: pérdida y regreso del poder', () => {
     expect(de(cerrarRondaGobierno(e, nunca), 'PoderRecuperado').map(x => x.datos.motivo)).toEqual(['eleccion']);
   });
 
+  it('teocracia, oligarquía y tecnocracia: sin poder, vuelven cuando los líderes (con su respeto) llegan a 50', () => {
+    for (const g of ['teocracia', 'oligarquia', 'tecnocracia']) {
+      p1.gobierno = g;
+      p1.enPoder = false;
+      p1.apoyo = { pueblo: 0, lideres: 30, militares: 0 };
+      expect(de(cerrarRondaGobierno(e, nunca), 'PoderRecuperado')).toEqual([]);
+      p1.apoyo = { pueblo: 0, lideres: 60, militares: 0 };
+      expect(de(cerrarRondaGobierno(e, nunca), 'PoderRecuperado').map(x => x.datos.motivo)).toEqual(['apoyo']);
+    }
+  });
+
+  it('multiplicadorProduccion: teocracia +20% cultura, oligarquía +15% oro, tecnocracia +20% ciencia', () => {
+    expect(multiplicadorProduccion({ gobierno: 'teocracia' }, 'culture')).toBeCloseTo(1.2);
+    expect(multiplicadorProduccion({ gobierno: 'oligarquia' }, 'gold')).toBeCloseTo(1.15);
+    expect(multiplicadorProduccion({ gobierno: 'tecnocracia' }, 'science')).toBeCloseTo(1.2);
+    expect(multiplicadorProduccion({ gobierno: 'tecnocracia' }, 'gold')).toBe(1);
+  });
+
+  it('aristocracia: vuelve con los líderes y produce +20% comida; tiranía: la echan y vuelve los militares', () => {
+    expect(multiplicadorProduccion({ gobierno: 'aristocracia' }, 'food')).toBeCloseTo(1.2);
+    expect(multiplicadorProduccion({ gobierno: 'tirania' }, 'gold')).toBeCloseTo(1.15);
+    p1.gobierno = 'tirania';
+    p1.apoyo = { pueblo: 100, lideres: 100, militares: 5 };
+    expect(de(cerrarRondaGobierno(e, nunca), 'PoderPerdido').map(x => x.datos.motivo)).toEqual(['expulsion']);
+    p1.enPoder = false;
+    expect(de(cerrarRondaGobierno(e, nunca), 'PoderRecuperado')).toEqual([]);
+    p1.apoyo = { pueblo: 0, lideres: 0, militares: 80 };
+    expect(de(cerrarRondaGobierno(e, nunca), 'PoderRecuperado').map(x => x.datos.motivo)).toEqual(['apoyo']);
+    p1.gobierno = 'aristocracia';
+    p1.apoyo = { pueblo: 0, lideres: 60, militares: 0 };
+    expect(de(cerrarRondaGobierno(e, nunca), 'PoderRecuperado').map(x => x.datos.motivo)).toEqual(['apoyo']);
+  });
+
   it('estratocracia: sin poder, recupera al llegar los militares a 70', () => {
     p1.gobierno = 'estratocracia';
     p1.enPoder = false;
