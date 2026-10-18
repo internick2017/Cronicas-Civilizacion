@@ -487,6 +487,15 @@ const umbralAviso = computed(() =>
         el apoyo de un grupo, y se queda. A la hora de votar pesa más si prefieren el gobierno nuevo al actual
         que cuánto te apoyan.
       </p>
+      <p>
+        <strong>Separación de poderes.</strong> El <strong>Ejecutivo</strong> siempre lo llevás vos. Según el gobierno,
+        otros tres poderes son <strong>independientes</strong> (los ves en el panel de Gobierno) o los concentra quien manda:
+        el <strong>Legislativo</strong> independiente suma {{ constantes.efectosPoderes?.legislativo?.apoyoPueblo }} de apoyo del pueblo por ronda;
+        el <strong>Judiciario</strong>, {{ Math.round((1 - (constantes.efectosPoderes?.judiciario?.crisis ?? 1)) * 100) }}% menos de probabilidad de crisis;
+        y el <strong>Moderador</strong> hace que te echen recién con el apoyo bajo
+        {{ (constantes.umbralesGobierno?.expulsion ?? 25) + (constantes.efectosPoderes?.moderador?.expulsion ?? 0) }}.
+        Las repúblicas, el presidencialismo y el parlamentarismo separan más poderes; el despotismo y los gobiernos de fuerza, ninguno.
+      </p>
       <p class="aviso">
         <strong>Podés perder el poder</strong> (nunca la partida): por una crisis, por una expulsión si el apoyo de
         los líderes (o de los militares, en estratocracia y los gobiernos de fuerza: tiranía, dictadura y totalitarismo) cae por debajo de {{ constantes.umbralesGobierno?.expulsion }},

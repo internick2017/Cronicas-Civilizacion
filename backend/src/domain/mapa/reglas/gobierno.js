@@ -2,7 +2,7 @@ import {
   GOBIERNOS, FORMAS_ESTADO, GRUPOS_DE_APOYO, APOYO_INICIAL, RESPETO, ESPERANZA_DE_VIDA_TURNOS,
   PREFERENCIAS, PESO_PREFERENCIA, PESO_APOYO, ORO_A_VOTOS, UMBRAL_APROBACION, ENFRIAMIENTO_VOTO,
   ORO_POR_PUNTO_APOYO, VARIACION_APOYO_POR_RONDA, BAJADA_APOYO_POR_RONDA, PISO_APOYO_POR_TERRITORIO,
-  RECUPERACION_APOYO_SIN_PODER, BONO_PRODUCCION_GOBIERNO, PROBABILIDAD_CRISIS, UMBRAL_EXPULSION,
+  RECUPERACION_APOYO_SIN_PODER, BONO_PRODUCCION_GOBIERNO, PODERES_SEPARADOS, EFECTOS_PODERES, PROBABILIDAD_CRISIS, UMBRAL_EXPULSION,
   UMBRAL_REGRESO_MILITAR, UMBRAL_ELECCION, BONO_PRODUCCION_REPUBLICA, IMPUESTOS, LARGO_MAXIMO_NOMBRE_GOBIERNO,
 } from '../constantes.js';
 import { jugadorPorId, puedePagar, LIMITES_CONFIG } from '../MapGame.js';
@@ -24,6 +24,14 @@ export const formaEstadoDe = (jugador) =>
   (FORMAS_ESTADO.includes(jugador?.formaEstado) ? jugador.formaEstado : 'unitario');
 
 export const estaEnPoder = (jugador) => jugador?.enPoder !== false;
+
+// Los poderes que el gobierno del jugador mantiene independientes (constantes.js).
+export const poderesDe = (jugador) => PODERES_SEPARADOS[gobiernoDe(jugador)] ?? [];
+const tienePoder = (jugador, poder) => poderesDe(jugador).includes(poder);
+
+// Con un Moderador independiente cuesta mas echarte.
+const umbralExpulsion = (jugador) =>
+  UMBRAL_EXPULSION + (tienePoder(jugador, 'moderador') ? EFECTOS_PODERES.moderador.expulsion : 0);
 
 export const impuestosDe = (jugador) =>
   (Object.hasOwn(IMPUESTOS, jugador?.impuestos) ? jugador.impuestos : 'normales');
@@ -208,7 +216,8 @@ const gobiernoDeFuerza = (jugador) => grupoQueExpulsa(jugador) === 'militares';
 
 // Cuanto mas desprotegido el grupo mas flojo, mas probable la crisis.
 const probabilidadDeCrisis = (jugador) =>
-  PROBABILIDAD_CRISIS * (1 - Math.min(...GRUPOS_DE_APOYO.map(g => apoyoEfectivo(jugador, g))) / 100);
+  PROBABILIDAD_CRISIS * (1 - Math.min(...GRUPOS_DE_APOYO.map(g => apoyoEfectivo(jugador, g))) / 100)
+    * (tienePoder(jugador, 'judiciario') ? EFECTOS_PODERES.judiciario.crisis : 1);
 
 // Una pasada por ronda para cada jugador HUMANO activo (los bots quedan fuera:
 // no tienen gobierno que perder). Puro: el azar viene por parametro. Devuelve
@@ -246,7 +255,8 @@ export function cerrarRondaGobierno(estado, rng) {
     }
     // Un problema de pobreza activo (Estado federal) erosiona el apoyo del pueblo,
     // y los impuestos lo suben (bajos) o lo bajan (altos).
-    apoyo.pueblo = acotar(apoyo.pueblo - caidaApoyoPueblo(jugador) + IMPUESTOS[impuestosDe(jugador)].apoyoPueblo);
+    apoyo.pueblo = acotar(apoyo.pueblo - caidaApoyoPueblo(jugador) + IMPUESTOS[impuestosDe(jugador)].apoyoPueblo
+      + (tienePoder(jugador, 'legislativo') ? EFECTOS_PODERES.legislativo.apoyoPueblo : 0));
     if (GRUPOS_DE_APOYO.some(g => apoyo[g] !== apoyoAntes[g])) {
       eventos.push(evento('ApoyoActualizado', estado, jugador.id, { apoyo }));
     }
@@ -259,7 +269,7 @@ export function cerrarRondaGobierno(estado, rng) {
     if (estaEnPoder(j)) {
       if (gobierno === 'despotismo') continue; // el despota no se pierde
       let motivo = null;
-      if (apoyoEfectivo(j, grupoQueExpulsa(j)) < UMBRAL_EXPULSION) motivo = 'expulsion';
+      if (apoyoEfectivo(j, grupoQueExpulsa(j)) < umbralExpulsion(j)) motivo = 'expulsion';
       else if (haceElecciones && apoyoDelElectorado(j) < UMBRAL_ELECCION) motivo = 'eleccion';
       else if (gobierno === 'monarquia' && rng() < probabilidadSucesion()) motivo = 'sucesion';
       else if (rng() < probabilidadDeCrisis(j)) motivo = 'crisis';

@@ -597,6 +597,29 @@ export const GOBIERNOS = {
   republica_directa: { nombre: 'República directa', electorado: 'pueblo' },
 };
 export const FORMAS_ESTADO = ['unitario', 'federal'];
+
+// Separacion de poderes. El Ejecutivo siempre es del jugador. Los otros tres son
+// independientes (o no) segun el gobierno: donde no estan en la lista, los
+// concentra quien manda y no dan nada. Los numeros son AJUSTABLES, como los demas.
+export const PODERES = ['legislativo', 'judiciario', 'moderador'];
+export const EFECTOS_PODERES = {
+  legislativo: { apoyoPueblo: 1 },   // puntos de apoyo del pueblo por ronda: se siente representado
+  judiciario: { crisis: 0.5 },       // multiplica la probabilidad de crisis: menos corrupcion
+  moderador: { expulsion: -10 },     // baja el umbral de expulsion: arbitra y frena las caidas
+};
+export const PODERES_SEPARADOS = {
+  monarquia: ['moderador'],
+  teocracia: ['moderador'],
+  regencia: ['moderador'],
+  oligarquia: ['legislativo'],
+  aristocracia: ['legislativo'],
+  tecnocracia: ['judiciario'],
+  parlamentarismo: ['legislativo', 'moderador'],
+  presidencialismo: ['legislativo', 'judiciario'],
+  republica_directa: ['legislativo'],
+  republica_semidirecta: ['legislativo', 'judiciario'],
+  republica_indirecta: ['legislativo', 'judiciario', 'moderador'],
+};
 export const GRUPOS_DE_APOYO = ['pueblo', 'lideres', 'militares'];
 
 // Un turno son 6 meses: 159 turnos son ~80 años de vida, y 1/159 es el 0,63%

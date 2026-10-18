@@ -72,7 +72,30 @@ const efectosElegido = computed(() => {
   const partes = Object.entries(bonos).map(([r, f]) => `+${Math.round(f * 100)}% de ${r === 'todo' ? 'todo' : NOMBRE_RECURSO[r] || r}`)
   const respeto = Object.entries(props.constantes.respetoGobierno?.[tipo] || {})
     .map(([g, n]) => `${n > 0 ? '+' : ''}${n} respeto de ${NOMBRE_GRUPO[g].toLowerCase()}`)
-  return [...partes, ...respeto].join(', ') || 'Sin bonos.'
+  const poderes = poderesSeparadosDe(tipo).map(p => `${NOMBRE_PODER[p]} independiente`)
+  return [...partes, ...respeto, ...poderes].join(', ') || 'Sin bonos.'
+})
+
+// --- Separacion de poderes: el Ejecutivo siempre es tuyo; los otros tres son
+// independientes o no segun el gobierno, y cada uno separado da un efecto.
+const NOMBRE_PODER = { legislativo: 'Legislativo', judiciario: 'Judiciario', moderador: 'Moderador' }
+const EXPLICACION_PODER = (poder) => {
+  const e = props.constantes.efectosPoderes?.[poder] || {}
+  if (poder === 'legislativo') return `+${e.apoyoPueblo ?? 0} de apoyo del pueblo por ronda`
+  if (poder === 'judiciario') return `${Math.round((1 - (e.crisis ?? 1)) * 100)}% menos de probabilidad de crisis`
+  return `te echan recién con el apoyo bajo ${(props.constantes.umbralesGobierno?.expulsion ?? 25) + (e.expulsion ?? 0)}`
+}
+const poderesSeparadosDe = (tipo) => props.constantes.poderesGobierno?.[tipo] || []
+const poderesDelGobierno = computed(() => {
+  const separados = poderesSeparadosDe(yo.value?.gobierno)
+  return (props.constantes.poderes || []).map(p => ({
+    poder: p, nombre: NOMBRE_PODER[p] || p, separado: separados.includes(p), efecto: EXPLICACION_PODER(p)
+  }))
+})
+const umbralExpulsionActual = computed(() => {
+  const base = props.constantes.umbralesGobierno?.expulsion ?? 25
+  return base + (poderesSeparadosDe(yo.value?.gobierno).includes('moderador')
+    ? (props.constantes.efectosPoderes?.moderador?.expulsion ?? 0) : 0)
 })
 
 const oroOfrecido = ref(0)
@@ -177,11 +200,19 @@ const ventajas = (grupo) => {
         Perdiste el poder: la máquina juega tus turnos. Podés dar ventajas para ganar apoyo y recuperarlo.
       </em>
       <em v-else-if="enPeligro" class="alerta">
-        {{ NOMBRE_GRUPO[grupoQueExpulsa] }} te miran raro: si el apoyo baja de 25 te echan.
+        {{ NOMBRE_GRUPO[grupoQueExpulsa] }} te miran raro: si el apoyo baja de {{ umbralExpulsionActual }} te echan.
       </em>
       <em v-if="enEnfriamiento && enPoder" class="aviso">
         Tu último pedido fue rechazado. Podés volver a proponer en el turno {{ bloqueadoHasta }}.
       </em>
+    </section>
+
+    <section v-if="hayGobierno && poderesDelGobierno.length">
+      <h4>Poderes</h4>
+      <small>Ejecutivo: decidís vos.</small>
+      <small v-for="p in poderesDelGobierno" :key="p.poder">
+        {{ p.nombre }}: {{ p.separado ? `independiente (${p.efecto})` : 'concentrado en quien manda' }}
+      </small>
     </section>
 
     <section v-if="hayGobierno">

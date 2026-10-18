@@ -130,6 +130,32 @@ describe('cerrarRondaGobierno: pérdida y regreso del poder', () => {
     }
   });
 
+  it('poderes: el Moderador baja el umbral de expulsión (25 a 15)', () => {
+    p1.gobierno = 'aristocracia'; // sin Moderador; respeto de líderes +15
+    p1.apoyo = { pueblo: 100, lideres: 5, militares: 100 };
+    expect(de(cerrarRondaGobierno(e, nunca), 'PoderPerdido').map(x => x.datos.motivo)).toEqual(['expulsion']);
+    p1.gobierno = 'monarquia'; // Moderador; respeto de líderes +10: 10 + 10 = 20, no cae de 15
+    p1.apoyo = { pueblo: 100, lideres: 10, militares: 100 };
+    expect(de(cerrarRondaGobierno(e, nunca), 'PoderPerdido')).toEqual([]);
+  });
+
+  it('poderes: el Legislativo da +1 de apoyo del pueblo por ronda', () => {
+    p1.apoyo = todos(50);
+    p1.gobierno = 'oligarquia';
+    expect(de(cerrarRondaGobierno(e, nunca), 'ApoyoActualizado')[0].datos.apoyo.pueblo).toBe(51);
+    p1.gobierno = 'dictadura'; // sin Legislativo
+    expect(de(cerrarRondaGobierno(e, nunca), 'ApoyoActualizado')).toEqual([]);
+  });
+
+  it('poderes: el Judiciario reduce a la mitad la probabilidad de crisis', () => {
+    const azar = () => 0.01;
+    p1.gobierno = 'dictadura'; // sin Judiciario: crisis con prob. 0,016
+    p1.apoyo = todos(30);
+    expect(de(cerrarRondaGobierno(e, azar), 'PoderPerdido').map(x => x.datos.motivo)).toEqual(['crisis']);
+    p1.gobierno = 'tecnocracia'; // Judiciario: 0,014 / 2 = 0,007
+    expect(de(cerrarRondaGobierno(e, azar), 'PoderPerdido')).toEqual([]);
+  });
+
   it('estratocracia: sin poder, recupera al llegar los militares a 70', () => {
     p1.gobierno = 'estratocracia';
     p1.enPoder = false;
