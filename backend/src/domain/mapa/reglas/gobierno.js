@@ -1,8 +1,8 @@
 import {
-  GOBIERNOS, FORMAS_ESTADO, GRUPOS_DE_APOYO, APOYO_INICIAL, RESPETO, ESPERANZA_DE_VIDA_TURNOS,
-  PREFERENCIAS, PESO_PREFERENCIA, PESO_APOYO, ORO_A_VOTOS, UMBRAL_APROBACION, ENFRIAMIENTO_VOTO,
+  FORMAS_ESTADO, GRUPOS_DE_APOYO, APOYO_INICIAL, ESPERANZA_DE_VIDA_TURNOS,
+  PESO_PREFERENCIA, PESO_APOYO, ORO_A_VOTOS, UMBRAL_APROBACION, ENFRIAMIENTO_VOTO,
   ORO_POR_PUNTO_APOYO, VARIACION_APOYO_POR_RONDA, BAJADA_APOYO_POR_RONDA, PISO_APOYO_POR_TERRITORIO,
-  RECUPERACION_APOYO_SIN_PODER, BONO_PRODUCCION_GOBIERNO, PODERES_SEPARADOS, EFECTOS_PODERES, PROBABILIDAD_CRISIS, UMBRAL_EXPULSION,
+  RECUPERACION_APOYO_SIN_PODER, EFECTOS_PODERES, PROBABILIDAD_CRISIS, UMBRAL_EXPULSION,
   UMBRAL_REGRESO_MILITAR, UMBRAL_ELECCION, BONO_PRODUCCION_REPUBLICA, IMPUESTOS, LARGO_MAXIMO_NOMBRE_GOBIERNO,
 } from '../constantes.js';
 import { jugadorPorId, puedePagar, LIMITES_CONFIG } from '../MapGame.js';
@@ -13,12 +13,21 @@ import { caidaApoyoPueblo } from './efectosProblemas.js';
 import { produccionPorcentualDeRaza } from './razas.js';
 import { jugadorQueNombra } from './pais.js';
 import { exigirMecanica, mecanicaActiva } from './modo.js';
+import {
+  piezasDeClave, claveDePiezas, perfilDeGobierno, preferenciaDe, validarClaveDeGobierno, GOBIERNO_POR_DEFECTO,
+} from './composicionGobierno.js';
 
 // Toda lectura de los campos de gobierno pasa por estos accesores: una partida
 // guardada antes de que existieran no los trae, y se cae al valor por defecto
 // en vez de romper (mismo criterio que tecnologiasDe / rasgosDe).
-export const gobiernoDe = (jugador) =>
-  (Object.hasOwn(GOBIERNOS, jugador?.gobierno) ? jugador.gobierno : 'despotismo');
+// La clave canonica del gobierno (una pieza o varias unidas con '+'; ver
+// composicionGobierno.js). Una guardada que ya no vale se lee como despotismo.
+export const gobiernoDe = (jugador) => {
+  const piezas = piezasDeClave(jugador?.gobierno);
+  return piezas ? claveDePiezas(piezas) : GOBIERNO_POR_DEFECTO;
+};
+const perfilDe = (jugador) => perfilDeGobierno(gobiernoDe(jugador));
+export { perfilDe as perfilGobiernoDe };
 
 export const formaEstadoDe = (jugador) =>
   (FORMAS_ESTADO.includes(jugador?.formaEstado) ? jugador.formaEstado : 'unitario');
@@ -26,7 +35,7 @@ export const formaEstadoDe = (jugador) =>
 export const estaEnPoder = (jugador) => jugador?.enPoder !== false;
 
 // Los poderes que el gobierno del jugador mantiene independientes (constantes.js).
-export const poderesDe = (jugador) => PODERES_SEPARADOS[gobiernoDe(jugador)] ?? [];
+export const poderesDe = (jugador) => perfilDe(jugador).poderes;
 const tienePoder = (jugador, poder) => poderesDe(jugador).includes(poder);
 
 // Con un Moderador independiente cuesta mas echarte.
@@ -50,7 +59,7 @@ export function apoyoDe(jugador) {
 
 // El respeto del gobierno se suma al LEER, no se guarda.
 export function apoyoEfectivo(jugador, grupo) {
-  const base = apoyoDe(jugador)[grupo] + (RESPETO[gobiernoDe(jugador)]?.[grupo] ?? 0);
+  const base = apoyoDe(jugador)[grupo] + (perfilDe(jugador).respeto[grupo] ?? 0);
   return Math.max(0, Math.min(100, base));
 }
 
@@ -71,8 +80,8 @@ function jugadorDeGobierno(estado, jugadorId) {
 
 // Los grupos que votan segun QUIEN decide en el gobierno actual. `jugador`
 // (despotismo y monarquia) no tiene votacion: manda el propio jugador.
-function gruposQueVotan(gobierno) {
-  const { electorado } = GOBIERNOS[gobierno];
+function gruposQueVotan(jugador) {
+  const { electorado } = perfilDe(jugador);
   if (electorado === 'jugador') return [];
   if (electorado === 'mixto') return ['pueblo', 'lideres'];
   return [electorado];
@@ -84,11 +93,11 @@ function gruposQueVotan(gobierno) {
 export function resultadoVotacion(estado, jugadorId, nuevoGobierno, oro = 0) {
   const jugador = jugadorDeGobierno(estado, jugadorId);
   const actual = gobiernoDe(jugador);
-  const grupos = gruposQueVotan(actual);
+  const grupos = gruposQueVotan(jugador);
   if (grupos.length === 0) return { aprobada: true, porcentaje: 100 };
 
   const porGrupo = grupos.map((grupo) => {
-    const diferencia = PREFERENCIAS[grupo][nuevoGobierno] - PREFERENCIAS[grupo][actual];
+    const diferencia = preferenciaDe(nuevoGobierno, grupo) - preferenciaDe(actual, grupo);
     const preferencia = acotar(50 + diferencia / 2);
     return acotar(PESO_APOYO * apoyoEfectivo(jugador, grupo) + PESO_PREFERENCIA * preferencia + oro * ORO_A_VOTOS);
   });
@@ -105,8 +114,8 @@ export function proponerGobierno(estado, jugadorId, { gobierno, oro = 0 }) {
   // `oro` se reasigna mas abajo; viene por destructuring, que lo permite.
   const jugador = jugadorDeGobierno(estado, jugadorId);
   if (!estaEnPoder(jugador)) throw new ReglaError('SIN_PODER', 'No tenés el poder para proponer un cambio');
-  // hasOwn y no `in`: `in` aceptaria 'toString' o 'constructor' como gobierno.
-  if (!Object.hasOwn(GOBIERNOS, gobierno)) throw new ReglaError('GOBIERNO_INVALIDO', 'Gobierno inválido');
+  // Una pieza o varias unidas con '+': existen, son de ejes distintos y no se contradicen.
+  gobierno = validarClaveDeGobierno(gobierno);
   if (gobierno === gobiernoDe(jugador)) throw new ReglaError('GOBIERNO_IGUAL', 'Ya tenés ese gobierno');
   if ((jugador.cambioBloqueadoHasta ?? 0) > estado.turno) {
     throw new ReglaError('EN_ENFRIAMIENTO', `No podés volver a proponer hasta el turno ${jugador.cambioBloqueadoHasta}`);
@@ -116,7 +125,7 @@ export function proponerGobierno(estado, jugadorId, { gobierno, oro = 0 }) {
 
   // Donde nadie vota (despotismo, monarquia) no hay votos que comprar: el oro
   // ofrecido no se gasta.
-  if (gruposQueVotan(gobiernoDe(jugador)).length === 0) oro = 0;
+  if (gruposQueVotan(jugador).length === 0) oro = 0;
 
   const eventos = [];
   if (oro > 0) eventos.push(evento('RecursosGastados', estado, jugadorId, { costo: { gold: oro } }));
@@ -150,7 +159,7 @@ export function darVentajas(estado, jugadorId, { grupo, oro }) {
   ];
 }
 
-const esRepublica = (jugador) => gobiernoDe(jugador).startsWith('republica_');
+const esRepublica = (jugador) => perfilDe(jugador).republica;
 
 // Gratis y sin turno, como el resto del gobierno; solo quien manda.
 export function fijarImpuestos(estado, jugadorId, { nivel }) {
@@ -194,24 +203,23 @@ export function nombrarGobierno(estado, jugadorId, { nombre }) {
 // redondea por turno y con valores chicos (2 de cultura por ciudad) un -25% se
 // perdia entero. Este camino arrastra el decimal al turno siguiente.
 export function multiplicadorProduccion(jugador, recurso) {
-  const gobierno = gobiernoDe(jugador);
   const republica = esRepublica(jugador) ? BONO_PRODUCCION_REPUBLICA : 0;
   const impuestos = recurso === 'gold' ? IMPUESTOS[impuestosDe(jugador)].oro : 0;
-  return 1 + republica + (BONO_PRODUCCION_GOBIERNO[gobierno]?.[recurso] ?? 0)
+  return 1 + republica + (perfilDe(jugador).bono[recurso] ?? 0)
     + produccionPorcentualDeRaza(jugador, recurso) + impuestos;
 }
 
 // Quien tiene que sostenerte en el cargo: el grupo del electorado de tu
 // gobierno (el promedio de pueblo y lideres en la semidirecta).
 function apoyoDelElectorado(jugador) {
-  const grupos = gruposQueVotan(gobiernoDe(jugador));
+  const grupos = gruposQueVotan(jugador);
   if (grupos.length === 0) return 100;
   return grupos.reduce((suma, g) => suma + apoyoEfectivo(jugador, g), 0) / grupos.length;
 }
 
 // A los lideres (o, en los gobiernos de fuerza, a los militares) les molesta que
 // los trates mal: si te ven raro, te expulsan.
-const grupoQueExpulsa = (jugador) => GOBIERNOS[gobiernoDe(jugador)].sostenidoPor ?? 'lideres';
+const grupoQueExpulsa = (jugador) => perfilDe(jugador).sostenidoPor;
 const gobiernoDeFuerza = (jugador) => grupoQueExpulsa(jugador) === 'militares';
 
 // Cuanto mas desprotegido el grupo mas flojo, mas probable la crisis.
@@ -263,28 +271,29 @@ export function cerrarRondaGobierno(estado, rng) {
     // El resto de la pasada decide con el apoyo ya actualizado, aunque el
     // evento todavia no se haya aplicado.
     const j = { ...jugador, apoyo };
-    const gobierno = gobiernoDe(j);
+    const perfil = perfilDe(j);
     const haceElecciones = esRepublica(j) && estado.turno % mandatoDe(estado, j) === 0;
 
     if (estaEnPoder(j)) {
-      if (gobierno === 'despotismo') continue; // el despota no se pierde
+      if (perfil.inmortal) continue; // el despota no se pierde
       let motivo = null;
       if (apoyoEfectivo(j, grupoQueExpulsa(j)) < umbralExpulsion(j)) motivo = 'expulsion';
       else if (haceElecciones && apoyoDelElectorado(j) < UMBRAL_ELECCION) motivo = 'eleccion';
-      else if (gobierno === 'monarquia' && rng() < probabilidadSucesion()) motivo = 'sucesion';
+      else if (perfil.monarquia && rng() < probabilidadSucesion()) motivo = 'sucesion';
       else if (rng() < probabilidadDeCrisis(j)) motivo = 'crisis';
       if (motivo) eventos.push(evento('PoderPerdido', estado, jugador.id, { motivo }));
     } else {
       let motivo = null;
-      if (gobierno === 'despotismo') motivo = 'regreso';
-      else if (gobierno === 'monarquia') motivo = rng() < probabilidadSucesion() ? 'sucesion' : null;
+      if (perfil.inmortal) motivo = 'regreso';
       else if (gobiernoDeFuerza(j)) motivo = apoyoEfectivo(j, 'militares') >= UMBRAL_REGRESO_MILITAR ? 'apoyo' : null;
-      else if (!esRepublica(j)) {
+      else if (perfil.republica) {
+        if (haceElecciones) motivo = apoyoDelElectorado(j) >= UMBRAL_ELECCION ? 'eleccion' : null;
+      } else if (perfil.monarquia) motivo = rng() < probabilidadSucesion() ? 'sucesion' : null;
+      else {
         // Donde no vota nadie (electorado 100) vuelve cuando el grupo que lo sostiene lo respalda.
-        const respaldo = GOBIERNOS[gobierno].electorado === 'jugador' ? apoyoEfectivo(j, grupoQueExpulsa(j)) : apoyoDelElectorado(j);
+        const respaldo = perfil.electorado === 'jugador' ? apoyoEfectivo(j, grupoQueExpulsa(j)) : apoyoDelElectorado(j);
         motivo = respaldo >= UMBRAL_ELECCION ? 'apoyo' : null;
       }
-      else if (haceElecciones) motivo = apoyoDelElectorado(j) >= UMBRAL_ELECCION ? 'eleccion' : null;
       if (motivo) eventos.push(evento('PoderRecuperado', estado, jugador.id, { motivo }));
     }
   }

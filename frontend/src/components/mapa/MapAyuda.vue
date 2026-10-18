@@ -373,6 +373,15 @@ const umbralAviso = computed(() =>
         Empezás en despotismo (mandás vos). Cambiar de gobierno no cuesta nada, pero hay que
         <strong>ganar la votación</strong> del gobierno en el que estás.
       </p>
+      <p>
+        Un gobierno <strong>combina</strong> hasta tres piezas, una por eje: la <strong>forma de jefatura</strong>
+        (despotismo, monarquía, estratocracia, teocracia, regencia, tiranía), el <strong>sistema</strong>
+        (parlamentarismo, presidencialismo, absolutismo, tecnocracia) y el <strong>régimen</strong> (las tres democracias,
+        oligarquía, aristocracia, autoritarismo, dictadura, totalitarismo). Por ejemplo, <em>Monarquía + Parlamentarismo +
+        Democracia representativa</em> es una monarquía constitucional. Los bonos, el respeto y los poderes de las piezas se
+        <strong>suman</strong>; solo las que se contradicen (como una democracia con un despotismo, o el presidencialismo con
+        una monarquía) no se pueden juntar. La tabla describe cada pieza.
+      </p>
       <table>
         <thead>
           <tr><th>Gobierno</th><th>Quién aprueba un cambio</th><th>Qué te da</th></tr>
@@ -457,17 +466,17 @@ const umbralAviso = computed(() =>
             <td>{{ listaBono(bonosGobierno.totalitarismo) }} y mucho respeto del ejército, pero el pueblo y los líderes te temen y te quieren mucho menos. Se sostiene por la fuerza.</td>
           </tr>
           <tr>
-            <td>República representativa</td>
+            <td>Democracia representativa</td>
             <td>La mitad de los líderes</td>
             <td>+{{ pct(constantes.bonoProduccionRepublica) }} de producción en todo: los líderes elegidos mejoran el país.</td>
           </tr>
           <tr>
-            <td>República semidirecta</td>
+            <td>Democracia semidirecta</td>
             <td>Pueblo (50%) y líderes (50%)</td>
             <td>El mismo bono; las decisiones pesan por mitades.</td>
           </tr>
           <tr>
-            <td>República directa</td>
+            <td>Democracia directa</td>
             <td>La mitad del pueblo</td>
             <td>El mismo bono; decide la población.</td>
           </tr>

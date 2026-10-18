@@ -1,6 +1,6 @@
 <!-- frontend/src/components/mapa/MapGobiernoPanel.vue -->
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import MapSubdivisiones from './MapSubdivisiones.vue'
 import MapProblemas from './MapProblemas.vue'
 
@@ -26,53 +26,79 @@ const grupos = computed(() => props.constantes.gruposDeApoyo || [])
 const oroPorPunto = computed(() => props.constantes.oroPorPuntoApoyo || 5)
 const oroDisponible = computed(() => yo.value?.recursos?.gold ?? 0)
 const nombreGobierno = (tipo) => gobiernos.value.find(g => g.tipo === tipo)?.nombre || tipo
-const electoradoActual = computed(
-  () => gobiernos.value.find(g => g.tipo === yo.value?.gobierno)?.electorado || 'jugador'
-)
+// El gobierno actual puede ser una combinacion ('monarquia+parlamentarismo'): se nombra pieza por pieza.
+const nombreCompuesto = (clave) => (clave || '').split('+').filter(Boolean).map(nombreGobierno).join(' + ')
+const electoradoActual = computed(() => perfil.value.electorado || 'jugador')
 
 const hayVotacion = computed(() => electoradoActual.value !== 'jugador')
 const enPoder = computed(() => yo.value?.enPoder !== false)
 const bloqueadoHasta = computed(() => yo.value?.cambioBloqueadoHasta ?? 0)
 const enEnfriamiento = computed(() => bloqueadoHasta.value > props.vista.turno)
 
-// Los grupos que pueden echarte: avisa ANTES de que ocurra.
-const grupoQueExpulsa = computed(() => (gobiernos.value.find(g => g.tipo === yo.value?.gobierno)?.sostenidoPor || 'lideres'))
+// Lo que importa del gobierno actual lo calcula el servidor (perfilGobierno) mezclando
+// todas sus piezas: aca solo se lee.
+const perfil = computed(() => yo.value?.perfilGobierno || {})
+const grupoQueExpulsa = computed(() => perfil.value.sostenidoPor || 'lideres')
 const apoyoQueExpulsa = computed(() => yo.value?.apoyo?.[grupoQueExpulsa.value] ?? 100)
 const enPeligro = computed(
-  () => enPoder.value && yo.value?.gobierno !== 'despotismo' && apoyoQueExpulsa.value < 40
+  () => enPoder.value && !perfil.value.inmortal && apoyoQueExpulsa.value < 40
 )
 
-// El selector agrupa los gobiernos por familia: son demasiados para una lista plana.
-const FAMILIAS = [
-  { titulo: 'Un solo mando', tipos: ['despotismo', 'monarquia', 'absolutismo', 'autoritarismo', 'regencia'] },
-  { titulo: 'Por la fuerza', tipos: ['estratocracia', 'tirania', 'dictadura', 'totalitarismo'] },
-  { titulo: 'De una élite', tipos: ['teocracia', 'oligarquia', 'aristocracia', 'tecnocracia', 'parlamentarismo'] },
-  { titulo: 'Con elecciones', tipos: ['presidencialismo', 'republica_indirecta', 'republica_semidirecta', 'republica_directa'] }
-]
-const categorias = computed(() => {
-  const disponibles = gobiernos.value.filter(x => x.tipo !== yo.value?.gobierno)
-  const cats = FAMILIAS.map(f => ({
-    titulo: f.titulo, gobiernos: disponibles.filter(g => f.tipos.includes(g.tipo))
-  }))
-  // Un gobierno que el servidor agregue y esta lista no conozca igual se puede elegir.
-  const conocidos = FAMILIAS.flatMap(f => f.tipos)
-  const otros = disponibles.filter(g => !conocidos.includes(g.tipo))
-  if (otros.length) cats.push({ titulo: 'Otros', gobiernos: otros })
-  return cats.filter(c => c.gobiernos.length)
+// --- Gobierno combinable: una pieza por eje (Forma, Sistema, Regimen) o ninguna.
+// Las piezas que se contradicen no se pueden elegir juntas (el servidor tambien lo valida).
+const NOMBRE_EJE = { forma: 'Forma de jefatura', sistema: 'Sistema', regimen: 'Régimen' }
+const ejes = computed(() => Object.entries(props.constantes.ejesGobierno || {}).map(([eje, piezas]) => ({
+  eje, nombre: NOMBRE_EJE[eje] || eje, piezas
+})))
+const piezasActuales = () => (yo.value?.gobierno || '').split('+').filter(Boolean)
+// Arranca en el gobierno actual: se cambia lo que se quiera de el.
+const elegidas = ref({})
+const iniciarElegidas = () => {
+  const actuales = piezasActuales()
+  elegidas.value = Object.fromEntries(ejes.value.map(({ eje, piezas }) => [eje, piezas.find(p => actuales.includes(p)) || '']))
+}
+iniciarElegidas()
+watch(() => yo.value?.gobierno, iniciarElegidas)
+
+const piezasElegidas = computed(() => ejes.value.map(({ eje }) => elegidas.value[eje]).filter(Boolean))
+const claveElegida = computed(() => piezasElegidas.value.join('+'))
+const incompatibles = computed(() => props.constantes.gobiernosIncompatibles || [])
+// La pieza choca con alguna de las ya elegidas en OTRO eje.
+const choca = (pieza, eje) => piezasElegidas.value.some(
+  o => o !== elegidas.value[eje] && incompatibles.value.some(([a, b]) => (a === pieza && b === o) || (b === pieza && a === o)))
+const contradiccion = computed(() => {
+  const p = piezasElegidas.value
+  const par = incompatibles.value.find(([a, b]) => p.includes(a) && p.includes(b))
+  return par ? `${nombreGobierno(par[0])} y ${nombreGobierno(par[1])} se contradicen` : null
 })
-const elegido = ref('')
-const detalleElegido = computed(() => gobiernos.value.find(g => g.tipo === elegido.value) || null)
+const nombreElegido = computed(() => piezasElegidas.value.map(nombreGobierno).join(' + '))
+const esElActual = computed(() => claveElegida.value === (yo.value?.gobierno || ''))
+const electoradoElegido = computed(() => {
+  const orden = [...ejes.value].reverse() // regimen, sistema, forma
+  for (const { eje } of orden) {
+    const e = gobiernos.value.find(g => g.tipo === elegidas.value[eje])?.electorado
+    if (e && e !== 'jugador') return e
+  }
+  return 'jugador'
+})
+
 const NOMBRE_RECURSO = { food: 'comida', gold: 'oro', wood: 'madera', stone: 'piedra', science: 'ciencia', culture: 'cultura' }
+const sumarPorPieza = (tabla) => piezasElegidas.value.reduce((acc, p) => {
+  for (const [k, v] of Object.entries(tabla?.[p] || {})) acc[k] = (acc[k] ?? 0) + v
+  return acc
+}, {})
 const efectosElegido = computed(() => {
-  const tipo = elegido.value
-  if (!tipo) return ''
-  const bonos = tipo.startsWith('republica_')
-    ? { todo: props.constantes.bonoProduccionRepublica || 0 }
-    : (props.constantes.bonosProduccionGobierno?.[tipo] || {})
+  if (!piezasElegidas.value.length) return ''
+  const bonos = sumarPorPieza(props.constantes.bonosProduccionGobierno)
+  if (piezasElegidas.value.some(p => p.startsWith('republica_'))) {
+    bonos.todo = (bonos.todo ?? 0) + (props.constantes.bonoProduccionRepublica || 0)
+  }
   const partes = Object.entries(bonos).map(([r, f]) => `+${Math.round(f * 100)}% de ${r === 'todo' ? 'todo' : NOMBRE_RECURSO[r] || r}`)
-  const respeto = Object.entries(props.constantes.respetoGobierno?.[tipo] || {})
+  const respeto = Object.entries(sumarPorPieza(props.constantes.respetoGobierno))
+    .filter(([, n]) => n !== 0)
     .map(([g, n]) => `${n > 0 ? '+' : ''}${n} respeto de ${NOMBRE_GRUPO[g].toLowerCase()}`)
-  const poderes = poderesSeparadosDe(tipo).map(p => `${NOMBRE_PODER[p]} independiente`)
+  const poderes = [...new Set(piezasElegidas.value.flatMap(p => poderesSeparadosDe(p)))]
+    .map(p => `${NOMBRE_PODER[p]} independiente`)
   return [...partes, ...respeto, ...poderes].join(', ') || 'Sin bonos.'
 })
 
@@ -87,14 +113,14 @@ const EXPLICACION_PODER = (poder) => {
 }
 const poderesSeparadosDe = (tipo) => props.constantes.poderesGobierno?.[tipo] || []
 const poderesDelGobierno = computed(() => {
-  const separados = poderesSeparadosDe(yo.value?.gobierno)
+  const separados = perfil.value.poderes || []
   return (props.constantes.poderes || []).map(p => ({
     poder: p, nombre: NOMBRE_PODER[p] || p, separado: separados.includes(p), efecto: EXPLICACION_PODER(p)
   }))
 })
 const umbralExpulsionActual = computed(() => {
   const base = props.constantes.umbralesGobierno?.expulsion ?? 25
-  return base + (poderesSeparadosDe(yo.value?.gobierno).includes('moderador')
+  return base + ((perfil.value.poderes || []).includes('moderador')
     ? (props.constantes.efectosPoderes?.moderador?.expulsion ?? 0) : 0)
 })
 
@@ -112,7 +138,7 @@ const motivoVentajas = computed(() =>
 )
 
 // --- Nombre propio, impuestos y mandato ---
-const nombreDelGobierno = computed(() => yo.value?.nombreGobierno || nombreGobierno(yo.value?.gobierno))
+const nombreDelGobierno = computed(() => yo.value?.nombreGobierno || nombreCompuesto(yo.value?.gobierno))
 const largoNombreGobierno = computed(() => props.constantes.largoNombreGobierno || 40)
 const nombreGobiernoNuevo = ref(yo.value?.nombreGobierno ?? '')
 // Vacio vuelve al nombre del tipo de gobierno.
@@ -127,7 +153,7 @@ const efectoImpuestos = (nivel) => {
   return `${signo(Math.round(oro * 100))}% de oro, ${signo(apoyoPueblo)} de apoyo del pueblo por ronda`
 }
 
-const esRepublica = computed(() => (yo.value?.gobierno || '').startsWith('republica_'))
+const esRepublica = computed(() => perfil.value.republica === true)
 const limitesMandato = computed(() => props.constantes.limitesMandato || { min: 2, max: 50 })
 const mandatoNuevo = ref(yo.value?.mandato ?? 8)
 const motivoMandato = computed(() => {
@@ -184,7 +210,7 @@ const ventajas = (grupo) => {
     <section v-if="hayGobierno">
       <h4>Gobierno actual</h4>
       <p class="actual">{{ nombreDelGobierno }}</p>
-      <small v-if="yo.nombreGobierno">{{ nombreGobierno(yo.gobierno) }}</small>
+      <small v-if="yo.nombreGobierno">{{ nombreCompuesto(yo.gobierno) }}</small>
       <div class="fila-botones">
         <input
           v-model="nombreGobiernoNuevo"
@@ -249,19 +275,30 @@ const ventajas = (grupo) => {
         <input v-model.number="oroOfrecido" class="entrada-oro" type="number" min="0" step="5">
       </template>
       <small v-else>Decidís vos: no hay votación ni oro que ofrecer.</small>
-      <select v-model="elegido" class="selector-gobierno">
-        <option value="" disabled>Elegí un gobierno…</option>
-        <optgroup v-for="cat in categorias" :key="cat.titulo" :label="cat.titulo">
-          <option v-for="g in cat.gobiernos" :key="g.tipo" :value="g.tipo">{{ g.nombre }}</option>
-        </optgroup>
-      </select>
-      <div v-if="detalleElegido" class="detalle-gobierno">
-        <small>Para cambiarlo después: {{ QUIEN_APRUEBA[detalleElegido.electorado] }}.</small>
+      <small>Un gobierno combina una pieza de cada eje; las que se contradicen no se pueden juntar.</small>
+      <label v-for="e in ejes" :key="e.eje" class="eje-gobierno">
+        <span>{{ e.nombre }}</span>
+        <select v-model="elegidas[e.eje]" class="selector-gobierno">
+          <option value="">Ninguna</option>
+          <option v-for="p in e.piezas" :key="p" :value="p" :disabled="choca(p, e.eje)">
+            {{ nombreGobierno(p) }}{{ choca(p, e.eje) ? ' (se contradice)' : '' }}
+          </option>
+        </select>
+      </label>
+      <div v-if="piezasElegidas.length" class="detalle-gobierno">
+        <strong>{{ nombreElegido }}</strong>
+        <small>Para cambiarlo después: {{ QUIEN_APRUEBA[electoradoElegido] }}.</small>
         <small>{{ efectosElegido }}</small>
       </div>
-      <button class="btn-secundario" :disabled="motivoProponer !== null || !elegido" @click="proponer(elegido)">
-        <strong>Proponer {{ detalleElegido?.nombre || '' }}</strong>
+      <button
+        class="btn-secundario"
+        :disabled="motivoProponer !== null || !piezasElegidas.length || esElActual || contradiccion !== null"
+        @click="proponer(claveElegida)"
+      >
+        <strong>Proponer {{ nombreElegido }}</strong>
       </button>
+      <em v-if="contradiccion">{{ contradiccion }}</em>
+      <em v-else-if="esElActual && piezasElegidas.length">es tu gobierno actual</em>
       <em v-if="motivoProponer">{{ motivoProponer }}</em>
     </section>
 
@@ -382,6 +419,7 @@ section { display: flex; flex-direction: column; gap: 0.35rem; }
   background: rgba(255, 255, 255, 0.1); color: inherit; font: inherit;
 }
 .selector-gobierno option, .selector-gobierno optgroup { color: #111; }
+.eje-gobierno { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; }
 .detalle-gobierno { display: flex; flex-direction: column; gap: 0.15rem; }
 .fila-botones { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .entrada-oro {

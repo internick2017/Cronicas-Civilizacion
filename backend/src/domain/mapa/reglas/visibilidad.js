@@ -9,7 +9,7 @@ import { problemasParaLaVista, senalesDe } from './problemas.js';
 import { multiplicadorCostos } from './efectosProblemas.js';
 import { reglasDelModo } from './modo.js';
 import {
-  gobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo, impuestosDe, mandatoDe, nombreGobiernoDe,
+  gobiernoDe, perfilGobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo, impuestosDe, mandatoDe, nombreGobiernoDe,
 } from './gobierno.js';
 import { capitalDe } from './capital.js';
 import { cargosDe } from './cargos.js';
@@ -76,6 +76,8 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       // mapa oculto tiene tomado el rival.
       dominacion: dominacionParaLaVista(estado, jugador.id),
       gobierno: gobiernoDe(jugador),
+      perfilGobierno: (({ electorado, sostenidoPor, poderes, republica, inmortal }) =>
+        ({ electorado, sostenidoPor, poderes, republica, inmortal }))(perfilGobiernoDe(jugador)),
       nombreGobierno: nombreGobiernoDe(jugador),
       formaEstado: formaEstadoDe(jugador),
       enPoder: estaEnPoder(jugador),

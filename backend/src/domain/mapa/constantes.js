@@ -592,11 +592,33 @@ export const GOBIERNOS = {
   autoritarismo: { nombre: 'Autoritarismo', electorado: 'jugador' },
   regencia: { nombre: 'Regencia', electorado: 'lideres' },
   totalitarismo: { nombre: 'Totalitarismo', electorado: 'jugador', sostenidoPor: 'militares' },
-  republica_indirecta: { nombre: 'República representativa', electorado: 'lideres' },
-  republica_semidirecta: { nombre: 'República semidirecta', electorado: 'mixto' },
-  republica_directa: { nombre: 'República directa', electorado: 'pueblo' },
+  republica_indirecta: { nombre: 'Democracia representativa', electorado: 'lideres' },
+  republica_semidirecta: { nombre: 'Democracia semidirecta', electorado: 'mixto' },
+  republica_directa: { nombre: 'Democracia directa', electorado: 'pueblo' },
 };
 export const FORMAS_ESTADO = ['unitario', 'federal'];
+
+// Un gobierno combina UNA pieza por eje (o ninguna en un eje): quien encabeza el
+// Estado, como se ejerce el gobierno y que tan abierto es el regimen. Cada pieza
+// es una entrada de GOBIERNOS (y de RESPETO, PREFERENCIAS, etc.); los efectos de
+// las que se combinan se suman (ver reglas/composicionGobierno.js).
+export const EJES_GOBIERNO = {
+  forma: ['despotismo', 'monarquia', 'estratocracia', 'teocracia', 'regencia', 'tirania'],
+  sistema: ['parlamentarismo', 'presidencialismo', 'absolutismo', 'tecnocracia'],
+  regimen: [
+    'republica_directa', 'republica_semidirecta', 'republica_indirecta', 'oligarquia', 'aristocracia',
+    'autoritarismo', 'dictadura', 'totalitarismo',
+  ],
+};
+const DEMOCRACIAS = ['republica_directa', 'republica_semidirecta', 'republica_indirecta'];
+const FORMAS_DE_FUERZA = ['despotismo', 'estratocracia', 'tirania'];
+const cruzar = (as, bs) => as.flatMap(a => bs.map(b => [a, b]));
+// Parejas que NO pueden ir juntas (el resto se combina libremente).
+export const INCOMPATIBLES = [
+  ...cruzar(DEMOCRACIAS, [...FORMAS_DE_FUERZA, 'teocracia', 'absolutismo']),
+  ...cruzar(['parlamentarismo'], [...FORMAS_DE_FUERZA, 'autoritarismo', 'dictadura', 'totalitarismo']),
+  ...cruzar(['presidencialismo'], ['monarquia', 'regencia', 'teocracia', ...FORMAS_DE_FUERZA, 'dictadura', 'totalitarismo']),
+];
 
 // Separacion de poderes. El Ejecutivo siempre es del jugador. Los otros tres son
 // independientes (o no) segun el gobierno: donde no estan en la lista, los
