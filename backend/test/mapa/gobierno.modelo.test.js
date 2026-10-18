@@ -33,11 +33,11 @@ describe('modelo de gobierno', () => {
     expect(probabilidadSucesion(100)).toBeCloseTo(0.01, 6);
   });
 
-  it('GOBIERNOS tiene exactamente los once gobiernos', () => {
+  it('GOBIERNOS tiene exactamente los dieciocho gobiernos', () => {
     expect(Object.keys(GOBIERNOS).sort()).toEqual([
-      'aristocracia', 'despotismo', 'estratocracia', 'monarquia', 'oligarquia',
+      'absolutismo', 'aristocracia', 'autoritarismo', 'despotismo', 'ditadura', 'estratocracia', 'monarquia', 'oligarquia', 'parlamentarismo', 'presidencialismo', 'regencia',
       'republica_directa', 'republica_indirecta', 'republica_semidirecta',
-      'tecnocracia', 'teocracia', 'tirania',
+      'tecnocracia', 'teocracia', 'tirania', 'totalitarismo',
     ]);
   });
 

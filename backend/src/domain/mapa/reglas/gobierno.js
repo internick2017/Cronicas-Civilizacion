@@ -201,10 +201,10 @@ function apoyoDelElectorado(jugador) {
   return grupos.reduce((suma, g) => suma + apoyoEfectivo(jugador, g), 0) / grupos.length;
 }
 
-// A los lideres (o, en la estratocracia y la tirania, a los militares) les molesta que
+// A los lideres (o, en los gobiernos de fuerza, a los militares) les molesta que
 // los trates mal: si te ven raro, te expulsan.
-const gobiernoDeFuerza = (jugador) => ['estratocracia', 'tirania'].includes(gobiernoDe(jugador));
-const grupoQueExpulsa = (jugador) => (gobiernoDeFuerza(jugador) ? 'militares' : 'lideres');
+const grupoQueExpulsa = (jugador) => GOBIERNOS[gobiernoDe(jugador)].sostenidoPor ?? 'lideres';
+const gobiernoDeFuerza = (jugador) => grupoQueExpulsa(jugador) === 'militares';
 
 // Cuanto mas desprotegido el grupo mas flojo, mas probable la crisis.
 const probabilidadDeCrisis = (jugador) =>
@@ -269,7 +269,11 @@ export function cerrarRondaGobierno(estado, rng) {
       if (gobierno === 'despotismo') motivo = 'regreso';
       else if (gobierno === 'monarquia') motivo = rng() < probabilidadSucesion() ? 'sucesion' : null;
       else if (gobiernoDeFuerza(j)) motivo = apoyoEfectivo(j, 'militares') >= UMBRAL_REGRESO_MILITAR ? 'apoyo' : null;
-      else if (!esRepublica(j)) motivo = apoyoDelElectorado(j) >= UMBRAL_ELECCION ? 'apoyo' : null;
+      else if (!esRepublica(j)) {
+        // Donde no vota nadie (electorado 100) vuelve cuando el grupo que lo sostiene lo respalda.
+        const respaldo = GOBIERNOS[gobierno].electorado === 'jugador' ? apoyoEfectivo(j, grupoQueExpulsa(j)) : apoyoDelElectorado(j);
+        motivo = respaldo >= UMBRAL_ELECCION ? 'apoyo' : null;
+      }
       else if (haceElecciones) motivo = apoyoDelElectorado(j) >= UMBRAL_ELECCION ? 'eleccion' : null;
       if (motivo) eventos.push(evento('PoderRecuperado', estado, jugador.id, { motivo }));
     }

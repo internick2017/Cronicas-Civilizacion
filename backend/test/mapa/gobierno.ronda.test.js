@@ -112,6 +112,24 @@ describe('cerrarRondaGobierno: pérdida y regreso del poder', () => {
     expect(de(cerrarRondaGobierno(e, nunca), 'PoderRecuperado').map(x => x.datos.motivo)).toEqual(['apoyo']);
   });
 
+  it('absolutismo/autoritarismo: los echan los líderes y vuelven con su apoyo; dictadura/totalitarismo: los militares', () => {
+    for (const g of ['absolutismo', 'autoritarismo']) {
+      p1.gobierno = g;
+      p1.apoyo = { pueblo: 100, lideres: 5, militares: 100 };
+      expect(de(cerrarRondaGobierno(e, nunca), 'PoderPerdido').map(x => x.datos.motivo)).toEqual(['expulsion']);
+      p1.enPoder = false;
+      expect(de(cerrarRondaGobierno(e, nunca), 'PoderRecuperado')).toEqual([]);
+      p1.apoyo = { pueblo: 0, lideres: 60, militares: 0 };
+      expect(de(cerrarRondaGobierno(e, nunca), 'PoderRecuperado').map(x => x.datos.motivo)).toEqual(['apoyo']);
+      p1.enPoder = true;
+    }
+    for (const g of ['ditadura', 'totalitarismo']) {
+      p1.gobierno = g;
+      p1.apoyo = { pueblo: 100, lideres: 100, militares: 5 };
+      expect(de(cerrarRondaGobierno(e, nunca), 'PoderPerdido').map(x => x.datos.motivo)).toEqual(['expulsion']);
+    }
+  });
+
   it('estratocracia: sin poder, recupera al llegar los militares a 70', () => {
     p1.gobierno = 'estratocracia';
     p1.enPoder = false;

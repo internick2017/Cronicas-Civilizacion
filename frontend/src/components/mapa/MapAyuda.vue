@@ -422,6 +422,41 @@ const umbralAviso = computed(() =>
             <td>{{ listaBono(bonosGobierno.tirania) }} y más respeto del ejército, pero el pueblo te odia (menos respeto). Si los militares te abandonan te echan, y para volver necesitás su apoyo de {{ constantes.umbralesGobierno?.regresoMilitar }}.</td>
           </tr>
           <tr>
+            <td>Parlamentarismo</td>
+            <td>La mitad de los líderes (el parlamento)</td>
+            <td>{{ listaBono(bonosGobierno.parlamentarismo) }} y más respeto de los líderes.</td>
+          </tr>
+          <tr>
+            <td>Presidencialismo</td>
+            <td>La mitad del pueblo</td>
+            <td>{{ listaBono(bonosGobierno.presidencialismo) }} y más respeto del pueblo.</td>
+          </tr>
+          <tr>
+            <td>Dictadura</td>
+            <td>Vos</td>
+            <td>{{ listaBono(bonosGobierno.ditadura) }} y más respeto del ejército, pero el pueblo te quiere menos. Se sostiene por la fuerza: te echan los militares.</td>
+          </tr>
+          <tr>
+            <td>Absolutismo</td>
+            <td>Vos</td>
+            <td>{{ listaBono(bonosGobierno.absolutismo) }} y más respeto de pueblo y líderes.</td>
+          </tr>
+          <tr>
+            <td>Autoritarismo</td>
+            <td>Vos</td>
+            <td>{{ listaBono(bonosGobierno.autoritarismo) }} con algo menos de respeto del pueblo.</td>
+          </tr>
+          <tr>
+            <td>Regencia</td>
+            <td>La mitad de los líderes</td>
+            <td>{{ listaBono(bonosGobierno.regencia) }} y algo más de respeto de los líderes: un gobierno de transición.</td>
+          </tr>
+          <tr>
+            <td>Totalitarismo</td>
+            <td>Vos</td>
+            <td>{{ listaBono(bonosGobierno.totalitarismo) }} y mucho respeto del ejército, pero el pueblo y los líderes te temen y te quieren mucho menos. Se sostiene por la fuerza.</td>
+          </tr>
+          <tr>
             <td>República representativa</td>
             <td>La mitad de los líderes</td>
             <td>+{{ pct(constantes.bonoProduccionRepublica) }} de producción en todo: los líderes elegidos mejoran el país.</td>
@@ -454,7 +489,7 @@ const umbralAviso = computed(() =>
       </p>
       <p class="aviso">
         <strong>Podés perder el poder</strong> (nunca la partida): por una crisis, por una expulsión si el apoyo de
-        los líderes (o de los militares, en estratocracia y tiranía) cae por debajo de {{ constantes.umbralesGobierno?.expulsion }},
+        los líderes (o de los militares, en estratocracia y los gobiernos de fuerza: tiranía, dictadura y totalitarismo) cae por debajo de {{ constantes.umbralesGobierno?.expulsion }},
         por sucesión en la monarquía, o en las elecciones de las repúblicas, que son cada {{ rondasElecciones }} rondas
         salvo que fijes otro mandato.
         Sin poder, <strong>la máquina juega tus turnos</strong> y el botón pasa a "Esperar". Mientras tanto

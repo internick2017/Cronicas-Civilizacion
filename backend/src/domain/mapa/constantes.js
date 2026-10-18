@@ -574,15 +574,24 @@ export const COSTO_MEJORA_CIUDAD = (nivel) => ({ science: 15 * nivel, gold: 10 *
 // (ver docs/superpowers/specs/2026-10-11-gobierno-design.md). `electorado` es
 // quien tiene que aprobar un cambio de gobierno estando en ese gobierno:
 // `jugador` = nadie mas, `mixto` = pueblo y lideres al 50% cada uno.
+// `sostenidoPor` (por defecto los lideres) es el grupo que te echa si te abandona y
+// del que depende volver al poder; quien manda por la fuerza se apoya en `militares`.
 export const GOBIERNOS = {
   despotismo: { nombre: 'Despotismo', electorado: 'jugador' },
   monarquia: { nombre: 'Monarquía', electorado: 'jugador' },
-  estratocracia: { nombre: 'Estratocracia', electorado: 'militares' },
+  estratocracia: { nombre: 'Estratocracia', electorado: 'militares', sostenidoPor: 'militares' },
   teocracia: { nombre: 'Teocracia', electorado: 'lideres' },
   oligarquia: { nombre: 'Oligarquía', electorado: 'lideres' },
   tecnocracia: { nombre: 'Tecnocracia', electorado: 'lideres' },
   aristocracia: { nombre: 'Aristocracia', electorado: 'lideres' },
-  tirania: { nombre: 'Tiranía', electorado: 'jugador' },
+  tirania: { nombre: 'Tiranía', electorado: 'jugador', sostenidoPor: 'militares' },
+  parlamentarismo: { nombre: 'Parlamentarismo', electorado: 'lideres' },
+  presidencialismo: { nombre: 'Presidencialismo', electorado: 'pueblo' },
+  ditadura: { nombre: 'Dictadura', electorado: 'jugador', sostenidoPor: 'militares' },
+  absolutismo: { nombre: 'Absolutismo', electorado: 'jugador' },
+  autoritarismo: { nombre: 'Autoritarismo', electorado: 'jugador' },
+  regencia: { nombre: 'Regencia', electorado: 'lideres' },
+  totalitarismo: { nombre: 'Totalitarismo', electorado: 'jugador', sostenidoPor: 'militares' },
   republica_indirecta: { nombre: 'República representativa', electorado: 'lideres' },
   republica_semidirecta: { nombre: 'República semidirecta', electorado: 'mixto' },
   republica_directa: { nombre: 'República directa', electorado: 'pueblo' },
@@ -607,13 +616,20 @@ export const RESPETO = {
   oligarquia: { lideres: 10 },
   aristocracia: { lideres: 15 },
   tirania: { pueblo: -15, militares: 10 },
+  parlamentarismo: { lideres: 10 },
+  presidencialismo: { pueblo: 10 },
+  ditadura: { pueblo: -10, militares: 10 },
+  absolutismo: { pueblo: 5, lideres: 10 },
+  autoritarismo: { pueblo: -5, lideres: 5 },
+  regencia: { lideres: 5 },
+  totalitarismo: { pueblo: -20, lideres: -10, militares: 15 },
 };
 // Que tanto prefiere cada grupo cada gobierno (0 a 100). En una votacion pesa
 // la DIFERENCIA entre el propuesto y el actual.
 export const PREFERENCIAS = {
-  pueblo: { despotismo: 20, monarquia: 30, estratocracia: 25, teocracia: 40, oligarquia: 20, tecnocracia: 45, aristocracia: 35, tirania: 10, republica_indirecta: 60, republica_semidirecta: 70, republica_directa: 80 },
-  lideres: { despotismo: 40, monarquia: 70, estratocracia: 30, teocracia: 85, oligarquia: 90, tecnocracia: 70, aristocracia: 95, tirania: 20, republica_indirecta: 75, republica_semidirecta: 65, republica_directa: 25 },
-  militares: { despotismo: 50, monarquia: 55, estratocracia: 90, teocracia: 40, oligarquia: 60, tecnocracia: 35, aristocracia: 55, tirania: 85, republica_indirecta: 30, republica_semidirecta: 30, republica_directa: 30 },
+  pueblo: { despotismo: 20, monarquia: 30, estratocracia: 25, teocracia: 40, oligarquia: 20, tecnocracia: 45, aristocracia: 35, tirania: 10, parlamentarismo: 60, presidencialismo: 65, ditadura: 15, absolutismo: 25, autoritarismo: 20, regencia: 40, totalitarismo: 5, republica_indirecta: 60, republica_semidirecta: 70, republica_directa: 80 },
+  lideres: { despotismo: 40, monarquia: 70, estratocracia: 30, teocracia: 85, oligarquia: 90, tecnocracia: 70, aristocracia: 95, tirania: 20, parlamentarismo: 80, presidencialismo: 55, ditadura: 30, absolutismo: 75, autoritarismo: 50, regencia: 65, totalitarismo: 25, republica_indirecta: 75, republica_semidirecta: 65, republica_directa: 25 },
+  militares: { despotismo: 50, monarquia: 55, estratocracia: 90, teocracia: 40, oligarquia: 60, tecnocracia: 35, aristocracia: 55, tirania: 85, parlamentarismo: 30, presidencialismo: 45, ditadura: 80, absolutismo: 55, autoritarismo: 65, regencia: 40, totalitarismo: 85, republica_indirecta: 30, republica_semidirecta: 30, republica_directa: 30 },
 };
 export const PESO_PREFERENCIA = 0.6; // "principalmente" lo que prefieren
 export const PESO_APOYO = 0.4;
@@ -638,6 +654,13 @@ export const BONO_PRODUCCION_GOBIERNO = {
   tecnocracia: { science: 0.2 },
   aristocracia: { food: 0.2 },
   tirania: { gold: 0.15, wood: 0.15 },
+  parlamentarismo: { science: 0.1, culture: 0.1 },
+  presidencialismo: { gold: 0.1, food: 0.1 },
+  ditadura: { gold: 0.1, stone: 0.1 },
+  absolutismo: { gold: 0.1, culture: 0.1 },
+  autoritarismo: { gold: 0.1, food: 0.1 },
+  regencia: { culture: 0.1 },
+  totalitarismo: { gold: 0.15, food: 0.15, wood: 0.15, stone: 0.15 },
 };
 // Hasta que nivel mejora ciudades SOLA el Estado federal (el jugador puede
 // seguir subiendolas a mano): sin tope vaciaba la ciencia y el oro.
