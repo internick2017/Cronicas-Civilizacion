@@ -18,6 +18,8 @@ const ATAJOS = [
   { valor: 60, etiqueta: 'Gigante' },
 ]
 
+const AVISO_DESDE = 36
+
 const casillas = computed(() => (tamano.value * tamano.value).toLocaleString('es'))
 
 // Al escribir se acepta cualquier cosa; al salir del campo se corrige al rango.
@@ -50,6 +52,11 @@ const fijar = (crudo) => {
       />
     </div>
     <p class="tamano-resumen">{{ tamano }}×{{ tamano }} = {{ casillas }} casillas ({{ min }} a {{ max }})</p>
+    <!-- Medido con maquinas dificiles (300 rondas): en 36 terminó 1 de 2 partidas y en 60 ninguna. -->
+    <p v-if="tamano >= AVISO_DESDE" class="tamano-aviso">
+      Mapa grande: la partida puede durar cientos de rondas. Conviene bajar el
+      territorio para ganar o poner un límite de rondas (en "Crear partida").
+    </p>
     <div class="tamano-atajos">
       <button
         v-for="a in ATAJOS"
@@ -76,6 +83,7 @@ const fijar = (crudo) => {
   text-align: center;
 }
 .tamano-resumen { margin: 0.35rem 0; font-size: 0.8rem; color: #95a5a6; }
+.tamano-aviso { margin: 0 0 0.4rem; font-size: 0.78rem; color: #f1c40f; }
 .tamano-atajos { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .atajo {
   background: rgba(255, 255, 255, 0.08);
