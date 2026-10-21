@@ -328,6 +328,21 @@ onMounted(() => {
         <h2>🗺️ Mapa y mecánicas</h2>
         <h3 class="titulo-mecanicas">Tamaño del mapa</h3>
         <MapTamano v-model="tamanoMapa" :min="limitesTamano.min" :max="limitesTamano.max" />
+        <label class="field">
+          Territorio para ganar
+          <select v-model.number="porcentajeVictoria">
+            <option v-for="o in OBJETIVOS" :key="o.valor" :value="o.valor">{{ o.etiqueta }}</option>
+          </select>
+        </label>
+        <label class="field">
+          Duración
+          <select v-model="limiteRondas">
+            <option v-for="d in DURACIONES" :key="String(d.valor)" :value="d.valor">{{ d.etiqueta }}</option>
+          </select>
+        </label>
+        <p class="ayuda-config">
+          Al llegar al límite de rondas gana quien controle más territorio.
+        </p>
         <label class="field field-check">
           <input v-model="islas" type="checkbox" />
           <span>Mapa de islas</span>
@@ -377,21 +392,6 @@ onMounted(() => {
           Nombre de la partida
           <input v-model="nombrePartida" type="text" placeholder="Mi partida" />
         </label>
-        <label class="field">
-          Territorio para ganar
-          <select v-model.number="porcentajeVictoria">
-            <option v-for="o in OBJETIVOS" :key="o.valor" :value="o.valor">{{ o.etiqueta }}</option>
-          </select>
-        </label>
-        <label class="field">
-          Duración
-          <select v-model="limiteRondas">
-            <option v-for="d in DURACIONES" :key="String(d.valor)" :value="d.valor">{{ d.etiqueta }}</option>
-          </select>
-        </label>
-        <p class="ayuda-config">
-          Al llegar al límite gana quien controle más territorio.
-        </p>
         <label class="field">
           Máquinas
           <select v-model.number="botsConGente">

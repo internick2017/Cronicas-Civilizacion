@@ -55,7 +55,7 @@ const fijar = (crudo) => {
     <!-- Medido con maquinas dificiles (300 rondas): en 36 terminó 1 de 2 partidas y en 60 ninguna. -->
     <p v-if="tamano >= AVISO_DESDE" class="tamano-aviso">
       Mapa grande: la partida puede durar cientos de rondas. Conviene bajar el
-      territorio para ganar o poner un límite de rondas (en "Crear partida").
+      territorio para ganar o poner un límite de rondas (más abajo).
     </p>
     <div class="tamano-atajos">
       <button
