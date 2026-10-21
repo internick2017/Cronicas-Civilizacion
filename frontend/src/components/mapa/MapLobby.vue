@@ -3,6 +3,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useMapApi } from '../../composables/useMapApi.js'
 import MapMecanicas from './MapMecanicas.vue'
+import MapTamano from './MapTamano.vue'
 
 const emit = defineEmits(['partida-unida'])
 
@@ -18,13 +19,6 @@ const OBJETIVOS = [
   { valor: 60, etiqueta: '60% — equilibrada' },
   { valor: 75, etiqueta: '75% — larga' },
 ]
-const TAMANOS = [
-  { valor: 10, etiqueta: 'Mini (10×10)' },
-  { valor: 14, etiqueta: 'Chico (14×14)' },
-  { valor: 20, etiqueta: 'Mediano (20×20)' },
-  { valor: 28, etiqueta: 'Grande (28×28)' },
-  { valor: 36, etiqueta: 'Enorme (36×36)' },
-]
 const DURACIONES = [
   { valor: null, etiqueta: 'Sin límite' },
   { valor: 40, etiqueta: '40 rondas' },
@@ -33,6 +27,9 @@ const DURACIONES = [
 ]
 const porcentajeVictoria = ref(60)
 const tamanoMapa = ref(20)
+// Los limites reales los manda el backend (llegan con las constantes); estos son
+// solo el respaldo si esa llamada falla.
+const limitesTamano = ref({ min: 10, max: 60 })
 const limiteRondas = ref(null)
 // Apagado por defecto: un mapa de islas es otro juego (mitad del mundo es mar y
 // hay que cruzarlo en transporte), asi que se elige, no se hereda.
@@ -238,7 +235,8 @@ const unirseConCodigo = async (codigo) => {
 
 const cargarConstantes = async () => {
   try {
-    const { dificultadesIA: lista, razas: listaRazas } = await obtenerConstantes()
+    const { dificultadesIA: lista, razas: listaRazas, limitesTamanoMapa } = await obtenerConstantes()
+    if (limitesTamanoMapa) limitesTamano.value = limitesTamanoMapa
     dificultadesIA.value = lista || []
     dificultadIA.value = lista?.find(d => d.porDefecto)?.tipo ?? lista?.[0]?.tipo ?? null
     razas.value = listaRazas || []
@@ -325,6 +323,24 @@ onMounted(() => {
         </div>
       </section>
 
+      <!-- Un solo estado para los dos caminos (Jugar solo y Crear partida). -->
+      <section class="panel">
+        <h2>🗺️ Mapa y mecánicas</h2>
+        <h3 class="titulo-mecanicas">Tamaño del mapa</h3>
+        <MapTamano v-model="tamanoMapa" :min="limitesTamano.min" :max="limitesTamano.max" />
+        <label class="field field-check">
+          <input v-model="islas" type="checkbox" />
+          <span>Mapa de islas</span>
+        </label>
+        <p class="ayuda-config">
+          La mitad del mundo es mar y cada uno empieza en una isla distinta. Para
+          tocar al rival hay que construir un puerto y cruzar en transporte. Si la
+          semilla no da dos islas grandes, la partida arranca como una normal.
+        </p>
+        <h3 class="titulo-mecanicas">Mecánicas</h3>
+        <MapMecanicas v-model="mecanicas" />
+      </section>
+
       <section class="panel panel-ia">
         <h2>🤖 Jugar solo</h2>
         <p class="ayuda">Sin esperar a nadie: la máquina controla a tus rivales.</p>
@@ -348,10 +364,7 @@ onMounted(() => {
           </label>
         </div>
 
-        <details class="mecanicas-solo">
-          <summary>Mecánicas de la partida ({{ resumenMecanicas }})</summary>
-          <MapMecanicas v-model="mecanicas" />
-        </details>
+        <p class="ayuda-config">Usa el mapa y las mecánicas de arriba ({{ tamanoMapa }}×{{ tamanoMapa }}, {{ resumenMecanicas }}).</p>
 
         <button class="btn-primary" :disabled="cargando" @click="jugarContraIA">
           Jugar contra la máquina
@@ -368,12 +381,6 @@ onMounted(() => {
           Territorio para ganar
           <select v-model.number="porcentajeVictoria">
             <option v-for="o in OBJETIVOS" :key="o.valor" :value="o.valor">{{ o.etiqueta }}</option>
-          </select>
-        </label>
-        <label class="field">
-          Tamaño del mapa
-          <select v-model.number="tamanoMapa">
-            <option v-for="t in TAMANOS" :key="t.valor" :value="t.valor">{{ t.etiqueta }}</option>
           </select>
         </label>
         <label class="field">
@@ -412,17 +419,7 @@ onMounted(() => {
           Todos a la vez: cada uno mueve cuando quiere y la ronda termina cuando
           todos tocaron "Terminar turno". De a uno: se juega por orden, como antes.
         </p>
-        <label class="field field-check">
-          <input v-model="islas" type="checkbox" />
-          <span>Mapa de islas</span>
-        </label>
-        <p class="ayuda-config">
-          La mitad del mundo es mar y cada uno empieza en una isla distinta. Para
-          tocar al rival hay que construir un puerto y cruzar en transporte. Si la
-          semilla no da dos islas grandes, la partida arranca como una normal.
-        </p>
-        <h3 class="titulo-mecanicas">Mecánicas de la partida</h3>
-        <MapMecanicas v-model="mecanicas" />
+        <p class="ayuda-config">Usa el mapa y las mecánicas del panel de arriba.</p>
         <button class="btn-primary" :disabled="cargando" @click="crear">Crear</button>
       </section>
 
@@ -517,14 +514,6 @@ onMounted(() => {
 
 .field-check { flex-direction: row; align-items: center; gap: 0.5rem; }
 .field-check input { width: auto; }
-.mecanicas-solo {
-  margin-bottom: 0.75rem;
-  font-size: 0.9rem;
-}
-.mecanicas-solo summary {
-  cursor: pointer;
-  margin-bottom: 0.5rem;
-}
 
 .titulo-mecanicas {
   margin: 0.75rem 0 0.25rem;

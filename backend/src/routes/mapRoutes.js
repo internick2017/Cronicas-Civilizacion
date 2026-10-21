@@ -222,6 +222,7 @@ export function crearMapRoutes(servicio) {
       acunacion: ACUNACION,
       impuestos: IMPUESTOS,
       limitesMandato: LIMITES_CONFIG.rondasEntreElecciones,
+      limitesTamanoMapa: LIMITES_CONFIG.tamanoMapa,
       largoNombreGobierno: LARGO_MAXIMO_NOMBRE_GOBIERNO,
     });
   });
