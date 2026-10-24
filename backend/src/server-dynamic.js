@@ -6,6 +6,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import os from 'os';
+import path from 'path';
+import { existsSync } from 'fs';
+import { fileURLToPath } from 'url';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -102,13 +105,37 @@ async function initializeConnections() {
   }
 }
 
+// Detras del proxy de Render todos los pedidos llegan con la IP del proxy: sin esto el
+// limitador de pedidos cuenta a todos los jugadores como una sola persona.
+if (config.server.nodeEnv === 'production') app.set('trust proxy', 1);
+
 // Middleware
-app.use(helmet());
+// PixiJS crea un worker desde un blob (decodifica texturas): la politica por defecto de
+// helmet lo bloquea y el mapa queda en blanco.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'worker-src': ["'self'", 'blob:'],
+      'img-src': ["'self'", 'data:', 'blob:'],
+      // PixiJS pide por fetch una imagen data: de 1 pixel como textura vacia.
+      'connect-src': ["'self'", 'data:'],
+    },
+  },
+}));
 app.use(cors({ origin: true }));
 app.use(compression());
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// En produccion el servidor entrega tambien la pagina compilada (frontend/dist): el socket
+// se conecta al mismo dominio de la pagina (frontend/src/config/env.js), asi que pagina y
+// servidor tienen que vivir juntos. En desarrollo no existe dist y lo sirve Vite.
+const carpetaPagina = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../frontend/dist');
+const hayPagina = existsSync(path.join(carpetaPagina, 'index.html'));
+// Antes del limitador: los archivos de la pagina no deben gastar el cupo de pedidos.
+if (hayPagina) app.use(express.static(carpetaPagina));
 
 // Rate limiting
 app.use(generalLimiter);
@@ -219,6 +246,14 @@ io.on('connection', (socket) => {
     logger.info(`Player disconnected: ${socket.id}`);
   });
 });
+
+// Cualquier otra direccion que pida el navegador (no la API, el socket ni un archivo con
+// extension: un .js que falta debe dar 404, no la pagina) recibe la pagina.
+if (hayPagina) {
+  app.get(/^\/(?!api\/|socket\.io\/|health|config|debug)[^.]*$/, (req, res) => {
+    res.sendFile(path.join(carpetaPagina, 'index.html'));
+  });
+}
 
 // Error handling middleware
 app.use(errorHandler);

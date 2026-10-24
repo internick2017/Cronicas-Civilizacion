@@ -2,6 +2,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Application, Container, Sprite, Graphics, Text, Assets } from 'pixi.js'
+// PixiJS genera codigo con eval por dentro; este modulo lo reemplaza para que el mapa
+// funcione con la politica de seguridad (CSP) del servidor en produccion.
+import 'pixi.js/unsafe-eval'
 import { SPRITE_TERRENO, TINTE_TERRENO, ROTACION_TERRENO, SPRITE_CIUDAD, SPRITE_CIUDADANO, SPRITE_UNIDAD, colorDeJugador, cargarSprites } from '../../mapa/sprites.js'
 import { aliadosDe } from './alianzas.js'
 

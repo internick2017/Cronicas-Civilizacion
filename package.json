@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev-sqlite --prefix backend\" \"npm run dev --prefix frontend\"",
-    "test": "npm test --prefix backend -- --run"
+    "test": "npm test --prefix backend -- --run",
+    "build": "yarn --cwd frontend install --frozen-lockfile --production=false && yarn --cwd frontend build && yarn --cwd backend install --frozen-lockfile",
+    "start": "node backend/src/server-dynamic.js"
   },
   "devDependencies": { "concurrently": "^9.0.0" }
 }
