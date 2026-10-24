@@ -125,7 +125,8 @@ app.use(helmet({
 }));
 app.use(cors({ origin: true }));
 app.use(compression());
-app.use(morgan('combined'));
+// Con el tiempo de respuesta al final: en Render permite ver cuanto tarda cada accion.
+app.use(morgan(`${morgan.combined} :response-time ms`));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 

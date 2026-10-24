@@ -3,7 +3,9 @@ import config from '../config/env.js'
 
 const api = axios.create({
   baseURL: `${config.api.baseUrl}/api/map`,
-  timeout: config.api.timeout,
+  // Una accion (sobre todo pasar el turno, que juega a los bots) hace varias consultas a la
+  // base; en el servidor gratis puede pasar de los 10 s generales y el navegador la cortaba.
+  timeout: 60000,
   headers: { 'Content-Type': 'application/json' }
 })
 
