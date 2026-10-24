@@ -20,14 +20,15 @@ export const ACCIONES_DE_CARGO = {
 };
 
 // Una partida guardada antes de los cargos no los trae: se juega con los dos.
-export const cargosDe = (jugador) => {
-  const guardados = Array.isArray(jugador?.cargos) ? jugador.cargos.filter(c => CARGOS.includes(c)) : [];
-  return guardados.length > 0 ? guardados : [...CARGOS];
-};
+// Una lista vacia es otra cosa: el modo espectador (easter egg), donde la
+// maquina lleva el pais entero y el jugador solo mira.
+export const cargosDe = (jugador) => (Array.isArray(jugador?.cargos)
+  ? jugador.cargos.filter(c => CARGOS.includes(c))
+  : [...CARGOS]);
 
 export function validarCargos(cargos) {
   if (cargos == null) return [...CARGOS];
-  if (!Array.isArray(cargos) || cargos.length === 0 || !cargos.every(c => CARGOS.includes(c))) {
+  if (!Array.isArray(cargos) || !cargos.every(c => CARGOS.includes(c))) {
     throw new ReglaError('CARGOS_INVALIDOS', 'Elegí Jefe de Estado, Jefe de Gobierno o los dos');
   }
   return CARGOS.filter(c => cargos.includes(c));

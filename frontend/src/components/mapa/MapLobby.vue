@@ -83,18 +83,13 @@ const dificultadIA = ref(null)
 // cambian con el balance. Se elige al unirse (crear, jugar solo o unirse con codigo).
 // Cargos: el Jefe de Estado lleva las relaciones con otros paises; el Jefe de
 // Gobierno, lo interno. Se puede asumir uno o los dos; lo que no asumas lo lleva
-// la maquina. Siempre queda al menos uno marcado.
+// la maquina. Sin ninguno es el modo espectador (easter egg): la maquina juega todo.
 const esJefeEstado = ref(true)
 const esJefeGobierno = ref(true)
 const cargosElegidos = () => [
   ...(esJefeEstado.value ? ['estado'] : []),
   ...(esJefeGobierno.value ? ['gobierno'] : [])
 ]
-const alternarCargo = (cargo) => {
-  const [uno, otro] = cargo === 'estado' ? [esJefeEstado, esJefeGobierno] : [esJefeGobierno, esJefeEstado]
-  if (uno.value && !otro.value) return
-  uno.value = !uno.value
-}
 
 const razas = ref([])
 const raza = ref(null)
@@ -285,17 +280,20 @@ onMounted(() => {
         <h2>Tu cargo</h2>
         <div class="cargo-lista">
           <label class="cargo-opcion" :class="{ elegida: esJefeEstado }">
-            <input type="checkbox" :checked="esJefeEstado" @change="alternarCargo('estado')" />
+            <input v-model="esJefeEstado" type="checkbox" />
             <span class="raza-nombre">🌐 Jefe de Estado</span>
             <small>Llevás las relaciones con otros países: guerra, ejércitos y alianzas.</small>
           </label>
           <label class="cargo-opcion" :class="{ elegida: esJefeGobierno }">
-            <input type="checkbox" :checked="esJefeGobierno" @change="alternarCargo('gobierno')" />
+            <input v-model="esJefeGobierno" type="checkbox" />
             <span class="raza-nombre">🏛️ Jefe de Gobierno</span>
             <small>Llevás lo interno: ciudades, edificios, ciencia, cultura, gobierno y moneda.</small>
           </label>
         </div>
-        <small class="cargo-nota">Lo que no asumas lo lleva la máquina por vos al terminar tu turno.</small>
+        <small v-if="!esJefeEstado && !esJefeGobierno" class="cargo-nota">
+          👁️ Modo espectador: la máquina juega tu país y los turnos pasan solos. Vos mirás.
+        </small>
+        <small v-else class="cargo-nota">Lo que no asumas lo lleva la máquina por vos al terminar tu turno.</small>
       </section>
 
       <!-- La raza vale para las tres formas de entrar (solo, crear, unirse). Cada

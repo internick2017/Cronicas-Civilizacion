@@ -21,14 +21,20 @@ describe('reglas de cargos', () => {
     expect(validarCargos(['gobierno', 'estado'])).toEqual(['estado', 'gobierno']);
   });
 
-  it('vacio o desconocido se rechaza', () => {
-    expect(() => validarCargos([])).toThrow(/Jefe de Estado/);
+  it('desconocido se rechaza', () => {
     expect(() => validarCargos(['rey'])).toThrow(/Jefe de Estado/);
     expect(() => validarCargos('estado')).toThrow(/Jefe de Estado/);
   });
 
   it('una partida vieja sin cargos juega con los dos', () => {
     expect(cargosDe({})).toEqual(['estado', 'gobierno']);
+  });
+
+  it('ningun cargo es el modo espectador: la maquina lleva todo', () => {
+    expect(validarCargos([])).toEqual([]);
+    expect(cargosDe({ cargos: [] })).toEqual([]);
+    expect(cargoQueFalta({ cargos: [] }, 'atacar')).toBe('estado');
+    expect(cargoQueFalta({ cargos: [] }, 'terminarTurno')).toBeNull();
   });
 
   it('cada orden pertenece a un cargo; terminar turno es libre', () => {
@@ -70,6 +76,14 @@ describe('cargos en la partida', () => {
     const { svc, id, token } = await partida(['estado']);
     const r = await svc.accion(id, 'yo', { tipo: 'terminarTurno' }, token);
     // El humano no ordeno nada interno, pero la maquina construyo por el antes de cerrar.
+    expect(r.eventos.some(e => e.jugadorId === 'yo' && e.tipo === 'EdificioConstruido')).toBe(true);
+    expect(r.vista.turno).toBeGreaterThan(1);
+  });
+
+  it('espectador: la maquina juega todo su pais al terminar el turno', async () => {
+    const { svc, id, token, vista } = await partida([]);
+    expect(vista.jugadores.find(j => j.id === 'yo').cargos).toEqual([]);
+    const r = await svc.accion(id, 'yo', { tipo: 'terminarTurno' }, token);
     expect(r.eventos.some(e => e.jugadorId === 'yo' && e.tipo === 'EdificioConstruido')).toBe(true);
     expect(r.vista.turno).toBeGreaterThan(1);
   });

@@ -80,9 +80,12 @@ const hayGobierno = computed(() => vista.value?.reglas?.gobierno !== false)
 const misCargos = computed(() => vista.value?.jugadores.find(j => j.id === jugadorId)?.cargos ?? ['estado', 'gobierno'])
 const esJefeEstado = computed(() => misCargos.value.includes('estado'))
 const esJefeGobierno = computed(() => misCargos.value.includes('gobierno'))
-const etiquetaCargos = computed(() => (esJefeEstado.value && esJefeGobierno.value
-  ? 'Jefe de Estado y de Gobierno'
-  : esJefeEstado.value ? 'Jefe de Estado (la máquina lleva el gobierno)' : 'Jefe de Gobierno (la máquina lleva el Estado)'))
+const esEspectador = computed(() => misCargos.value.length === 0)
+const etiquetaCargos = computed(() => (esEspectador.value
+  ? 'Espectador (la máquina lleva todo)'
+  : esJefeEstado.value && esJefeGobierno.value
+    ? 'Jefe de Estado y de Gobierno'
+    : esJefeEstado.value ? 'Jefe de Estado (la máquina lleva el gobierno)' : 'Jefe de Gobierno (la máquina lleva el Estado)'))
 // Cuantos problemas activos o señales de aviso hay: el boton Gobierno lo muestra
 // para que no haga falta abrirlo a mirar.
 const avisosGobierno = computed(() => {
@@ -334,6 +337,23 @@ const onAccionAlianza = async (datosAccion) => {
 }
 
 const onTerminarTurno = () => ejecutarAccion({ tipo: 'terminarTurno' })
+
+// Modo espectador: nadie aprieta "terminar turno", lo hace esto. Se mira cada
+// vista nueva (no esMiTurno) porque en secuencial los bots juegan dentro de la
+// misma respuesta y el turno vuelve a ser mio sin pasar nunca por false.
+const PAUSA_ESPECTADOR_MS = 1500
+let turnoEspectador = null
+let desmontada = false
+const programarTurnoEspectador = () => {
+  if (desmontada || turnoEspectador || !esEspectador.value || !esMiTurno.value || vista.value.estado !== 'jugando') return
+  turnoEspectador = setTimeout(async () => {
+    await onTerminarTurno()
+    turnoEspectador = null
+    // La vista nueva pudo llegar mientras esperabamos la respuesta: se revisa aca.
+    programarTurnoEspectador()
+  }, PAUSA_ESPECTADOR_MS)
+}
+watch(vista, programarTurnoEspectador, { immediate: true })
 
 const onIniciarPartida = async () => {
   if (!puedeIniciar.value || iniciando.value) return
@@ -628,6 +648,8 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onTecla)
   detenerVigilancia()
   desconectar()
+  desmontada = true
+  clearTimeout(turnoEspectador)
 })
 </script>
 
