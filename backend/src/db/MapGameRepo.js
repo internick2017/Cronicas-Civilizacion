@@ -25,7 +25,9 @@ export class MapGameRepo {
       this.db.exec(indiceTokens);
       return this._migrar();
     }
-    return Promise.all([...statements, indiceTokens].map(stmt => this.db.query(stmt)))
+    // En orden: el indice necesita que su tabla ya exista (en paralelo fallaba en una base vacia).
+    return [...statements, indiceTokens]
+      .reduce((prev, stmt) => prev.then(() => this.db.query(stmt)), Promise.resolve())
       .then(() => this._migrar());
   }
 
