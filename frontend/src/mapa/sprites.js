@@ -78,6 +78,9 @@ export const ROTACION_TERRENO = {
 
 export const SPRITE_CIUDAD = `${BASE}/ciudad.png`
 
+// El guerrero sin el arma: la gente que camina dentro de las ciudades.
+export const SPRITE_CIUDADANO = `${BASE}/ciudadano.png`
+
 export const SPRITE_UNIDAD = {
   warrior: `${BASE}/unidad-warrior.png`,
   archer: `${BASE}/unidad-archer.png`,
@@ -126,6 +129,7 @@ export async function cargarSprites() {
   const urls = [...new Set([
     ...Object.values(SPRITE_TERRENO),
     SPRITE_CIUDAD,
+    SPRITE_CIUDADANO,
     ...Object.values(SPRITE_UNIDAD)
   ])]
   await Assets.load(urls)

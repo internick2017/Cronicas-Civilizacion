@@ -2,7 +2,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Application, Container, Sprite, Graphics, Text, Assets } from 'pixi.js'
-import { SPRITE_TERRENO, TINTE_TERRENO, ROTACION_TERRENO, SPRITE_CIUDAD, SPRITE_UNIDAD, colorDeJugador, cargarSprites } from '../../mapa/sprites.js'
+import { SPRITE_TERRENO, TINTE_TERRENO, ROTACION_TERRENO, SPRITE_CIUDAD, SPRITE_CIUDADANO, SPRITE_UNIDAD, colorDeJugador, cargarSprites } from '../../mapa/sprites.js'
 import { aliadosDe } from './alianzas.js'
 
 const props = defineProps({
@@ -30,6 +30,7 @@ let capaTerreno = null
 let capaCosta = null   // linea de costa (mar/tierra) y ribera (rio/tierra)
 let capaTerritorio = null
 let capaPiezas = null  // ciudades y ejercitos
+let capaGente = null   // ciudadanos que caminan dentro de las ciudades
 let capaOverlay = null // seleccion, alcanzables
 let capaNiebla = null
 
@@ -381,6 +382,94 @@ function dibujarPiezas() {
     }
   }
   for (const cartel of carteles) capaPiezas.addChild(cartel)
+}
+
+// --- Gente de las ciudades -----------------------------------------------
+// Capa propia y NO parte de dibujarPiezas: esa se destruye y se rehace en cada
+// cambio, y los ciudadanos se quedarian reiniciando su camino. Aca viven entre
+// actualizaciones y solo se agregan o quitan cuando cambia cuanta gente toca.
+const ZOOM_GENTE = 0.9   // mas lejos son puntitos: ni se dibujan ni se mueven
+const MAX_GENTE = 200
+// El muneco ocupa solo una parte del cuadro de 64 px: con 0.7 (lo que usa un
+// soldado) llenaria la casilla, con 0.5 se lee como un soldado un poco menor.
+const TAM_CIUDADANO = TILE * 0.5
+const VELOCIDAD_CIUDADANO = 9 // pixeles de mundo por segundo
+// "x:y" de la ciudad -> { ox, oy (esquina de la casilla), lista: [ciudadano] }
+const gente = new Map()
+
+// Entre las dos barras de vida (la de la ciudad arriba, la de la tropa abajo).
+const puntoEnCiudad = () => ({ x: 6 + Math.random() * (TILE - 12), y: 15 + Math.random() * 20 })
+
+function nuevoCiudadano(ox, oy) {
+  const sprite = new Sprite(Assets.get(SPRITE_CIUDADANO))
+  sprite.anchor.set(0.5)
+  sprite.width = TAM_CIUDADANO
+  sprite.height = TAM_CIUDADANO
+  const p = puntoEnCiudad()
+  sprite.position.set(ox + p.x, oy + p.y)
+  capaGente.addChild(sprite)
+  return { sprite, escala: sprite.scale.x, fase: Math.random() * 6, x: p.x, y: p.y, dx: p.x, dy: p.y, espera: Math.random() * 2 }
+}
+
+function sincronizarGente() {
+  if (!capaGente) return
+  let total = 0
+  const vivas = new Set()
+  for (const tile of props.vista.mapa) {
+    if (!tile.descubierto || !tile.ciudad) continue
+    const clave = `${tile.x}:${tile.y}`
+    vivas.add(clave)
+    const ox = tile.x * TILE, oy = tile.y * TILE
+    if (!gente.has(clave)) gente.set(clave, { ox, oy, lista: [] })
+    const { lista } = gente.get(clave)
+    const quiere = Math.min(1 + (tile.ciudad.nivel ?? 1), 4, MAX_GENTE - total)
+    total += quiere
+    while (lista.length < quiere) lista.push(nuevoCiudadano(ox, oy))
+    // Sin tinte a proposito: la ciudad ya va teñida del color del dueno, y un
+    // ciudadano del mismo color se pierde contra ella.
+    while (lista.length > quiere) lista.pop().sprite.destroy()
+  }
+  // Ciudad que ya no esta (destruida o fuera de la vista): su gente se va con ella.
+  for (const [clave, { lista }] of gente) {
+    if (vivas.has(clave)) continue
+    lista.forEach(c => c.sprite.destroy())
+    gente.delete(clave)
+  }
+}
+
+// Un solo callback para todos (no un AnimatedSprite por muneco). Solo mueve la
+// gente de ciudades que estan en pantalla, y nada si el zoom esta lejos.
+function moverGente(ticker) {
+  if (!mundo || !capaGente) return
+  const zoom = mundo.scale.x
+  capaGente.visible = zoom >= ZOOM_GENTE
+  if (!capaGente.visible) return
+  const dt = ticker.deltaMS / 1000
+  const x0 = -mundo.x / zoom, y0 = -mundo.y / zoom
+  const x1 = x0 + app.screen.width / zoom, y1 = y0 + app.screen.height / zoom
+  const ahora = performance.now()
+  for (const { ox, oy, lista } of gente.values()) {
+    if (ox + TILE < x0 || ox > x1 || oy + TILE < y0 || oy > y1) continue
+    for (const c of lista) {
+      if (c.espera > 0) { c.espera -= dt; continue }
+      const faltaX = c.dx - c.x, faltaY = c.dy - c.y
+      const dist = Math.hypot(faltaX, faltaY)
+      const paso = VELOCIDAD_CIUDADANO * dt
+      if (dist <= paso) {
+        c.x = c.dx; c.y = c.dy
+        const p = puntoEnCiudad()
+        c.dx = p.x; c.dy = p.y
+        c.espera = 0.5 + Math.random() * 2
+      } else {
+        c.x += (faltaX / dist) * paso
+        c.y += (faltaY / dist) * paso
+        c.sprite.scale.x = (faltaX < 0 ? -1 : 1) * c.escala // mira hacia donde camina
+      }
+      // El saltito solo mientras camina: parado no rebota.
+      const salto = c.espera > 0 ? 0 : Math.sin(ahora / 90 + c.fase) * 0.8
+      c.sprite.position.set(ox + c.x, oy + c.y + salto)
+    }
+  }
 }
 
 function dibujarOverlay() {
@@ -749,7 +838,7 @@ function claveTerritorio(vista) {
 function clavePiezas(vista) {
   return vista.mapa.map(t => {
     if (!t.descubierto || (!t.ciudad && !t.ejercito)) return ''
-    const c = t.ciudad ? `c${t.dueno || ''}:${t.ciudad.salud}${t.ciudad.capital ? 'K' : ''}` : ''
+    const c = t.ciudad ? `c${t.dueno || ''}:${t.ciudad.salud}n${t.ciudad.nivel}${t.ciudad.capital ? 'K' : ''}` : ''
     const e = t.ejercito ? `e${t.ejercito.tipo}${t.ejercito.dueno || ''}:${t.ejercito.salud}` : ''
     return `${t.x}:${t.y}:${c}${e}`
   }).join('|') + `#${aliadosDe(vista, props.jugadorId).join(',')}`
@@ -802,6 +891,7 @@ function actualizarDesdeVista() {
     dibujarPiezas()
     animarCambios(vista, previa)
     piezasAnterior = snapshotPiezas(vista)
+    sincronizarGente()
   }
 
   const cn = claveNiebla(vista)
@@ -901,13 +991,15 @@ onMounted(async () => {
   capaCosta = new Container()
   capaTerritorio = new Container()
   capaPiezas = new Container()
+  capaGente = new Container()
   capaOverlay = new Container()
   capaNiebla = new Container()
   // La costa va ENCIMA del territorio: si fuera debajo, el relleno del color
   // del dueno le pasaria por arriba y la desdibujaria justo en las casillas
   // donde mas importa, que son las que alguien reclamo sobre la orilla.
-  mundo.addChild(capaTerreno, capaTerritorio, capaCosta, capaPiezas, capaOverlay, capaNiebla)
+  mundo.addChild(capaTerreno, capaTerritorio, capaCosta, capaPiezas, capaGente, capaOverlay, capaNiebla)
   app.stage.addChild(mundo)
+  app.ticker.add(moverGente)
 
   app.stage.eventMode = 'static'
   app.stage.hitArea = app.screen
