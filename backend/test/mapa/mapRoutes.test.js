@@ -23,6 +23,15 @@ function crearServicio(opts = {}) {
 }
 
 describe('mapRoutes', () => {
+  it('unirse sin id de jugador devuelve 400, no 500', async () => {
+    const { app } = crearServicio();
+    const { id } = (await request(app).post('/api/map').send({ nombre: 'T', semilla: 's1' })).body;
+
+    const res = await request(app).post(`/api/map/${id}/unirse`).send({ nombre: 'A', civilizacion: 'Incas' });
+
+    expect(res.status).toBe(400);
+  });
+
   it('flujo feliz: crear -> unirse x2 -> iniciar -> accion', async () => {
     const { app } = crearServicio();
 

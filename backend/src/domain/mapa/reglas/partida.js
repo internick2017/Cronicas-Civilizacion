@@ -20,6 +20,7 @@ import { validarCargos } from './cargos.js';
 //
 // `cargos` (reglas/cargos.js): que mitad del pais lleva el jugador. Sin ellos, los dos.
 export function unirse(estado, { id, nombre, civilizacion, raza = null, cargos = null, esBot = false, dificultadIA = null }) {
+  if (typeof id !== 'string' || !id) throw new ReglaError('JUGADOR_INVALIDO', 'Falta el id del jugador');
   if (estado.estado !== 'esperando') throw new ReglaError('PARTIDA_YA_INICIADA', 'La partida ya inició');
   if (estado.jugadores.length >= estado.config.maxJugadores) throw new ReglaError('PARTIDA_LLENA', 'La partida está llena');
   if (jugadorPorId(estado, id)) throw new ReglaError('JUGADOR_DUPLICADO', 'Ese jugador ya está en la partida');
