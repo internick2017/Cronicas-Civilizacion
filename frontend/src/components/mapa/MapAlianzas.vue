@@ -91,7 +91,10 @@ const regalar = (id) => {
           </div>
         </template>
 
-        <span v-else-if="j.estado === 'le-propuse'" class="estado">Esperando su respuesta…</span>
+        <template v-else-if="j.estado === 'le-propuse'">
+          <span class="estado">Esperando su respuesta…</span>
+          <button class="btn" @click="emit('accion', { tipo: 'retirarAlianza', para: j.id })">Retirar propuesta</button>
+        </template>
 
         <template v-else>
           <span v-if="j.estado === 'tregua'" class="estado">Tregua hasta la próxima ronda</span>

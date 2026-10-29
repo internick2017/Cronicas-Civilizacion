@@ -15,7 +15,7 @@ import { reclutar } from '../domain/mapa/reglas/militar.js';
 import { adoptarRasgo } from '../domain/mapa/reglas/cultura.js';
 import { investigar } from '../domain/mapa/reglas/tecnologia.js';
 import { abandonar } from '../domain/mapa/reglas/abandono.js';
-import { proponerAlianza, responderAlianza, romperAlianza, regalarRecursos } from '../domain/mapa/reglas/alianzas.js';
+import { proponerAlianza, retirarAlianza, responderAlianza, romperAlianza, regalarRecursos } from '../domain/mapa/reglas/alianzas.js';
 import { renombrarPais } from '../domain/mapa/reglas/pais.js';
 import { moverCapital } from '../domain/mapa/reglas/capital.js';
 import { nombrarMoneda, acunarMoneda } from '../domain/mapa/reglas/moneda.js';
@@ -122,6 +122,7 @@ const REGLAS_POR_TIPO = {
   desasignarCiudades: (estado, jugadorId, accion) => desasignarCiudades(estado, jugadorId, accion),
   elegirCabecera: (estado, jugadorId, accion) => elegirCabecera(estado, jugadorId, accion),
   proponerAlianza: (estado, jugadorId, accion) => proponerAlianza(estado, jugadorId, accion),
+  retirarAlianza: (estado, jugadorId, accion) => retirarAlianza(estado, jugadorId, accion),
   responderAlianza: (estado, jugadorId, accion) => responderAlianza(estado, jugadorId, accion),
   romperAlianza: (estado, jugadorId) => romperAlianza(estado, jugadorId),
   regalarRecursos: (estado, jugadorId, accion) => regalarRecursos(estado, jugadorId, accion),

@@ -9,7 +9,7 @@ export const CARGOS = ['estado', 'gobierno'];
 export const ACCIONES_DE_CARGO = {
   estado: [
     'atacar', 'moverEjercito', 'embarcar', 'desembarcar', 'reclutar',
-    'proponerAlianza', 'responderAlianza', 'romperAlianza', 'regalarRecursos',
+    'proponerAlianza', 'retirarAlianza', 'responderAlianza', 'romperAlianza', 'regalarRecursos',
   ],
   gobierno: [
     'fundarCiudad', 'construir', 'adoptarRasgo', 'investigar', 'mejorarCiudad', 'renombrarCiudad', 'moverCapital',

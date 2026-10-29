@@ -436,6 +436,10 @@ export function aplicar(estado, eventos) {
         quitarPropuestasEntre(estado, jugadorId, datos.de);
         break;
 
+      case 'AlianzaRetirada':
+        quitarPropuestasEntre(estado, jugadorId, datos.para);
+        break;
+
       // jugadorId acepta a datos.con. Si alguno ya tenia alianza, el otro entra a esa.
       case 'AlianzaFormada': {
         const alianzas = estado.alianzas ?? [];

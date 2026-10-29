@@ -7,7 +7,7 @@ import { controlTerritorial } from './dominacion.js';
 import { alianzaDe, aliadosDe, sonAliados, propuestasDe } from './bandos.js';
 
 /**
- * Alianzas: proponer, responder, romper y regalar recursos.
+ * Alianzas: proponer, retirar, responder, romper y regalar recursos.
  *
  * Ninguna exige que sea tu turno (igual que el gobierno): contestarle a alguien
  * no puede depender de a quien le toca mover.
@@ -84,6 +84,15 @@ export function responderAlianza(estado, jugadorId, { de, aceptar }) {
   // Se vuelve a validar: desde que se propuso pudo cambiar quien esta con quien.
   miembrosSiSeAlian(estado, jugadorId, de);
   return [evento('AlianzaFormada', estado, jugadorId, { con: de })];
+}
+
+// Quien propuso se arrepiente antes de que le contesten. No hay tregua: nunca hubo alianza.
+export function retirarAlianza(estado, jugadorId, { para }) {
+  jugadorActivo(estado, jugadorId);
+  if (!propuestasDe(estado).some(p => p.de === jugadorId && p.para === para)) {
+    throw new ReglaError('SIN_PROPUESTA', 'No le propusiste una alianza a ese jugador');
+  }
+  return [evento('AlianzaRetirada', estado, jugadorId, { para })];
 }
 
 // Romper es con aviso: queda una tregua hasta que termine esta ronda, asi que

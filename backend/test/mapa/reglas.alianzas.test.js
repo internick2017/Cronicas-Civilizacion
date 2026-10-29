@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { crearEstado, jugadorPorId } from '../../src/domain/mapa/MapGame.js';
 import { aplicar } from '../../src/domain/mapa/aplicar.js';
 import { unirse, iniciar } from '../../src/domain/mapa/reglas/partida.js';
-import { proponerAlianza, responderAlianza, romperAlianza, regalarRecursos } from '../../src/domain/mapa/reglas/alianzas.js';
+import { proponerAlianza, responderAlianza, retirarAlianza, romperAlianza, regalarRecursos } from '../../src/domain/mapa/reglas/alianzas.js';
 import { sonAliados, enTregua } from '../../src/domain/mapa/reglas/bandos.js';
 import { atacar } from '../../src/domain/mapa/reglas/combate.js';
 import { moverEjercito } from '../../src/domain/mapa/reglas/movimiento.js';
@@ -63,6 +63,21 @@ describe('formar una alianza', () => {
     aplicar(e, responderAlianza(e, 'b', { de: 'a', aceptar: false }));
     expect(sonAliados(e, 'a', 'b')).toBe(false);
     expect(() => proponerAlianza(e, 'a', { para: 'b' })).not.toThrow();
+  });
+
+  it('quien propuso puede retirar la propuesta: ya no se puede aceptar y se puede volver a proponer', () => {
+    aplicar(e, proponerAlianza(e, 'a', { para: 'b' }));
+    aplicar(e, retirarAlianza(e, 'a', { para: 'b' }));
+    expect(e.propuestasAlianza).toEqual([]);
+    expect(() => responderAlianza(e, 'b', { de: 'a', aceptar: true })).toThrow(/no te propuso/);
+    expect(() => proponerAlianza(e, 'a', { para: 'b' })).not.toThrow();
+  });
+
+  it('no se retira lo que no se propuso, ni la propuesta que te hicieron a vos', () => {
+    expect(() => retirarAlianza(e, 'a', { para: 'b' })).toThrow(/no le propusiste/i);
+    aplicar(e, proponerAlianza(e, 'b', { para: 'a' }));
+    expect(() => retirarAlianza(e, 'a', { para: 'b' })).toThrow(/no le propusiste/i);
+    expect(e.propuestasAlianza).toHaveLength(1);
   });
 
   it('no se puede proponer dos veces, ni responder lo que nadie propuso', () => {
