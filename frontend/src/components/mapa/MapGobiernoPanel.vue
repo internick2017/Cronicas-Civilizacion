@@ -40,6 +40,10 @@ const enEnfriamiento = computed(() => bloqueadoHasta.value > props.vista.turno)
 const perfil = computed(() => yo.value?.perfilGobierno || {})
 const grupoQueExpulsa = computed(() => perfil.value.sostenidoPor || 'lideres')
 const apoyoQueExpulsa = computed(() => yo.value?.apoyo?.[grupoQueExpulsa.value] ?? 100)
+// El grupo mas descontento: bajo el umbral se puede alzar, sea cual sea el gobierno.
+const grupoDescontento = computed(() => Object.entries(yo.value?.apoyo ?? {}).sort((a, b) => a[1] - b[1])[0] ?? null)
+const riesgoLevantamiento = computed(() =>
+  enPoder.value && grupoDescontento.value?.[1] < (props.constantes.umbralesGobierno?.levantamiento ?? 25))
 const enPeligro = computed(
   () => enPoder.value && !perfil.value.inmortal && apoyoQueExpulsa.value < 40
 )
@@ -224,6 +228,10 @@ const ventajas = (grupo) => {
       <small>Para cambiarlo: {{ QUIEN_APRUEBA[electoradoActual] }}.</small>
       <em v-if="!enPoder" class="alerta">
         Perdiste el poder: la máquina juega tus turnos. Podés dar ventajas para ganar apoyo y recuperarlo.
+      </em>
+      <em v-else-if="riesgoLevantamiento" class="alerta">
+        {{ grupoDescontento[0] === 'pueblo' ? 'Riesgo de revolución' : 'Riesgo de golpe de Estado' }}:
+        apoyo de {{ grupoDescontento[1] }} en {{ NOMBRE_GRUPO[grupoDescontento[0]] }}. Dales ventajas antes de que se alcen.
       </em>
       <em v-else-if="enPeligro" class="alerta">
         {{ NOMBRE_GRUPO[grupoQueExpulsa] }} te miran raro: si el apoyo baja de {{ umbralExpulsionActual }} te echan.

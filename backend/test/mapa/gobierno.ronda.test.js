@@ -30,8 +30,8 @@ describe('cerrarRondaGobierno: pérdida y regreso del poder', () => {
     expect(cerrarRondaGobierno(e, siempre).filter(x => x.jugadorId === 'p2')).toEqual([]);
   });
 
-  it('despotismo nunca emite PoderPerdido en 500 rondas simuladas', () => {
-    p1.apoyo = todos(0);
+  it('despotismo con apoyo sobre el umbral de levantamiento no cae en 500 rondas', () => {
+    p1.apoyo = todos(25);
     const rng = crearRng('desp');
     for (let i = 0; i < 500; i++) {
       e.turno = i + 1;
@@ -149,8 +149,8 @@ describe('cerrarRondaGobierno: pérdida y regreso del poder', () => {
 
   it('poderes: el Judiciario reduce a la mitad la probabilidad de crisis', () => {
     const azar = () => 0.01;
-    p1.gobierno = 'dictadura'; // sin Judiciario: crisis con prob. 0,016
-    p1.apoyo = todos(30);
+    p1.gobierno = 'dictadura'; // sin Judiciario: crisis con prob. 0,014
+    p1.apoyo = { pueblo: 40, lideres: 30, militares: 30 }; // el pueblo a 30 tras el respeto: sin levantamiento
     expect(de(cerrarRondaGobierno(e, azar), 'PoderPerdido').map(x => x.datos.motivo)).toEqual(['crisis']);
     p1.gobierno = 'tecnocracia'; // Judiciario: 0,014 / 2 = 0,007
     expect(de(cerrarRondaGobierno(e, azar), 'PoderPerdido')).toEqual([]);

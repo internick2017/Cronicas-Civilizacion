@@ -281,6 +281,13 @@ export function narrarRonda(eventos, jugadores = []) {
         break;
       }
 
+      case 'Levantamiento': {
+        frases.push(datos.tipo === 'revolucion'
+          ? `El pueblo de ${quien} hizo la revolucion y derroco a su gobierno.`
+          : `Los ${datos.grupo === 'militares' ? 'militares' : 'lideres'} de ${quien} dieron un golpe de Estado.`);
+        break;
+      }
+
       case 'JugadorEliminado': {
         // El jugadorId del evento es quien cerro el turno, no el eliminado; el eliminado
         // viaja en datos.jugadorId (ver reglas/turnos.js:terminarTurno). nombreDe ya

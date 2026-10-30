@@ -238,6 +238,18 @@ export function aplicar(estado, eventos) {
         jugadorPorId(estado, jugadorId).enPoder = true;
         break;
 
+      case 'Levantamiento': {
+        const j = jugadorPorId(estado, jugadorId);
+        j.gobierno = datos.gobierno;
+        j.enPoder = false;
+        j.apoyo = { ...datos.apoyo };
+        break;
+      }
+
+      case 'Manifestacion':
+        jugadorPorId(estado, jugadorId).manifestoEnRonda = datos.ronda;
+        break;
+
       case 'EdificioConstruido': {
         const t = tileEn(estado, datos.x, datos.y);
         t.ciudad.edificios.push(datos.edificio);

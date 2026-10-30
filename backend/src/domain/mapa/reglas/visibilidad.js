@@ -87,6 +87,7 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       // cuenta en una votacion. Privado, como los recursos.
       apoyo: Object.fromEntries(GRUPOS_DE_APOYO.map(g => [g, apoyoEfectivo(jugador, g)])),
       cambioBloqueadoHasta: jugador.cambioBloqueadoHasta ?? 0,
+      manifestoEnRonda: jugador.manifestoEnRonda ?? 0,
       // Problemas sociales: privados, igual que el apoyo. Los medidores crudos no salen.
       problemas: problemasParaLaVista(estado, jugador),
       // La interfaz muestra los precios reales: la inflacion los sube.

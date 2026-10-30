@@ -396,7 +396,7 @@ describe('mecanicas: gobierno, lo pasivo', () => {
       return e;
     };
     expect(cerrarRondaGobierno(preparar({ mecanicas: { gobierno: false } }), () => 0)).toEqual([]);
-    expect(cerrarRondaGobierno(preparar({}), () => 0).map(ev => ev.tipo)).toContain('PoderPerdido');
+    expect(cerrarRondaGobierno(preparar({}), () => 0).map(ev => ev.tipo)).toContain('Levantamiento');
   });
 
   it('sin gobierno, la maquina no se vuelve federal', () => {

@@ -513,6 +513,18 @@ const umbralAviso = computed(() =>
         Sin poder, <strong>la máquina juega tus turnos</strong> y el botón pasa a "Esperar". Mientras tanto
         solo podés dar ventajas para volver a ganar apoyo.
       </p>
+      <p class="aviso">
+        <strong>Golpes de Estado y revoluciones.</strong> Si el apoyo de un grupo cae por debajo de
+        {{ constantes.umbralesGobierno?.levantamiento }}, se puede alzar, y ningún gobierno está a salvo, ni el despotismo.
+        Cuanto más bajo el apoyo, más probable. El pueblo hace una <strong>revolución</strong> e impone la democracia directa;
+        los líderes dan un <strong>golpe</strong> e imponen la oligarquía; los militares, un golpe que impone la dictadura.
+        Perdés el poder y queda el gobierno nuevo. Las máquinas no sufren levantamientos.
+      </p>
+      <p>
+        <strong>Ciudadano.</strong> Si entrás sin ningún cargo, la máquina gobierna tu país y vos sos un ciudadano: una vez
+        por ronda podés salir a apoyar o a protestar, y eso mueve {{ constantes.puntosManifestacion }} puntos el apoyo del pueblo.
+        Protestando se puede llegar a tumbar a tu propio gobierno.
+      </p>
       <p>
         <strong>Forma de Estado.</strong> En el Estado <strong>unitario</strong> mandás vos en cada ciudad. En el
         <strong>federal</strong>, todas tus ciudades se administran solas al terminar tu turno: construyen según su

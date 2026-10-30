@@ -4,6 +4,7 @@ import {
   ORO_POR_PUNTO_APOYO, VARIACION_APOYO_POR_RONDA, BAJADA_APOYO_POR_RONDA, PISO_APOYO_POR_TERRITORIO,
   RECUPERACION_APOYO_SIN_PODER, EFECTOS_PODERES, PROBABILIDAD_CRISIS, UMBRAL_EXPULSION,
   UMBRAL_REGRESO_MILITAR, UMBRAL_ELECCION, BONO_PRODUCCION_REPUBLICA, IMPUESTOS, LARGO_MAXIMO_NOMBRE_GOBIERNO,
+  UMBRAL_LEVANTAMIENTO, PROBABILIDAD_LEVANTAMIENTO, LEVANTAMIENTOS, PUNTOS_MANIFESTACION,
 } from '../constantes.js';
 import { jugadorPorId, puedePagar, LIMITES_CONFIG } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
@@ -12,6 +13,7 @@ import { controlTerritorial } from './dominacion.js';
 import { caidaApoyoPueblo } from './efectosProblemas.js';
 import { produccionPorcentualDeRaza } from './razas.js';
 import { jugadorQueNombra } from './pais.js';
+import { cargosDe } from './cargos.js';
 import { exigirMecanica, mecanicaActiva } from './modo.js';
 import {
   piezasDeClave, claveDePiezas, perfilDeGobierno, preferenciaDe, validarClaveDeGobierno, GOBIERNO_POR_DEFECTO,
@@ -159,6 +161,23 @@ export function darVentajas(estado, jugadorId, { grupo, oro }) {
   ];
 }
 
+// El ciudadano es quien no asumio ningun cargo: la maquina lleva el pais y el
+// solo puede salir a la calle, una vez por ronda.
+const MANIFESTACIONES = { apoyar: PUNTOS_MANIFESTACION, protestar: -PUNTOS_MANIFESTACION };
+
+export function manifestarse(estado, jugadorId, { postura }) {
+  const jugador = jugadorDeGobierno(estado, jugadorId);
+  if (cargosDe(jugador).length > 0) throw new ReglaError('SOLO_CIUDADANOS', 'Solo un ciudadano sin cargo sale a manifestarse');
+  if (!Object.hasOwn(MANIFESTACIONES, postura)) throw new ReglaError('POSTURA_INVALIDA', 'Podés apoyar o protestar');
+  if (jugador.manifestoEnRonda === estado.turno) throw new ReglaError('YA_TE_MANIFESTASTE', 'Ya te manifestaste en esta ronda');
+  const apoyo = apoyoDe(jugador);
+  apoyo.pueblo = acotar(apoyo.pueblo + MANIFESTACIONES[postura]);
+  return [
+    evento('Manifestacion', estado, jugadorId, { postura, ronda: estado.turno }),
+    evento('ApoyoActualizado', estado, jugadorId, { apoyo }),
+  ];
+}
+
 const esRepublica = (jugador) => perfilDe(jugador).republica;
 
 // Gratis y sin turno, como el resto del gobierno; solo quien manda.
@@ -227,6 +246,18 @@ const probabilidadDeCrisis = (jugador) =>
   PROBABILIDAD_CRISIS * (1 - Math.min(...GRUPOS_DE_APOYO.map(g => apoyoEfectivo(jugador, g))) / 100)
     * (tienePoder(jugador, 'judiciario') ? EFECTOS_PODERES.judiciario.crisis : 1);
 
+// Se alza el grupo mas descontento; el azar solo se tira si esta bajo el umbral,
+// asi una partida con apoyo sano no consume numeros de mas.
+function levantamiento(jugador, rng) {
+  const apoyo = Math.min(...GRUPOS_DE_APOYO.map(g => apoyoEfectivo(jugador, g)));
+  if (apoyo >= UMBRAL_LEVANTAMIENTO) return null;
+  if (rng() >= PROBABILIDAD_LEVANTAMIENTO * (1 - apoyo / UMBRAL_LEVANTAMIENTO)) return null;
+  // Perder territorio baja a los tres por igual: sin sortear el empate, el pueblo
+  // ganaba siempre y nunca habia golpes (medido: 4 revoluciones de 4).
+  const peores = GRUPOS_DE_APOYO.filter(g => apoyoEfectivo(jugador, g) === apoyo);
+  return peores[Math.floor(rng() * peores.length)];
+}
+
 // Una pasada por ronda para cada jugador HUMANO activo (los bots quedan fuera:
 // no tienen gobierno que perder). Puro: el azar viene por parametro. Devuelve
 // eventos; terminarTurno los empuja antes de RondaCompletada.
@@ -275,7 +306,16 @@ export function cerrarRondaGobierno(estado, rng) {
     const haceElecciones = esRepublica(j) && estado.turno % mandatoDe(estado, j) === 0;
 
     if (estaEnPoder(j)) {
-      if (perfil.inmortal) continue; // el despota no se pierde
+      // Antes que todo: ni el despota esta a salvo, y el grupo alzado se calma con
+      // el gobierno que impuso (si no, volveria a alzarse apenas regreses).
+      const alzado = levantamiento(j, rng);
+      if (alzado) {
+        eventos.push(evento('Levantamiento', estado, jugador.id, {
+          ...LEVANTAMIENTOS[alzado], grupo: alzado, apoyo: { ...apoyo, [alzado]: APOYO_INICIAL },
+        }));
+        continue;
+      }
+      if (perfil.inmortal) continue; // el despota no cae por crisis ni por expulsion
       let motivo = null;
       if (apoyoEfectivo(j, grupoQueExpulsa(j)) < umbralExpulsion(j)) motivo = 'expulsion';
       else if (haceElecciones && apoyoDelElectorado(j) < UMBRAL_ELECCION) motivo = 'eleccion';

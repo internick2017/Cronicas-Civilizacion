@@ -5,7 +5,7 @@ import { crearRng } from '../domain/mapa/rng.js';
 import { ReglaError } from '../domain/mapa/errores.js';
 import { unirse as unirseRegla, iniciar as iniciarRegla, sumarMaquina } from '../domain/mapa/reglas/partida.js';
 import {
-  proponerGobierno, cambiarFormaEstado, darVentajas, estaEnPoder, fijarImpuestos, fijarMandato, nombrarGobierno,
+  proponerGobierno, cambiarFormaEstado, darVentajas, manifestarse, estaEnPoder, fijarImpuestos, fijarMandato, nombrarGobierno,
 } from '../domain/mapa/reglas/gobierno.js';
 import {
   crearSubdivision, quitarSubdivision, renombrarSubdivision, asignarCiudades, desasignarCiudades, elegirCabecera,
@@ -78,7 +78,7 @@ const VUELTAS_IA_MAXIMAS = 10;
 // mapa las juega por el la maquina. Ponerle nombre al pais, a la moneda o al
 // gobierno no es una orden.
 const ACCIONES_SIN_PODER = new Set([
-  'darVentajas', 'terminarTurno', 'abandonar', 'renombrarPais', 'nombrarMoneda', 'nombrarGobierno',
+  'darVentajas', 'terminarTurno', 'abandonar', 'renombrarPais', 'nombrarMoneda', 'nombrarGobierno', 'manifestarse',
 ]);
 
 // El apoyo y la administracion de subdivisiones de un jugador son privados,
@@ -87,7 +87,7 @@ const ACCIONES_SIN_PODER = new Set([
 // coordenadas revelarian una ciudad que el rival quizas no descubrio.
 const EVENTOS_PRIVADOS_DE_GOBIERNO = new Set(['ApoyoActualizado', 'SubdivisionCreada', 'SubdivisionQuitada', 'SubdivisionRenombrada', 'CiudadesAsignadas', 'CiudadesDesasignadas', 'CabeceraElegida',
   'MedidoresActualizados', 'ProblemaSurgido', 'ProblemaAgravado', 'ProblemaResuelto', 'ProblemasDescartados', 'PoblacionAjustada',
-  'CapitalMovida', 'MonedaAcunada', 'ImpuestosFijados', 'MandatoFijado']);
+  'CapitalMovida', 'MonedaAcunada', 'ImpuestosFijados', 'MandatoFijado', 'Manifestacion']);
 const eventosVisiblesPara = (eventos, jugadorId) =>
   eventos.filter(e => !EVENTOS_PRIVADOS_DE_GOBIERNO.has(e.tipo) || e.jugadorId === jugadorId);
 
@@ -112,6 +112,7 @@ const REGLAS_POR_TIPO = {
   proponerGobierno: (estado, jugadorId, accion) => proponerGobierno(estado, jugadorId, accion),
   cambiarFormaEstado: (estado, jugadorId, accion) => cambiarFormaEstado(estado, jugadorId, accion),
   darVentajas: (estado, jugadorId, accion) => darVentajas(estado, jugadorId, accion),
+  manifestarse: (estado, jugadorId, accion) => manifestarse(estado, jugadorId, accion),
   fijarImpuestos: (estado, jugadorId, accion) => fijarImpuestos(estado, jugadorId, accion),
   fijarMandato: (estado, jugadorId, accion) => fijarMandato(estado, jugadorId, accion),
   nombrarGobierno: (estado, jugadorId, accion) => nombrarGobierno(estado, jugadorId, accion),

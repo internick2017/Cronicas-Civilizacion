@@ -683,6 +683,18 @@ export const UMBRAL_APROBACION = 50;
 export const ENFRIAMIENTO_VOTO = 3;  // turnos sin volver a proponer tras perder
 export const PROBABILIDAD_CRISIS = 0.02;
 export const UMBRAL_EXPULSION = 25;
+// Por debajo de este apoyo un grupo se puede alzar, sin importar el gobierno. La
+// probabilidad por ronda crece lineal desde 0 en el umbral hasta PROBABILIDAD_LEVANTAMIENTO con apoyo 0.
+export const UMBRAL_LEVANTAMIENTO = 25;
+export const PROBABILIDAD_LEVANTAMIENTO = 0.3;
+// Quien se alza y que gobierno impone.
+export const LEVANTAMIENTOS = {
+  pueblo: { tipo: 'revolucion', gobierno: 'republica_directa' },
+  lideres: { tipo: 'golpe', gobierno: 'oligarquia' },
+  militares: { tipo: 'golpe', gobierno: 'dictadura' },
+};
+// Cuanto mueve el apoyo del pueblo un ciudadano en su unica manifestacion de la ronda.
+export const PUNTOS_MANIFESTACION = 3;
 export const UMBRAL_REGRESO_MILITAR = 70;
 export const UMBRAL_ELECCION = 50;
 export const BONO_PRODUCCION_REPUBLICA = 0.1; // a TODOS los recursos
