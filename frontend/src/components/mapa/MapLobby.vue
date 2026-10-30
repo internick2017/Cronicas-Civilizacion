@@ -4,6 +4,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useMapApi } from '../../composables/useMapApi.js'
 import MapMecanicas from './MapMecanicas.vue'
 import MapTamano from './MapTamano.vue'
+import MapTema from './MapTema.vue'
+import { TEMAS, tema } from '../../mapa/temas.js'
 
 const emit = defineEmits(['partida-unida'])
 
@@ -308,6 +310,11 @@ onMounted(async () => {
       </div>
 
       <details class="panel plegable">
+        <summary>Apariencia <small>{{ TEMAS.find(t => t.id === tema).nombre }}</small></summary>
+        <MapTema />
+      </details>
+
+      <details class="panel plegable">
         <summary>Tu raza y cargo <small>{{ resumenPerfil }}</small></summary>
         <h3 class="titulo-mecanicas">Tu cargo</h3>
         <div class="cargo-lista">
@@ -482,20 +489,25 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* Fija como la partida: el fondo del tema cubre el degradado general de la app. */
 .map-lobby {
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow-y: auto;
+  background: rgb(var(--t-fondo));
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 2rem 2rem;
-  color: #ecf0f1;
+  color: rgb(var(--t-texto));
 }
 
 .panel {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: rgb(var(--t-tinta) / 0.05);
+  border: 1px solid rgb(var(--t-tinta) / 0.1);
+  border-radius: calc(var(--t-radio) * 12px);
   padding: 1.25rem;
   width: 100%;
   max-width: 420px;
@@ -510,22 +522,22 @@ onMounted(async () => {
 }
 
 .field input, .field select {
-  background: #34495e;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  background: rgb(var(--t-control));
+  border: 1px solid rgb(var(--t-tinta) / 0.15);
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.5rem;
   min-height: 44px;
-  color: #ecf0f1;
+  color: rgb(var(--t-texto));
 }
 
 .campo-nombre { width: 100%; max-width: 420px; margin-bottom: 0; }
 
 .modos { display: flex; gap: 0.3rem; width: 100%; max-width: 420px; }
 .modo {
-  flex: 1; min-height: 44px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
-  background: rgba(255, 255, 255, 0.06); color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.15);
+  flex: 1; min-height: 44px; border-radius: calc(var(--t-radio) * 6px); cursor: pointer; font-size: 0.85rem;
+  background: rgb(var(--t-tinta) / 0.06); color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.15);
 }
-.modo.elegido { border-color: #2ecc71; background: rgba(46, 204, 113, 0.18); }
+.modo.elegido { border-color: rgb(var(--t-exito)); background: rgb(var(--t-exito) / 0.18); }
 
 .plegable { padding: 0 1.25rem; }
 .plegable[open] { padding-bottom: 1rem; }
@@ -533,19 +545,19 @@ onMounted(async () => {
   display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
   min-height: 44px; padding: 0.4rem 0; cursor: pointer; font-weight: 600;
 }
-.plegable summary small { color: #bdc3c7; font-weight: 400; margin-left: auto; }
+.plegable summary small { color: rgb(var(--t-texto-suave)); font-weight: 400; margin-left: auto; }
 
 .codigo {
   font-size: 2rem;
   font-weight: bold;
   letter-spacing: 0.3rem;
-  color: #3498db;
+  color: rgb(var(--t-info));
   margin: 0.5rem 0;
   text-align: center;
 }
 
 .ayuda {
-  color: #bdc3c7;
+  color: rgb(var(--t-texto-suave));
   font-size: 0.85rem;
   margin: 0.25rem 0;
 }
@@ -554,8 +566,8 @@ onMounted(async () => {
    sin nombre de partida ni codigo que compartir), asi que conviene que se
    note distinto en vez de mezclarse con "crear" y "unirse". */
 .panel-ia {
-  border-color: rgba(46, 204, 113, 0.35);
-  background: rgba(46, 204, 113, 0.08);
+  border-color: rgb(var(--t-exito) / 0.35);
+  background: rgb(var(--t-exito) / 0.08);
 }
 
 .field-check { flex-direction: row; align-items: center; gap: 0.5rem; }
@@ -569,7 +581,7 @@ onMounted(async () => {
 .ayuda-config {
   margin: 0.25rem 0 0.75rem;
   font-size: 0.8rem;
-  color: #95a5a6;
+  color: rgb(var(--t-texto-tenue));
 }
 
 .dificultad-lista {
@@ -584,17 +596,17 @@ onMounted(async () => {
   grid-template-columns: auto 1fr;
   column-gap: 0.5rem;
   align-items: baseline;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  background: rgb(var(--t-tinta) / 0.05);
+  border: 1px solid rgb(var(--t-tinta) / 0.12);
+  border-radius: calc(var(--t-radio) * 8px);
   padding: 0.45rem 0.6rem;
   cursor: pointer;
   font-size: 0.85rem;
 }
 
 .dificultad-opcion.elegida {
-  border-color: rgba(46, 204, 113, 0.6);
-  background: rgba(46, 204, 113, 0.12);
+  border-color: rgb(var(--t-exito) / 0.6);
+  background: rgb(var(--t-exito) / 0.12);
 }
 
 .dificultad-nombre { font-weight: 600; }
@@ -603,9 +615,9 @@ onMounted(async () => {
 .cargo-lista { display: flex; flex-direction: column; gap: 0.4rem; }
 .cargo-opcion {
   display: grid; grid-template-columns: auto 1fr; column-gap: 0.5rem; align-items: center;
-  padding: 0.5rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.2); cursor: pointer;
+  padding: 0.5rem 0.6rem; border-radius: calc(var(--t-radio) * 6px); border: 1px solid rgb(var(--t-tinta) / 0.2); cursor: pointer;
 }
-.cargo-opcion.elegida { border-color: #2ecc71; background: rgba(46, 204, 113, 0.12); }
+.cargo-opcion.elegida { border-color: rgb(var(--t-exito)); background: rgb(var(--t-exito) / 0.12); }
 .cargo-opcion small { grid-column: 2; opacity: 0.7; }
 .cargo-nota { opacity: 0.7; }
 .raza-lista {
@@ -620,31 +632,31 @@ onMounted(async () => {
   column-gap: 0.5rem;
   row-gap: 0.2rem;
   align-items: baseline;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  background: rgb(var(--t-tinta) / 0.05);
+  border: 1px solid rgb(var(--t-tinta) / 0.12);
+  border-radius: calc(var(--t-radio) * 8px);
   padding: 0.5rem 0.6rem;
   cursor: pointer;
   font-size: 0.85rem;
 }
 
 .raza-opcion.elegida {
-  border-color: rgba(52, 152, 219, 0.7);
-  background: rgba(52, 152, 219, 0.14);
+  border-color: rgb(var(--t-info) / 0.7);
+  background: rgb(var(--t-info) / 0.14);
 }
 
 .raza-nombre { font-weight: 600; }
 .raza-opcion small { grid-column: 2; opacity: 0.7; }
 .raza-efectos { grid-column: 2; display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.efecto { font-size: 0.75rem; border-radius: 4px; padding: 0.05rem 0.4rem; }
-.efecto-bueno { background: rgba(46, 204, 113, 0.18); color: #2ecc71; }
-.efecto-malo { background: rgba(231, 76, 60, 0.18); color: #e74c3c; }
+.efecto { font-size: 0.75rem; border-radius: calc(var(--t-radio) * 4px); padding: 0.05rem 0.4rem; }
+.efecto-bueno { background: rgb(var(--t-exito) / 0.18); color: rgb(var(--t-exito)); }
+.efecto-malo { background: rgb(var(--t-peligro) / 0.18); color: rgb(var(--t-peligro)); }
 
 .btn-primary {
-  background: linear-gradient(45deg, #27ae60, #2ecc71);
-  color: white;
+  background: rgb(var(--t-cta));
+  color: rgb(var(--t-sobre-cta));
   border: none;
-  border-radius: 6px;
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.6rem 1rem;
   min-height: 44px;
   width: 100%;
@@ -657,10 +669,10 @@ onMounted(async () => {
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  background: rgb(var(--t-tinta) / 0.1);
+  color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.15);
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.4rem 0.8rem;
   min-height: 44px;
   cursor: pointer;
@@ -682,9 +694,9 @@ onMounted(async () => {
 }
 
 .lobby-error {
-  background: rgba(231, 76, 60, 0.15);
-  color: #e74c3c;
-  border-radius: 6px;
+  background: rgb(var(--t-peligro) / 0.15);
+  color: rgb(var(--t-peligro));
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.6rem 1rem;
   max-width: 420px;
 }

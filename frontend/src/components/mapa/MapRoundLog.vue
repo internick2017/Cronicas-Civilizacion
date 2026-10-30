@@ -26,16 +26,16 @@ const ordenadas = computed(() => [...props.narrativas].reverse())
 
 <style scoped>
 .round-log {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  background: rgb(var(--t-sombra) / 0.25);
+  border: 1px solid rgb(var(--t-tinta) / 0.12);
+  border-radius: calc(var(--t-radio) * 8px);
   padding: 0.75rem 1rem;
   max-height: 30vh;
   overflow-y: auto;
 }
-.round-log h3 { margin: 0 0 0.5rem; font-size: 1rem; color: #f1c40f; }
-.entrada { border-left: 2px solid rgba(255, 255, 255, 0.15); padding-left: 0.6rem; margin-bottom: 0.6rem; }
-.entrada.reciente { border-left-color: #f1c40f; }
+.round-log h3 { margin: 0 0 0.5rem; font-size: 1rem; color: rgb(var(--t-aviso)); }
+.entrada { border-left: 2px solid rgb(var(--t-tinta) / 0.15); padding-left: 0.6rem; margin-bottom: 0.6rem; }
+.entrada.reciente { border-left-color: rgb(var(--t-aviso)); }
 .entrada p { margin: 0.15rem 0 0; line-height: 1.4; }
 .ronda { font-size: 0.75rem; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.05em; }
 </style>

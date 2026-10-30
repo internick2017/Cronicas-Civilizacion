@@ -75,25 +75,25 @@ const fijar = (crudo) => {
 .tamano-rango { flex: 1; }
 .tamano-numero {
   width: 4.5rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  background: rgb(var(--t-tinta) / 0.1);
+  border: 1px solid rgb(var(--t-tinta) / 0.15);
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.4rem;
-  color: #ecf0f1;
+  color: rgb(var(--t-texto));
   text-align: center;
 }
-.tamano-resumen { margin: 0.35rem 0; font-size: 0.8rem; color: #95a5a6; }
-.tamano-aviso { margin: 0 0 0.4rem; font-size: 0.78rem; color: #f1c40f; }
+.tamano-resumen { margin: 0.35rem 0; font-size: 0.8rem; color: rgb(var(--t-texto-tenue)); }
+.tamano-aviso { margin: 0 0 0.4rem; font-size: 0.78rem; color: rgb(var(--t-aviso)); }
 .tamano-atajos { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .atajo {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  background: rgb(var(--t-tinta) / 0.08);
+  color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.15);
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.2rem 0.5rem;
   min-height: 44px;
   font-size: 0.75rem;
   cursor: pointer;
 }
-.atajo.elegido { border-color: #2ecc71; background: rgba(46, 204, 113, 0.18); }
+.atajo.elegido { border-color: rgb(var(--t-exito)); background: rgb(var(--t-exito) / 0.18); }
 </style>

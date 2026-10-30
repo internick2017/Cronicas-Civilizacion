@@ -122,29 +122,29 @@ const regalar = (id) => {
 <style scoped>
 .alianzas { display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.9rem; max-width: 520px; }
 .explicacion, .romper p { margin: 0; line-height: 1.45; }
-.aviso { margin: 0; color: #f1c40f; }
+.aviso { margin: 0; color: rgb(var(--t-aviso)); }
 .lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .fila {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem;
-  padding: 0.6rem; border-radius: 8px; background: rgba(255, 255, 255, 0.06);
+  padding: 0.6rem; border-radius: calc(var(--t-radio) * 8px); background: rgb(var(--t-tinta) / 0.06);
 }
 .quien { flex: 1 1 140px; }
 .quien small { opacity: 0.7; }
-.estado { color: #bdc3c7; }
-.estado.aliado { color: #2ecc71; font-weight: bold; }
+.estado { color: rgb(var(--t-texto-suave)); }
+.estado.aliado { color: rgb(var(--t-exito)); font-weight: bold; }
 .regalo, .botones { display: flex; flex-wrap: wrap; gap: 0.4rem; flex-basis: 100%; }
 .regalo select, .regalo input {
-  background: #34495e; color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px; padding: 0.45rem;
+  background: rgb(var(--t-control)); color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.2);
+  border-radius: calc(var(--t-radio) * 6px); padding: 0.45rem;
 }
 .regalo input { width: 5.5rem; }
 .btn {
-  background: rgba(255, 255, 255, 0.1); color: #ecf0f1; min-height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; padding: 0.45rem 0.8rem; cursor: pointer;
+  background: rgb(var(--t-tinta) / 0.1); color: rgb(var(--t-texto)); min-height: 40px;
+  border: 1px solid rgb(var(--t-tinta) / 0.15); border-radius: calc(var(--t-radio) * 6px); padding: 0.45rem 0.8rem; cursor: pointer;
 }
-.btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
+.btn:hover:not(:disabled) { background: rgb(var(--t-tinta) / 0.2); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-si { background: #27ae60; border-color: #27ae60; }
-.btn-romper { border-color: #e74c3c; color: #ffb3a8; }
-.romper { display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 0.75rem; }
+.btn-si { background: rgb(var(--t-exito-fuerte)); border-color: rgb(var(--t-exito-fuerte)); }
+.btn-romper { border-color: rgb(var(--t-peligro)); color: rgb(var(--t-peligro)); }
+.romper { display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid rgb(var(--t-tinta) / 0.1); padding-top: 0.75rem; }
 </style>

@@ -281,44 +281,44 @@ const motivoCapital = computed(() => falta(costoCapital.value))
 .ciudad-menu { display: flex; flex-direction: column; gap: 1rem; }
 .pestanas { display: flex; gap: 0.3rem; }
 .pestana {
-  flex: 1; min-height: 44px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
-  background: rgba(255, 255, 255, 0.06); color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.15);
+  flex: 1; min-height: 44px; border-radius: calc(var(--t-radio) * 6px); cursor: pointer; font-size: 0.85rem;
+  background: rgb(var(--t-tinta) / 0.06); color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.15);
 }
-.pestana.elegida { border-color: #2ecc71; background: rgba(46, 204, 113, 0.18); }
+.pestana.elegida { border-color: rgb(var(--t-exito)); background: rgb(var(--t-exito) / 0.18); }
 h4 { margin: 0 0 0.4rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7; }
 section { display: flex; flex-direction: column; gap: 0.35rem; }
 .btn-secundario {
-  background: rgba(255, 255, 255, 0.1); color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px;
+  background: rgb(var(--t-tinta) / 0.1); color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.15); border-radius: calc(var(--t-radio) * 6px);
   padding: 0.5rem 0.8rem; min-height: 44px; cursor: pointer; text-align: left;
   display: flex; flex-direction: column; gap: 0.1rem; font-size: 0.85rem;
 }
-.btn-secundario:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
+.btn-secundario:hover:not(:disabled) { background: rgb(var(--t-tinta) / 0.2); }
 /* Lo apagado es el boton, no el motivo: es justo lo que hay que poder leer. */
-.btn-secundario:disabled { background: rgba(0, 0, 0, 0.15); cursor: not-allowed; }
+.btn-secundario:disabled { background: rgb(var(--t-sombra) / 0.15); cursor: not-allowed; }
 .btn-secundario:disabled strong, .btn-secundario:disabled small { opacity: 0.6; }
 small { opacity: 0.7; font-size: 0.75rem; }
-em { color: #f5b041; font-size: 0.75rem; font-style: normal; }
+em { color: rgb(var(--t-alerta)); font-size: 0.75rem; font-style: normal; }
 .fila-nombre { display: flex; gap: 0.4rem; }
 .entrada-nombre {
-  flex: 1; min-width: 0; min-height: 44px; padding: 0.4rem 0.6rem; border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.25); color: #ecf0f1;
+  flex: 1; min-width: 0; min-height: 44px; padding: 0.4rem 0.6rem; border-radius: calc(var(--t-radio) * 6px);
+  border: 1px solid rgb(var(--t-tinta) / 0.2); background: rgb(var(--t-sombra) / 0.25); color: rgb(var(--t-texto));
 }
-.bono-cuartel { color: #2ecc71; }
+.bono-cuartel { color: rgb(var(--t-exito)); }
 .capital { margin: 0; font-size: 0.85rem; }
 .confirmar {
   position: sticky; bottom: -1.5rem; z-index: 1;
   margin: 0 -0.5rem; padding: 0.75rem;
-  background: #1f2d3a; border: 1px solid #f1c40f; border-radius: 8px;
+  background: rgb(var(--t-panel)); border: 1px solid rgb(var(--t-aviso)); border-radius: calc(var(--t-radio) * 8px);
   display: flex; flex-direction: column; gap: 0.3rem;
-  box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 -6px 16px rgb(var(--t-sombra) / 0.45);
 }
 .confirmar small { opacity: 0.8; font-size: 0.8rem; }
 .confirmar-botones { display: flex; gap: 0.5rem; margin-top: 0.3rem; }
 .btn-confirmar, .btn-cancelar {
-  flex: 1; min-height: 44px; border-radius: 6px; cursor: pointer; font-weight: bold;
-  color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.2);
+  flex: 1; min-height: 44px; border-radius: calc(var(--t-radio) * 6px); cursor: pointer; font-weight: bold;
+  color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.2);
 }
-.btn-confirmar { background: #27ae60; border-color: #27ae60; }
-.btn-cancelar { background: rgba(255, 255, 255, 0.1); }
+.btn-confirmar { background: rgb(var(--t-exito-fuerte)); border-color: rgb(var(--t-exito-fuerte)); }
+.btn-cancelar { background: rgb(var(--t-tinta) / 0.1); }
 </style>

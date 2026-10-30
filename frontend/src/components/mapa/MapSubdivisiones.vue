@@ -196,23 +196,23 @@ h5 { margin: 0.6rem 0 0; font-size: 0.8rem; text-transform: uppercase; opacity: 
 .datos small { opacity: 0.7; font-size: 0.72rem; }
 .acciones { display: flex; gap: 0.25rem; flex-shrink: 0; }
 .mini {
-  background: rgba(255, 255, 255, 0.1); color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 5px; padding: 0.2rem 0.45rem; font-size: 0.72rem; cursor: pointer;
+  background: rgb(var(--t-tinta) / 0.1); color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.15);
+  border-radius: calc(var(--t-radio) * 5px); padding: 0.2rem 0.45rem; font-size: 0.72rem; cursor: pointer;
 }
-.mini:hover { background: rgba(255, 255, 255, 0.2); }
+.mini:hover { background: rgb(var(--t-tinta) / 0.2); }
 .asignar { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.3rem 0 0.2rem 0.6rem; }
 .check { font-size: 0.8rem; display: flex; gap: 0.4rem; align-items: center; }
 .entrada {
-  padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.25); color: #ecf0f1;
+  padding: 0.35rem 0.5rem; border-radius: calc(var(--t-radio) * 6px); border: 1px solid rgb(var(--t-tinta) / 0.2);
+  background: rgb(var(--t-sombra) / 0.25); color: rgb(var(--t-texto));
 }
 .entrada.ancha { width: 100%; box-sizing: border-box; }
 .boton {
-  background: rgba(255, 255, 255, 0.1); color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px; padding: 0.5rem 0.8rem; cursor: pointer; text-align: left;
+  background: rgb(var(--t-tinta) / 0.1); color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.15);
+  border-radius: calc(var(--t-radio) * 6px); padding: 0.5rem 0.8rem; cursor: pointer; text-align: left;
 }
 .boton:disabled { opacity: 0.45; cursor: not-allowed; }
-.vacio { font-size: 0.72rem; font-style: normal; color: #e67e22; }
-.datos small.cabecera { color: #f1c40f; opacity: 1; }
+.vacio { font-size: 0.72rem; font-style: normal; color: rgb(var(--t-alerta)); }
+.datos small.cabecera { color: rgb(var(--t-aviso)); opacity: 1; }
 small { opacity: 0.7; font-size: 0.75rem; }
 </style>

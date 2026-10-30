@@ -67,32 +67,32 @@ const esAtajo = (atajo) =>
 .mecanicas { display: flex; flex-direction: column; gap: 0.4rem; }
 .atajos { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
 .atajo {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  background: rgb(var(--t-tinta) / 0.08);
+  color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.15);
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.2rem 0.55rem;
   min-height: 44px;
   font-size: 0.75rem;
   cursor: pointer;
 }
-.atajo.elegido { border-color: #2ecc71; background: rgba(46, 204, 113, 0.18); }
-.contador { margin-left: auto; font-size: 0.75rem; color: #95a5a6; }
-.nota { margin: 0; font-size: 0.75rem; color: #95a5a6; }
+.atajo.elegido { border-color: rgb(var(--t-exito)); background: rgb(var(--t-exito) / 0.18); }
+.contador { margin-left: auto; font-size: 0.75rem; color: rgb(var(--t-texto-tenue)); }
+.nota { margin: 0; font-size: 0.75rem; color: rgb(var(--t-texto-tenue)); }
 .tarjeta {
   display: grid;
   grid-template-columns: auto 1fr;
   column-gap: 0.5rem;
   align-items: center;
   padding: 0.45rem 0.6rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: calc(var(--t-radio) * 8px);
+  border: 1px solid rgb(var(--t-tinta) / 0.12);
+  background: rgb(var(--t-tinta) / 0.03);
   opacity: 0.6;
   cursor: pointer;
   font-size: 0.88rem;
 }
-.tarjeta.prendida { opacity: 1; border-color: rgba(46, 204, 113, 0.6); background: rgba(46, 204, 113, 0.1); }
+.tarjeta.prendida { opacity: 1; border-color: rgb(var(--t-exito) / 0.6); background: rgb(var(--t-exito) / 0.1); }
 .tarjeta-nombre { font-weight: 600; }
-.tarjeta small { grid-column: 2; color: #95a5a6; }
+.tarjeta small { grid-column: 2; color: rgb(var(--t-texto-tenue)); }
 </style>

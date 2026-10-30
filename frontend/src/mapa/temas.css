@@ -1,0 +1,93 @@
+/* Los colores van como "R G B" para poder escribir rgb(var(--t-tinta) / 0.1): asi una
+   capa translucida es blanca en un tema oscuro y tinta sobre el pergamino, sin
+   duplicar reglas en cada componente. --t-radio multiplica los border-radius. */
+:root {
+  --t-letra: 'IBM Plex Sans', sans-serif;
+  --t-letra-titulo: 'IBM Plex Mono', monospace;
+  --t-radio: 0.5;
+  --t-fondo: 10 20 28;
+  --t-panel: 15 31 42;
+  --t-control: 24 46 60;
+  --t-flotante: 7 14 20;
+  --t-tinta: 200 225 235;
+  --t-sombra: 0 0 0;
+  --t-texto: 215 227 234;
+  --t-texto-suave: 169 188 200;
+  --t-texto-tenue: 127 151 166;
+  --t-exito: 79 209 165;
+  --t-exito-fuerte: 16 120 90;
+  --t-aviso: 255 182 39;
+  --t-alerta: 255 160 60;
+  --t-peligro: 240 104 58;
+  --t-peligro-fuerte: 176 58 30;
+  --t-info: 51 209 224;
+  --t-sobre: 255 255 255;
+  --t-cta: 255 182 39;
+  --t-sobre-cta: 5 9 13;
+}
+
+:root[data-tema='campana'] {
+  --t-letra: 'EB Garamond', Georgia, serif;
+  --t-letra-titulo: 'Cinzel', Georgia, serif;
+  --t-radio: 0.6;
+  --t-fondo: 233 220 191;
+  --t-panel: 239 228 201;
+  --t-control: 246 238 219;
+  --t-flotante: 246 238 219;
+  --t-tinta: 43 32 21;
+  --t-sombra: 90 61 36;
+  --t-texto: 43 32 21;
+  --t-texto-suave: 90 70 45;
+  --t-texto-tenue: 105 84 57;
+  --t-exito: 47 98 35;
+  --t-exito-fuerte: 63 107 47;
+  --t-aviso: 122 84 20;
+  --t-alerta: 140 70 10;
+  --t-peligro: 124 45 30;
+  --t-peligro-fuerte: 124 45 30;
+  --t-info: 45 74 107;
+  --t-sobre: 246 238 219;
+  --t-cta: 124 45 30;
+  --t-sobre-cta: 246 238 219;
+}
+
+:root[data-tema='mesa'] {
+  --t-letra: 'Nunito', 'Trebuchet MS', sans-serif;
+  --t-letra-titulo: 'Baloo 2', 'Trebuchet MS', sans-serif;
+  --t-radio: 2;
+  --t-fondo: 111 208 242;
+  --t-panel: 255 255 255;
+  --t-control: 240 246 252;
+  --t-flotante: 255 255 255;
+  --t-tinta: 38 48 63;
+  --t-sombra: 38 48 63;
+  --t-texto: 38 48 63;
+  --t-texto-suave: 70 80 95;
+  --t-texto-tenue: 80 90 105;
+  --t-exito: 21 128 61;
+  --t-exito-fuerte: 21 128 61;
+  --t-aviso: 161 98 7;
+  --t-alerta: 180 83 9;
+  --t-peligro: 200 30 30;
+  --t-peligro-fuerte: 200 30 30;
+  --t-info: 29 78 216;
+  --t-sobre: 255 255 255;
+  --t-cta: 21 128 61;
+  --t-sobre-cta: 255 255 255;
+}
+
+.map-session, .map-lobby { font-family: var(--t-letra); }
+.map-session :is(button, input, select), .map-lobby :is(button, input, select) { font-family: inherit; }
+.map-session :is(h1, h2, h3), .map-lobby :is(h1, h2, h3), .turno-actual { font-family: var(--t-letra-titulo); }
+
+/* En "Juego de mesa" los paneles son cartas blancas de borde grueso, sobre el cielo. */
+:root[data-tema='mesa'] :is(.player-panel, .panel, .plegable) {
+  background: rgb(var(--t-panel));
+  border: 3px solid rgb(var(--t-tinta));
+}
+:root[data-tema='mesa'] :is(.btn-panel, .btn-sumar, .modo, .pestana) {
+  background: rgb(var(--t-panel));
+  border: 3px solid rgb(var(--t-tinta));
+  font-weight: 700;
+}
+:root[data-tema='mesa'] :is(.map-session, .map-lobby) { font-weight: 700; }

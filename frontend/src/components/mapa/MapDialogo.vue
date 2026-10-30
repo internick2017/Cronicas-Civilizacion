@@ -50,34 +50,34 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 <style scoped>
 .dialogo-overlay {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgb(var(--t-sombra) / 0.6);
   display: flex; align-items: center; justify-content: center;
 }
 .dialogo {
-  background: #2c3e50; border-radius: 12px; padding: 1.5rem;
+  background: rgb(var(--t-panel)); border-radius: calc(var(--t-radio) * 12px); padding: 1.5rem;
   min-width: 280px; max-width: 90vw; max-height: 85vh; overflow-y: auto;
-  color: #ecf0f1; display: flex; flex-direction: column; gap: 0.5rem;
+  color: rgb(var(--t-texto)); display: flex; flex-direction: column; gap: 0.5rem;
   outline: none;
 }
 .cabecera {
   position: sticky; top: -1.5rem; z-index: 1;
   margin: -1.5rem -1.5rem 0; padding: 0.75rem 0.75rem 0.75rem 1.5rem;
-  background: #2c3e50; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgb(var(--t-panel)); border-bottom: 1px solid rgb(var(--t-tinta) / 0.1);
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
 }
 .cabecera h3 { margin: 0; }
 .cerrar-x {
   flex: none; width: 44px; height: 44px; border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1); color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.15); font-size: 1.1rem; cursor: pointer;
+  background: rgb(var(--t-tinta) / 0.1); color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.15); font-size: 1.1rem; cursor: pointer;
 }
-.cerrar-x:hover { background: rgba(255, 255, 255, 0.2); }
+.cerrar-x:hover { background: rgb(var(--t-tinta) / 0.2); }
 .btn-secundario {
-  background: rgba(255, 255, 255, 0.1); color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px;
+  background: rgb(var(--t-tinta) / 0.1); color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.15); border-radius: calc(var(--t-radio) * 6px);
   padding: 0.5rem 0.8rem; min-height: 44px; cursor: pointer; text-align: left;
 }
-.btn-secundario:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
+.btn-secundario:hover:not(:disabled) { background: rgb(var(--t-tinta) / 0.2); }
 .btn-secundario:disabled { opacity: 0.45; cursor: not-allowed; }
 .cerrar { text-align: center; margin-top: 0.5rem; }
 </style>

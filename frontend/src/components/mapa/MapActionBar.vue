@@ -49,10 +49,10 @@ const texto = computed(() => {
 }
 
 .btn-primary {
-  background: linear-gradient(45deg, #27ae60, #2ecc71);
-  color: white;
+  background: rgb(var(--t-cta));
+  color: rgb(var(--t-sobre-cta));
   border: none;
-  border-radius: 6px;
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.6rem 1.2rem;
   min-height: 44px;
   font-size: 0.85rem;
@@ -62,13 +62,13 @@ const texto = computed(() => {
 
 .esperando {
   align-self: center;
-  color: #f1c40f;
+  color: rgb(var(--t-aviso));
   font-size: 0.9rem;
 }
 
 .btn-primary:disabled {
-  background: rgba(255, 255, 255, 0.1);
-  color: #bdc3c7;
+  background: rgb(var(--t-tinta) / 0.1);
+  color: rgb(var(--t-texto-suave));
   cursor: not-allowed;
 }
 

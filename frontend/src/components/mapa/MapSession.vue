@@ -10,6 +10,8 @@ import { puedeJugar } from './turno.js'
 import { textoCosto, textoFalta } from './recursos.js'
 import MapAlianzas from './MapAlianzas.vue'
 import MapCiudadano from './MapCiudadano.vue'
+import MapTema from './MapTema.vue'
+import { tema } from '../../mapa/temas.js'
 import { amigosDe, propuestasPara } from './alianzas.js'
 import { deQuienEs } from './casilla.js'
 import { colorCssDeJugador } from '../../mapa/sprites.js'
@@ -59,6 +61,7 @@ const nombreCiudad = ref('')
 const canvasRef = ref(null)
 const ciudadesAbierto = ref(false)
 const ciudadanoAbierto = ref(false)
+const temaAbierto = ref(false)
 const ayudaAbierta = ref(false)
 const gobiernoAbierto = ref(false)
 const alianzasAbierto = ref(false)
@@ -657,7 +660,7 @@ onUnmounted(() => {
 
 <template>
   <div class="map-session">
-    <MapPlayerPanel :vista="vista" :jugador-id="jugadorId" :constantes="constantes" @sumar-maquina="maquinaAbierta = true" @renombrar-pais="nombre => ejecutarAccion({ tipo: 'renombrarPais', nombre })" />
+    <MapPlayerPanel :vista="vista" :jugador-id="jugadorId" :constantes="constantes" @sumar-maquina="maquinaAbierta = true" @elegir-tema="temaAbierto = true" @renombrar-pais="nombre => ejecutarAccion({ tipo: 'renombrarPais', nombre })" />
 
     <div v-if="vista.estado === 'esperando'" class="sala-espera">
       <p class="sala-codigo">
@@ -724,8 +727,10 @@ onUnmounted(() => {
       <!-- Los paneles flotan solo sobre el mapa: si flotaran sobre toda la zona
            taparian la botonera, como le pasaba a la cronica. -->
       <div class="lienzo">
+        <!-- shortcut: cambiar de tema remonta el mapa y vuelve a centrar la camara; alcanza porque se cambia rara vez. -->
         <MapCanvas
           ref="canvasRef"
+          :key="tema"
           :vista="vista"
           :jugador-id="jugadorId"
           :seleccion="seleccion"
@@ -779,6 +784,10 @@ onUnmounted(() => {
         No hay vuelta atrás: abandonás esta partida y los demás siguen jugando sin vos.
       </p>
       <button class="btn-primario btn-peligro" @click="confirmarSalida">Sí, salir</button>
+    </MapDialogo>
+
+    <MapDialogo :abierto="temaAbierto" titulo="Apariencia" @cerrar="temaAbierto = false">
+      <MapTema />
     </MapDialogo>
 
     <MapDialogo :abierto="ciudadanoAbierto" titulo="Tu vida de ciudadano" @cerrar="ciudadanoAbierto = false">
@@ -933,8 +942,8 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.6rem;
   padding: 0.6rem;
-  color: #ecf0f1;
-  background: #1a2332;
+  color: rgb(var(--t-texto));
+  background: rgb(var(--t-fondo));
   overflow: hidden;
 }
 
@@ -977,10 +986,10 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: rgba(15, 20, 25, 0.85);
-  color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  background: rgb(var(--t-flotante) / 0.85);
+  color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.2);
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.4rem 0.7rem;
   min-height: 44px;
   cursor: pointer;
@@ -989,12 +998,12 @@ onUnmounted(() => {
 }
 
 .etiqueta-cargos { font-size: 0.75rem; opacity: 0.85; align-self: center; }
-.btn-panel:hover { background: rgba(52, 152, 219, 0.35); }
+.btn-panel:hover { background: rgb(var(--t-info) / 0.35); }
 
 /* Salir es la unica accion de la botonera que no se puede deshacer: se separa
    del resto y se tiñe para que nadie la toque de paso. */
-.btn-salir { margin-left: 0.6rem; border-color: rgba(231, 76, 60, 0.5); }
-.btn-salir:hover { background: rgba(231, 76, 60, 0.35); }
+.btn-salir { margin-left: 0.6rem; border-color: rgb(var(--t-peligro) / 0.5); }
+.btn-salir:hover { background: rgb(var(--t-peligro) / 0.35); }
 
 .salida-aviso { margin: 0; line-height: 1.45; }
 
@@ -1002,37 +1011,37 @@ onUnmounted(() => {
 .casilla-ajena {
   margin: 0;
   padding: 0.45rem 0.75rem;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
-  border-left: 4px solid #e74c3c;
-  color: #ecf0f1;
+  border-radius: calc(var(--t-radio) * 8px);
+  background: rgb(var(--t-tinta) / 0.07);
+  border-left: 4px solid rgb(var(--t-peligro));
+  color: rgb(var(--t-texto));
   font-size: 0.85rem;
 }
-.casilla-ajena.aliado { border-left-color: #2ecc71; }
-.casilla-ajena.tregua { border-left-color: #f1c40f; }
+.casilla-ajena.aliado { border-left-color: rgb(var(--t-exito)); }
+.casilla-ajena.tregua { border-left-color: rgb(var(--t-aviso)); }
 .casilla-ajena .color-bando {
   display: inline-block;
   width: 0.9em;
   height: 0.9em;
-  border-radius: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: calc(var(--t-radio) * 3px);
+  border: 1px solid rgb(var(--t-tinta) / 0.6);
   margin-right: 0.35rem;
   vertical-align: -0.1em;
 }
 .campo-maquina { display: flex; flex-direction: column; gap: 0.3rem; }
 .campo-maquina select {
-  background: #34495e; color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px; padding: 0.5rem;
+  background: rgb(var(--t-control)); color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.2);
+  border-radius: calc(var(--t-radio) * 6px); padding: 0.5rem;
 }
-.salida-fuerte { color: #e67e22; }
-.btn-peligro { background: #c0392b; margin-top: 0.4rem; }
+.salida-fuerte { color: rgb(var(--t-alerta)); }
+.btn-peligro { background: rgb(var(--t-peligro-fuerte)); margin-top: 0.4rem; }
 
 .panel-flotante {
   position: absolute;
   z-index: 2;
-  background: rgba(15, 20, 25, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
+  background: rgb(var(--t-flotante) / 0.92);
+  border: 1px solid rgb(var(--t-tinta) / 0.15);
+  border-radius: calc(var(--t-radio) * 8px);
 }
 
 .panel-ciudades {
@@ -1047,7 +1056,7 @@ onUnmounted(() => {
   gap: 0.3rem;
 }
 
-.panel-ciudades h3 { margin: 0 0 0.3rem; font-size: 1rem; color: #f1c40f; }
+.panel-ciudades h3 { margin: 0 0 0.3rem; font-size: 1rem; color: rgb(var(--t-aviso)); }
 .panel-vacio { opacity: 0.6; font-style: italic; margin: 0; font-size: 0.85rem; }
 
 .item-ciudad {
@@ -1055,10 +1064,10 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: baseline;
   gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.06);
-  color: #ecf0f1;
+  background: rgb(var(--t-tinta) / 0.06);
+  color: rgb(var(--t-texto));
   border: 0;
-  border-radius: 6px;
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.45rem 0.6rem;
   min-height: 44px;
   cursor: pointer;
@@ -1066,7 +1075,7 @@ onUnmounted(() => {
   font-size: 0.85rem;
 }
 
-.item-ciudad:hover { background: rgba(52, 152, 219, 0.35); }
+.item-ciudad:hover { background: rgb(var(--t-info) / 0.35); }
 .item-ciudad small { opacity: 0.6; font-size: 0.75rem; }
 
 /* La cronica es el corazon narrativo del juego: va a la vista, no enterrada
@@ -1087,13 +1096,13 @@ onUnmounted(() => {
   width: 44px;
   height: 44px;
   background: transparent;
-  color: #bdc3c7;
+  color: rgb(var(--t-texto-suave));
   border: 0;
   font-size: 0.85rem;
   cursor: pointer;
 }
 
-.cerrar-cronica:hover { color: #fff; }
+.cerrar-cronica:hover { color: rgb(var(--t-sobre)); }
 
 /* La cronica ahora vive dentro de un panel que ya pone fondo y borde: sin
    esto se veria un recuadro dentro de otro. */
@@ -1131,10 +1140,10 @@ onUnmounted(() => {
 }
 
 .sala-espera {
-  background: rgba(52, 152, 219, 0.15);
-  border-radius: 8px;
+  background: rgb(var(--t-info) / 0.15);
+  border-radius: calc(var(--t-radio) * 8px);
   padding: 1rem 1.25rem;
-  color: #ecf0f1;
+  color: rgb(var(--t-texto));
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -1148,14 +1157,14 @@ onUnmounted(() => {
 }
 
 .sala-codigo strong {
-  color: #3498db;
+  color: rgb(var(--t-info));
   letter-spacing: 0.2rem;
 }
 
 .sala-titulo {
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
-  color: #bdc3c7;
+  color: rgb(var(--t-texto-suave));
 }
 
 .sala-lista {
@@ -1168,32 +1177,32 @@ onUnmounted(() => {
 }
 
 .sala-etiqueta {
-  color: #f1c40f;
+  color: rgb(var(--t-aviso));
   font-size: 0.75rem;
 }
 
 .sala-motivo {
   margin: 0.25rem 0 0;
-  color: #e67e22;
+  color: rgb(var(--t-alerta));
   font-size: 0.85rem;
 }
 
 .insignia-aviso {
-  margin-left: 0.35rem; background: #e67e22; color: #fff; border-radius: 999px;
+  margin-left: 0.35rem; background: rgb(var(--t-alerta)); color: rgb(var(--t-sobre)); border-radius: 999px;
   padding: 0 0.4rem; font-size: 0.75rem; font-weight: 700;
 }
 .entrada-nombre {
-  background: rgba(0, 0, 0, 0.3); color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;
+  background: rgb(var(--t-sombra) / 0.3); color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.2); border-radius: calc(var(--t-radio) * 6px);
   padding: 0.5rem 0.7rem; font-size: 1rem;
 }
 .costo-fundar { opacity: 0.7; font-size: 0.75rem; }
-.motivo-fundar { color: #e67e22; font-size: 0.75rem; font-style: normal; }
+.motivo-fundar { color: rgb(var(--t-alerta)); font-size: 0.75rem; font-style: normal; }
 .ataque { display: flex; flex-direction: column; gap: 0.4rem; }
 .ataque-linea { display: flex; justify-content: space-between; gap: 1rem; margin: 0; }
 .ataque-nota { opacity: 0.7; font-size: 0.75rem; margin: 0.3rem 0 0.6rem; }
 .btn-primario {
-  background: #3498db; color: #fff; border: 0; border-radius: 6px;
+  background: rgb(var(--t-info)); color: rgb(var(--t-sobre)); border: 0; border-radius: calc(var(--t-radio) * 6px);
   padding: 0.5rem 0.9rem; min-height: 44px; font-size: 0.85rem; cursor: pointer;
 }
 .btn-primario:disabled { opacity: 0.6; cursor: not-allowed; }

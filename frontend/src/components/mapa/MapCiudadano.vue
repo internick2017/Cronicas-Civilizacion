@@ -56,17 +56,17 @@ const jugando = computed(() => props.vista.estado === 'jugando')
 .apoyos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; }
 .apoyos li { display: grid; grid-template-columns: 5rem 1fr 2rem; align-items: center; gap: 0.5rem; }
 .apoyos strong { text-align: right; }
-.barra { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
-.lleno { display: block; height: 100%; background: #2ecc71; }
-.lleno.bajo { background: #e74c3c; }
-.alerta { color: #f5b041; font-size: 0.75rem; font-style: normal; }
+.barra { height: 8px; border-radius: calc(var(--t-radio) * 4px); background: rgb(var(--t-tinta) / 0.12); overflow: hidden; }
+.lleno { display: block; height: 100%; background: rgb(var(--t-exito)); }
+.lleno.bajo { background: rgb(var(--t-peligro)); }
+.alerta { color: rgb(var(--t-alerta)); font-size: 0.75rem; font-style: normal; }
 .botones { display: flex; gap: 0.5rem; }
 .botones button {
-  flex: 1; min-height: 44px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold;
-  color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.2);
+  flex: 1; min-height: 44px; border-radius: calc(var(--t-radio) * 6px); cursor: pointer; font-size: 0.85rem; font-weight: bold;
+  color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.2);
 }
-.btn-apoyar { background: #27ae60; }
-.btn-protestar { background: #c0392b; }
+.btn-apoyar { background: rgb(var(--t-exito-fuerte)); }
+.btn-protestar { background: rgb(var(--t-peligro-fuerte)); }
 .botones button:disabled { opacity: 0.6; cursor: not-allowed; }
 small { opacity: 0.8; font-size: 0.75rem; }
 </style>

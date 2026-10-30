@@ -639,13 +639,13 @@ const umbralAviso = computed(() =>
 <style scoped>
 .ayuda { display: flex; flex-direction: column; gap: 1rem; font-size: 0.9rem; }
 .ayuda section { display: flex; flex-direction: column; gap: 0.4rem; }
-.ayuda h4 { margin: 0; color: #f1c40f; font-size: 0.95rem; }
+.ayuda h4 { margin: 0; color: rgb(var(--t-aviso)); font-size: 0.95rem; }
 .ayuda p { margin: 0; line-height: 1.45; }
-.aviso { color: #e67e22; }
+.aviso { color: rgb(var(--t-alerta)); }
 .ayuda-vacia { opacity: 0.7; font-style: italic; }
 
 table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
-th, td { text-align: left; padding: 0.25rem 0.4rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-th { color: #bdc3c7; font-weight: 600; }
+th, td { text-align: left; padding: 0.25rem 0.4rem; border-bottom: 1px solid rgb(var(--t-tinta) / 0.1); }
+th { color: rgb(var(--t-texto-suave)); font-weight: 600; }
 td small { opacity: 0.6; }
 </style>

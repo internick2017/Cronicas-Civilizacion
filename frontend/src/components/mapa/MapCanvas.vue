@@ -5,7 +5,8 @@ import { Application, Container, Sprite, Graphics, Text, Assets } from 'pixi.js'
 // PixiJS genera codigo con eval por dentro; este modulo lo reemplaza para que el mapa
 // funcione con la politica de seguridad (CSP) del servidor en produccion.
 import 'pixi.js/unsafe-eval'
-import { SPRITE_TERRENO, TINTE_TERRENO, ROTACION_TERRENO, SPRITE_CIUDAD, SPRITE_CIUDADANO, SPRITE_UNIDAD, colorDeJugador, cargarSprites } from '../../mapa/sprites.js'
+import { SPRITE_TERRENO, ROTACION_TERRENO, SPRITE_CIUDAD, SPRITE_CIUDADANO, SPRITE_UNIDAD, colorDeJugador, cargarSprites } from '../../mapa/sprites.js'
+import { paletaDeMapa } from '../../mapa/temas.js'
 import { aliadosDe } from './alianzas.js'
 
 const props = defineProps({
@@ -18,6 +19,8 @@ const props = defineProps({
 const emit = defineEmits(['click-tile'])
 
 const TILE = 48 // pixeles por casilla en zoom 1
+// Se lee una vez: MapSession remonta este componente al cambiar de tema.
+const paleta = paletaDeMapa()
 // Piso absoluto, por si el lienzo todavia no tiene tamano real. El piso que
 // manda en la practica es zoomMinimo(), que se calcula contra la pantalla.
 const ZOOM_MIN = 0.35
@@ -158,7 +161,7 @@ function actualizarTerreno() {
     // El tinte es lo que separa el mar de la montana y el rio del mar: los
     // sprites crudos son campos palidos casi indistinguibles (ver el comentario
     // de TINTE_TERRENO). Sin entrada en la tabla se dibuja tal cual viene.
-    sprite.tint = TINTE_TERRENO[tile.terreno] ?? 0xffffff
+    sprite.tint = paleta.tintes[tile.terreno] ?? 0xffffff
     capaTerreno.addChild(sprite)
     terrenoDibujado.add(clave)
   }
@@ -221,9 +224,9 @@ function dibujarTerritorio() {
 // porque el rio se vadea. Si se dibujaran iguales, la imagen le estaria
 // diciendo al jugador lo contrario de lo que dice la regla, y evitaria cruzar
 // rios por reflejo.
-const COSTA_COLOR = 0x0d2b45
+const COSTA_COLOR = paleta.costa
 const COSTA_GROSOR = 3
-const RIBERA_COLOR = 0x2e6b7a
+const RIBERA_COLOR = paleta.ribera
 const RIBERA_GROSOR = 1.5
 
 const esMar = (tile) => tile.terreno === 'water'
@@ -536,8 +539,8 @@ function hashCasilla(x, y, semilla) {
 // "territorio todavia no visto" en vez de "vacio". doble variante de color
 // mas variacion de alpha, ambas derivadas del hash, dan el efecto de nube
 // sin generar mas que un rect+fill por casilla (mismo costo que antes).
-const NIEBLA_COLOR_A = 0x2c333c
-const NIEBLA_COLOR_B = 0x454e59
+const NIEBLA_COLOR_A = paleta.niebla[0]
+const NIEBLA_COLOR_B = paleta.niebla[1]
 const NIEBLA_ALPHA_MIN = 0.82
 const NIEBLA_ALPHA_MAX = 0.95
 // Casillas de niebla pegadas a zona descubierta: mas transparentes, para que
@@ -1005,7 +1008,7 @@ onMounted(async () => {
 
   const nuevaApp = new Application()
   await nuevaApp.init({
-    background: 0x0f1419,
+    background: paleta.fondo,
     resizeTo: contenedor.value,
     antialias: false
   })
@@ -1143,8 +1146,8 @@ defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar, irA })
 .map-canvas {
   width: 100%;
   height: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
+  border: 1px solid rgb(var(--t-tinta) / 0.15);
+  border-radius: calc(var(--t-radio) * 8px);
   overflow: hidden;
   touch-action: none;
 }
@@ -1160,10 +1163,10 @@ defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar, irA })
   position: absolute;
   bottom: 0.75rem;
   right: 0.75rem;
-  background: rgba(15, 20, 25, 0.85);
-  color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  background: rgb(var(--t-flotante) / 0.85);
+  color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.2);
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.5rem 0.8rem;
   min-height: 44px;
   cursor: pointer;
@@ -1171,6 +1174,6 @@ defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar, irA })
 }
 
 .btn-recentrar:hover {
-  background: rgba(52, 152, 219, 0.35);
+  background: rgb(var(--t-info) / 0.35);
 }
 </style>

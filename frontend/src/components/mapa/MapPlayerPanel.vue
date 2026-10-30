@@ -13,7 +13,7 @@ const props = defineProps({
   constantes: { type: Object, default: null }
 })
 
-const emit = defineEmits(['sumar-maquina', 'renombrar-pais'])
+const emit = defineEmits(['sumar-maquina', 'renombrar-pais', 'elegir-tema'])
 const simultaneo = computed(() => esSimultaneo(props.vista))
 const jugadorActual = computed(() => props.vista.jugadores[props.vista.indiceJugadorActual])
 // A quien se resalta en la lista: en secuencial, al que le toca; en simultaneo, a todo el que sigue jugando.
@@ -118,6 +118,7 @@ const RECURSOS_ICONOS = {
 <template>
   <div class="player-panel">
     <div class="turno-actual">
+      <button class="btn-tema" title="Apariencia" aria-label="Apariencia" @click="emit('elegir-tema')">🎨</button>
       <button class="btn-jugadores" :aria-expanded="jugadoresAbiertos" aria-label="Jugadores" @click="jugadoresAbiertos = !jugadoresAbiertos">
         👥 {{ vista.jugadores.length }}
       </button>
@@ -207,11 +208,11 @@ const RECURSOS_ICONOS = {
 <style scoped>
 /* Dos columnas: el panel se queda con poco alto y el resto va para el mapa. */
 .player-panel {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: rgb(var(--t-tinta) / 0.05);
+  border: 1px solid rgb(var(--t-tinta) / 0.1);
+  border-radius: calc(var(--t-radio) * 12px);
   padding: 0.6rem 1rem;
-  color: #ecf0f1;
+  color: rgb(var(--t-texto));
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
   column-gap: 1.5rem;
@@ -234,21 +235,32 @@ const RECURSOS_ICONOS = {
   float: right;
   min-width: 44px;
   min-height: 44px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  background: rgb(var(--t-tinta) / 0.08);
+  color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.2);
+  border-radius: calc(var(--t-radio) * 6px);
   font-size: 0.85rem;
   cursor: pointer;
 }
 
+.btn-tema {
+  float: right;
+  margin-left: 0.3rem;
+  min-width: 32px;
+  min-height: 32px;
+  background: rgb(var(--t-tinta) / 0.08);
+  border: 1px solid rgb(var(--t-tinta) / 0.2);
+  border-radius: calc(var(--t-radio) * 6px);
+  cursor: pointer;
+}
+
 .tu-turno {
-  color: #2ecc71;
+  color: rgb(var(--t-exito));
   margin-left: 0.35rem;
 }
 
 .limite {
-  color: #f39c12;
+  color: rgb(var(--t-alerta));
 }
 
 .recursos {
@@ -259,14 +271,14 @@ const RECURSOS_ICONOS = {
 }
 
 .rinde {
-  color: #2ecc71;
+  color: rgb(var(--t-exito));
   font-size: 0.75rem;
   margin-left: 0.15rem;
 }
 
 /* Un +0 en verde se lee como "todo bien"; en gris apagado se lee como lo que
    es: ese recurso no esta entrando. */
-.rinde.nada { color: #7f8c8d; }
+.rinde.nada { color: rgb(var(--t-texto-tenue)); }
 
 .dominacion {
   display: flex;
@@ -280,25 +292,25 @@ const RECURSOS_ICONOS = {
   justify-content: space-between;
 }
 
-.dominacion-cabecera .cerca { color: #f1c40f; }
+.dominacion-cabecera .cerca { color: rgb(var(--t-aviso)); }
 
 .barra {
   height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.12);
+  border-radius: calc(var(--t-radio) * 3px);
+  background: rgb(var(--t-tinta) / 0.12);
   overflow: hidden;
 }
 
 .barra-llena {
   height: 100%;
-  background: linear-gradient(90deg, #27ae60, #f1c40f);
+  background: linear-gradient(90deg, rgb(var(--t-exito-fuerte)), rgb(var(--t-aviso)));
   transition: width 0.4s ease;
 }
 
 .aviso-rival {
   margin: 0;
   font-size: 0.75rem;
-  color: #e67e22;
+  color: rgb(var(--t-alerta));
 }
 
 .jugadores-lista {
@@ -306,7 +318,7 @@ const RECURSOS_ICONOS = {
   padding: 0;
   margin: 0;
   font-size: 0.85rem;
-  color: #bdc3c7;
+  color: rgb(var(--t-texto-suave));
   max-height: 6rem;
   overflow-y: auto;
 }
@@ -319,8 +331,8 @@ const RECURSOS_ICONOS = {
   display: inline-block;
   width: 0.9em;
   height: 0.9em;
-  border-radius: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: calc(var(--t-radio) * 3px);
+  border: 1px solid rgb(var(--t-tinta) / 0.6);
   margin-right: 0.35rem;
   vertical-align: -0.1em;
 }
@@ -339,17 +351,17 @@ const RECURSOS_ICONOS = {
 
 .btn-sumar {
   align-self: flex-start;
-  background: rgba(255, 255, 255, 0.08);
-  color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  background: rgb(var(--t-tinta) / 0.08);
+  color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.2);
+  border-radius: calc(var(--t-radio) * 6px);
   padding: 0.4rem 0.7rem;
   min-height: 44px;
   font-size: 0.85rem;
   cursor: pointer;
 }
 
-.btn-sumar:hover { background: rgba(255, 255, 255, 0.16); }
+.btn-sumar:hover { background: rgb(var(--t-tinta) / 0.16); }
 .btn-sumar:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-renombrar {
@@ -371,36 +383,36 @@ const RECURSOS_ICONOS = {
   flex: 1 1 10rem;
   min-height: 44px;
   padding: 0.3rem 0.5rem;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.25);
-  color: #ecf0f1;
+  border-radius: calc(var(--t-radio) * 6px);
+  border: 1px solid rgb(var(--t-tinta) / 0.2);
+  background: rgb(var(--t-sombra) / 0.25);
+  color: rgb(var(--t-texto));
   font-size: 0.85rem;
 }
 
 .jugadores-lista .aliado {
-  color: #f1c40f;
+  color: rgb(var(--t-aviso));
   margin-left: 0.25rem;
 }
 
 .jugadores-lista .listo {
-  color: #2ecc71;
+  color: rgb(var(--t-exito));
   margin-left: 0.25rem;
 }
 
 .jugadores-lista .activo {
-  color: #3498db;
+  color: rgb(var(--t-info));
   font-weight: bold;
 }
 
 @media (max-width: 640px), (pointer: coarse) {
-  .btn-renombrar { min-width: 44px; min-height: 44px; }
+  .btn-renombrar, .btn-tema { min-width: 44px; min-height: 44px; }
 }
 
 /* En el telefono el panel es una tira: ronda, recursos y dominacion. Los
    jugadores se abren con el boton. */
 @media (max-width: 640px) {
-  .player-panel { grid-template-columns: minmax(0, 1fr); padding: 0.4rem 0.6rem; border-radius: 8px; }
+  .player-panel { grid-template-columns: minmax(0, 1fr); padding: 0.4rem 0.6rem; border-radius: calc(var(--t-radio) * 8px); }
   .jugadores { grid-column: 1; grid-row: auto; }
   .jugadores.plegada { display: none; }
   .btn-jugadores { display: block; }

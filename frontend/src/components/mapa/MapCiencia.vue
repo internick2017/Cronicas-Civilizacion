@@ -88,17 +88,17 @@ const efecto = (tec) => {
 
 .tecnologia {
   display: flex; flex-direction: column; gap: 0.15rem;
-  background: rgba(255, 255, 255, 0.08); color: #ecf0f1;
-  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px;
+  background: rgb(var(--t-tinta) / 0.08); color: rgb(var(--t-texto));
+  border: 1px solid rgb(var(--t-tinta) / 0.12); border-radius: calc(var(--t-radio) * 8px);
   padding: 0.5rem 0.7rem; cursor: pointer; text-align: left;
 }
-.tecnologia:hover:not(:disabled) { background: rgba(52, 152, 219, 0.3); }
+.tecnologia:hover:not(:disabled) { background: rgb(var(--t-info) / 0.3); }
 .tecnologia:disabled { cursor: not-allowed; opacity: 0.6; }
-.tecnologia.investigada { border-color: rgba(46, 204, 113, 0.5); opacity: 0.85; }
+.tecnologia.investigada { border-color: rgb(var(--t-exito) / 0.5); opacity: 0.85; }
 
 .tecnologia-titulo { display: flex; justify-content: space-between; gap: 0.6rem; font-weight: 600; }
 .tecnologia-titulo small { font-weight: 400; opacity: 0.85; }
-.tecnologia-efecto { color: #2ecc71; font-size: 0.78rem; }
+.tecnologia-efecto { color: rgb(var(--t-exito)); font-size: 0.78rem; }
 .tecnologia-desc { opacity: 0.6; font-size: 0.76rem; font-style: italic; }
-.tecnologia-motivo { color: #e67e22; font-size: 0.75rem; font-style: normal; }
+.tecnologia-motivo { color: rgb(var(--t-alerta)); font-size: 0.75rem; font-style: normal; }
 </style>

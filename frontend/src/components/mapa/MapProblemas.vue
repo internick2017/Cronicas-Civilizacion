@@ -102,9 +102,9 @@ const resolutor = (p) => {
 <style scoped>
 .problemas { display: flex; flex-direction: column; gap: 0.3rem; }
 h5 { margin: 0.4rem 0 0; font-size: 0.8rem; text-transform: uppercase; opacity: 0.7; }
-.problema { display: flex; flex-direction: column; border-left: 3px solid #e74c3c; padding-left: 0.5rem; }
-.aviso { margin: 0; font-size: 0.82rem; color: #f1c40f; }
-.recuperacion { margin: 0; font-size: 0.82rem; color: #2ecc71; }
-.tranquilo { font-size: 0.75rem; font-style: normal; color: #2ecc71; }
+.problema { display: flex; flex-direction: column; border-left: 3px solid rgb(var(--t-peligro)); padding-left: 0.5rem; }
+.aviso { margin: 0; font-size: 0.82rem; color: rgb(var(--t-aviso)); }
+.recuperacion { margin: 0; font-size: 0.82rem; color: rgb(var(--t-exito)); }
+.tranquilo { font-size: 0.75rem; font-style: normal; color: rgb(var(--t-exito)); }
 small { opacity: 0.75; font-size: 0.75rem; }
 </style>
