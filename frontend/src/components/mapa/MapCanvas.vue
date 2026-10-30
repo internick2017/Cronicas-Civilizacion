@@ -34,6 +34,7 @@ let capaCosta = null   // linea de costa (mar/tierra) y ribera (rio/tierra)
 let capaTerritorio = null
 let capaPiezas = null  // ciudades y ejercitos
 let capaGente = null   // ciudadanos que caminan dentro de las ciudades
+let capaCarteles = null // barras e insignias: encima de la gente, para que nadie tape un numero
 let capaOverlay = null // seleccion, alcanzables
 let capaNiebla = null
 
@@ -311,6 +312,27 @@ function coronaCapital(tile) {
   corona.y = tile.y * TILE + 14
   return corona
 }
+// Insignia de la raza del dueno: el color ya dice DE QUIEN es la pieza, asi que
+// la raza va por la forma. Disco oscuro porque el icono de los humanos (👑) es
+// el mismo que el de la capital y sin el disco se confundirian. Entra justo entre
+// la barra de la ciudad y la de la tropa: en esa franja no tapa ningun numero.
+const DIAMETRO_INSIGNIA = 15
+function insignia(tile, duenoId) {
+  const tipo = props.vista.jugadores.find(j => j.id === duenoId)?.raza
+  const icono = props.constantes?.razas?.find(r => r.tipo === tipo)?.icono
+  if (!icono) return null
+  const r = DIAMETRO_INSIGNIA / 2
+  const grupo = new Container()
+  grupo.x = (tile.x + 1) * TILE - DIAMETRO_INSIGNIA - 2
+  grupo.y = tile.y * TILE + 14
+  grupo.addChild(new Graphics().circle(r, r, r).fill({ color: 0x000000, alpha: 0.65 }))
+  const texto = new Text({ text: icono, style: { fontSize: 9 } })
+  texto.anchor.set(0.5)
+  texto.x = r
+  texto.y = r
+  grupo.addChild(texto)
+  return grupo
+}
 function barraVidaCiudad(tile) {
   return barraVida(tile, tile.ciudad.salud, tile.ciudad.saludMax, 2)
 }
@@ -342,6 +364,7 @@ function dibujarPiezas() {
   // vuelo). Sin esto, limpiar(capaPiezas) revienta contra null.
   if (!capaPiezas) return
   limpiar(capaPiezas)
+  limpiar(capaCarteles)
   spritesCiudad.clear()
   const aliados = new Set(aliadosDe(props.vista, props.jugadorId))
   // Van al final, encima de todas las piezas: si no, la tropa de la casilla de
@@ -363,7 +386,7 @@ function dibujarPiezas() {
       capaPiezas.addChild(sprite)
       spritesCiudad.set(`${tile.x}:${tile.y}`, sprite)
       const vida = barraVidaCiudad(tile)
-      if (vida) capaPiezas.addChild(vida)
+      if (vida) carteles.push(vida)
       if (tile.ciudad.capital) carteles.push(coronaCapital(tile))
     }
 
@@ -381,10 +404,16 @@ function dibujarPiezas() {
 
       // Barra de salud con el numero adentro, siempre (no solo si esta danado).
       const barra = barraVida(tile, tile.ejercito.salud, saludMaximaDe(tile.ejercito.tipo), TILE - 18)
-      if (barra) capaPiezas.addChild(barra)
+      if (barra) carteles.push(barra)
     }
+
+    // Una sola por casilla: la guarnicion es del dueno de la ciudad, y si alguna
+    // vez no lo fuera, la tropa manda igual que en el cartel de aliado.
+    const duenoPieza = tile.ejercito?.dueno ?? (tile.ciudad ? tile.dueno : null)
+    const marca = duenoPieza ? insignia(tile, duenoPieza) : null
+    if (marca) carteles.push(marca)
   }
-  for (const cartel of carteles) capaPiezas.addChild(cartel)
+  for (const cartel of carteles) capaCarteles.addChild(cartel)
 }
 
 // --- Gente de las ciudades -----------------------------------------------
@@ -988,6 +1017,8 @@ onMounted(async () => {
   }
   app = nuevaApp
   contenedor.value.appendChild(app.canvas)
+  app.canvas.setAttribute('role', 'img')
+  app.canvas.setAttribute('aria-label', 'Mapa de la partida')
 
   mundo = new Container()
   capaTerreno = new Container()
@@ -995,12 +1026,13 @@ onMounted(async () => {
   capaTerritorio = new Container()
   capaPiezas = new Container()
   capaGente = new Container()
+  capaCarteles = new Container()
   capaOverlay = new Container()
   capaNiebla = new Container()
   // La costa va ENCIMA del territorio: si fuera debajo, el relleno del color
   // del dueno le pasaria por arriba y la desdibujaria justo en las casillas
   // donde mas importa, que son las que alguien reclamo sobre la orilla.
-  mundo.addChild(capaTerreno, capaTerritorio, capaCosta, capaPiezas, capaGente, capaOverlay, capaNiebla)
+  mundo.addChild(capaTerreno, capaTerritorio, capaCosta, capaPiezas, capaGente, capaCarteles, capaOverlay, capaNiebla)
   app.stage.addChild(mundo)
   app.ticker.add(moverGente)
 
@@ -1104,6 +1136,7 @@ defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar, irA })
      siempre pasaban de una pantalla y obligaban a scrollear. */
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
 }
 
@@ -1132,8 +1165,9 @@ defineExpose({ TILE, mundoRef: () => mundo, appRef: () => app, recentrar, irA })
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   padding: 0.5rem 0.8rem;
+  min-height: 44px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .btn-recentrar:hover {

@@ -21,6 +21,8 @@ const estaJugando = (j) => puedeJugar(props.vista, j.id)
 const misAliados = computed(() => aliadosDe(props.vista, props.jugadorId))
 const termino = (j) => simultaneo.value && j.activo && yaTermino(props.vista, j.id)
 const yo = computed(() => props.vista.jugadores.find(j => j.id === props.jugadorId))
+// Solo tiene efecto en telefonos: ahi la lista arranca plegada para darle el alto al mapa.
+const jugadoresAbiertos = ref(false)
 
 // Renombrar el pais es gratis y no exige turno. El limite de largo es el del
 // backend (LARGO_MAXIMO_NOMBRE_PAIS en reglas/pais.js): aca solo evita que el
@@ -116,7 +118,10 @@ const RECURSOS_ICONOS = {
 <template>
   <div class="player-panel">
     <div class="turno-actual">
-      Turno {{ vista.turno }}<span v-if="limiteRondas" class="limite"> / {{ limiteRondas }}</span>
+      <button class="btn-jugadores" :aria-expanded="jugadoresAbiertos" aria-label="Jugadores" @click="jugadoresAbiertos = !jugadoresAbiertos">
+        👥 {{ vista.jugadores.length }}
+      </button>
+      Ronda {{ vista.turno }}<span v-if="limiteRondas" class="limite"> / {{ limiteRondas }}</span>
       <template v-if="simultaneo">
         — <strong>juegan todos</strong>
         <span v-if="puedeJugar(vista, jugadorId)" class="tu-turno">(te falta terminar)</span>
@@ -160,11 +165,12 @@ const RECURSOS_ICONOS = {
       </p>
     </div>
 
+    <div :class="['jugadores', { plegada: !jugadoresAbiertos }]">
     <ul class="jugadores-lista">
       <li v-for="j in vista.jugadores" :key="j.id" :class="{ activo: estaJugando(j) }">
         <span class="color-bando" :style="{ background: colorCssDeJugador(vista.jugadores, j.id) }" title="Su color en el mapa"></span>
         <span v-if="j.esBot" title="Jugador controlado por la máquina">🤖</span>
-        {{ j.nombre }} ({{ j.civilizacion }})
+        {{ j.nombre }}<template v-if="j.civilizacion !== j.nombre"> ({{ j.civilizacion }})</template>
         <button
           v-if="j.id === jugadorId && puedeRenombrarPais && !editandoPais"
           class="btn-renombrar"
@@ -194,23 +200,51 @@ const RECURSOS_ICONOS = {
     <button v-if="vista.estado === 'jugando'" class="btn-sumar" @click="$emit('sumar-maquina')">
       ➕ Sumar una máquina
     </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* Dos columnas: el panel se queda con poco alto y el resto va para el mapa. */
 .player-panel {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-  padding: 1rem;
+  padding: 0.6rem 1rem;
   color: #ecf0f1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+  column-gap: 1.5rem;
+  row-gap: 0.35rem;
+}
+
+.turno-actual, .recursos, .dominacion { grid-column: 1; }
+
+.jugadores {
+  grid-column: 2;
+  grid-row: 1 / span 3;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.btn-jugadores {
+  display: none;
+  float: right;
+  min-width: 44px;
+  min-height: 44px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ecf0f1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
 }
 
 .tu-turno {
   color: #2ecc71;
+  margin-left: 0.35rem;
 }
 
 .limite {
@@ -221,7 +255,7 @@ const RECURSOS_ICONOS = {
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .rinde {
@@ -263,7 +297,7 @@ const RECURSOS_ICONOS = {
 
 .aviso-rival {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: #e67e22;
 }
 
@@ -273,6 +307,8 @@ const RECURSOS_ICONOS = {
   margin: 0;
   font-size: 0.85rem;
   color: #bdc3c7;
+  max-height: 6rem;
+  overflow-y: auto;
 }
 
 .jugadores-lista li { padding: 0.15rem 0; }
@@ -290,13 +326,14 @@ const RECURSOS_ICONOS = {
 }
 
 .dificultad-badge {
-  opacity: 0.6;
+  opacity: 0.8;
   margin-left: 0.25rem;
+  font-size: 0.75rem;
 }
 
 .raza-badge {
   margin-left: 0.25rem;
-  font-size: 0.8em;
+  font-size: 0.75rem;
   opacity: 0.85;
 }
 
@@ -307,7 +344,7 @@ const RECURSOS_ICONOS = {
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   padding: 0.4rem 0.7rem;
-  min-height: 36px;
+  min-height: 44px;
   font-size: 0.85rem;
   cursor: pointer;
 }
@@ -332,13 +369,13 @@ const RECURSOS_ICONOS = {
 
 .entrada-pais {
   flex: 1 1 10rem;
-  min-height: 36px;
+  min-height: 44px;
   padding: 0.3rem 0.5rem;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(0, 0, 0, 0.25);
   color: #ecf0f1;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .jugadores-lista .aliado {
@@ -354,5 +391,20 @@ const RECURSOS_ICONOS = {
 .jugadores-lista .activo {
   color: #3498db;
   font-weight: bold;
+}
+
+@media (max-width: 640px), (pointer: coarse) {
+  .btn-renombrar { min-width: 44px; min-height: 44px; }
+}
+
+/* En el telefono el panel es una tira: ronda, recursos y dominacion. Los
+   jugadores se abren con el boton. */
+@media (max-width: 640px) {
+  .player-panel { grid-template-columns: minmax(0, 1fr); padding: 0.4rem 0.6rem; border-radius: 8px; }
+  .jugadores { grid-column: 1; grid-row: auto; }
+  .jugadores.plegada { display: none; }
+  .btn-jugadores { display: block; }
+  .turno-actual { font-size: 0.85rem; min-height: 44px; }
+  .recursos { gap: 0.25rem 0.6rem; }
 }
 </style>

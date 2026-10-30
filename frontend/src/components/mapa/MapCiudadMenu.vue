@@ -1,7 +1,7 @@
 <!-- frontend/src/components/mapa/MapCiudadMenu.vue -->
 <script setup>
 import { computed, ref } from 'vue'
-import { recursoDe, textoCosto as textoCostoEn } from './recursos.js'
+import { recursoDe, textoCosto as textoCostoEn, textoFalta } from './recursos.js'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -64,8 +64,16 @@ const escalar = (costo) =>
     ? costo
     : Object.fromEntries(Object.entries(costo).map(([r, m]) => [r, Math.ceil(m * multiplicador.value - 1e-9)]))
 
-const puedePagar = (costo) =>
-  Object.entries(costo).every(([recurso, monto]) => (recursos.value[recurso] || 0) >= monto)
+const falta = (costo) => textoFalta(costo, recursos.value, moneda.value)
+
+// Abre en lo mas urgente: sin tropa en la casilla, reclutar. Con guarnicion no
+// se puede reclutar tierra, asi que construir.
+const PESTANAS = [
+  { valor: 'construir', etiqueta: 'Construir' },
+  { valor: 'reclutar', etiqueta: 'Reclutar' },
+  { valor: 'ciudad', etiqueta: 'Ciudad' },
+]
+const pestana = ref(tile.value?.ejercito ? 'construir' : 'reclutar')
 
 // Nada que cueste recursos se compra con un solo toque: el primero lo deja
 // PENDIENTE y muestra que se va a gastar y cuanto queda; el segundo confirma.
@@ -87,14 +95,13 @@ const motivoEdificio = (ed) => {
   if (reglas.value.tecnologias && ed.requiereTecnologia && !misTecnologias.value.includes(ed.requiereTecnologia)) {
     return `requiere ${nombreTecnologia(ed.requiereTecnologia)}`
   }
-  if (!puedePagar(escalar(ed.costo))) return 'sin recursos'
-  return null
+  return falta(escalar(ed.costo))
 }
 
 // El cuartel abarata y potencia lo reclutado EN esa ciudad (ver el
 // comentario en constantes.js#CUARTEL): sin esto el boton mostraria el
 // precio y el movimiento de lista aunque el backend vaya a cobrar/dar otra
-// cosa, y "sin recursos" podria estar mal si el precio real (con descuento)
+// cosa, y lo que dice que falta podria estar mal si el precio real (con descuento)
 // si te alcanza.
 const cuartel = computed(() => props.constantes.cuartel || null)
 // El buque queda FUERA del bono del cuartel, igual que en reglas/militar.js:
@@ -119,8 +126,7 @@ const motivoUnidad = (u) => {
   if (reglas.value.tecnologias && u.requiereTecnologia && !misTecnologias.value.includes(u.requiereTecnologia)) {
     return `requiere ${nombreTecnologia(u.requiereTecnologia)}`
   }
-  if (!puedePagar(costoReal(u.costo, u))) return 'sin recursos'
-  return null
+  return falta(costoReal(u.costo, u))
 }
 
 // Mejorar el nivel es repetible (a diferencia de construir un edificio): el
@@ -132,7 +138,7 @@ const costoMejora = computed(() => {
   const base = props.constantes.costoMejoraCiudadPorNivel || {}
   return escalar(Object.fromEntries(Object.entries(base).map(([r, m]) => [r, m * nivelActual.value])))
 })
-const motivoMejora = computed(() => (puedePagar(costoMejora.value) ? null : 'sin recursos'))
+const motivoMejora = computed(() => falta(costoMejora.value))
 
 // Renombrar es gratis. El limite de largo es el del backend
 // (LARGO_MAXIMO_NOMBRE_CIUDAD en reglas/ciudades.js): aca solo evita que el
@@ -157,11 +163,23 @@ const instalandoseHasta = computed(() => {
 })
 const capital = computed(() => props.constantes.capital || null)
 const costoCapital = computed(() => escalar(capital.value?.costoMover || {}))
-const motivoCapital = computed(() => (puedePagar(costoCapital.value) ? null : 'sin recursos'))
+const motivoCapital = computed(() => falta(costoCapital.value))
 </script>
 
 <template>
   <div class="ciudad-menu">
+    <div class="pestanas" role="tablist" aria-label="Secciones de la ciudad">
+      <button
+        v-for="p in PESTANAS"
+        :key="p.valor"
+        role="tab"
+        :aria-selected="pestana === p.valor"
+        :class="['pestana', { elegida: pestana === p.valor }]"
+        @click="pestana = p.valor"
+      >{{ p.etiqueta }}</button>
+    </div>
+
+    <template v-if="pestana === 'ciudad'">
     <section>
       <h4>Nombre</h4>
       <div class="fila-nombre">
@@ -214,9 +232,9 @@ const motivoCapital = computed(() => (puedePagar(costoCapital.value) ? null : 's
         <em v-if="motivoMejora">{{ motivoMejora }}</em>
       </button>
     </section>
+    </template>
 
-    <section>
-      <h4>Construir</h4>
+    <section v-if="pestana === 'construir'">
       <button
         v-for="ed in EDIFICIOS"
         :key="ed.tipo"
@@ -230,8 +248,7 @@ const motivoCapital = computed(() => (puedePagar(costoCapital.value) ? null : 's
       </button>
     </section>
 
-    <section>
-      <h4>Reclutar</h4>
+    <section v-if="pestana === 'reclutar'">
       <button
         v-for="u in UNIDADES"
         :key="u.tipo"
@@ -262,21 +279,29 @@ const motivoCapital = computed(() => (puedePagar(costoCapital.value) ? null : 's
 
 <style scoped>
 .ciudad-menu { display: flex; flex-direction: column; gap: 1rem; }
+.pestanas { display: flex; gap: 0.3rem; }
+.pestana {
+  flex: 1; min-height: 44px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.06); color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.pestana.elegida { border-color: #2ecc71; background: rgba(46, 204, 113, 0.18); }
 h4 { margin: 0 0 0.4rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7; }
 section { display: flex; flex-direction: column; gap: 0.35rem; }
 .btn-secundario {
   background: rgba(255, 255, 255, 0.1); color: #ecf0f1;
   border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px;
-  padding: 0.5rem 0.8rem; cursor: pointer; text-align: left;
-  display: flex; flex-direction: column; gap: 0.1rem;
+  padding: 0.5rem 0.8rem; min-height: 44px; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 0.1rem; font-size: 0.85rem;
 }
 .btn-secundario:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
-.btn-secundario:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Lo apagado es el boton, no el motivo: es justo lo que hay que poder leer. */
+.btn-secundario:disabled { background: rgba(0, 0, 0, 0.15); cursor: not-allowed; }
+.btn-secundario:disabled strong, .btn-secundario:disabled small { opacity: 0.6; }
 small { opacity: 0.7; font-size: 0.75rem; }
-em { color: #e67e22; font-size: 0.72rem; font-style: normal; }
+em { color: #f5b041; font-size: 0.75rem; font-style: normal; }
 .fila-nombre { display: flex; gap: 0.4rem; }
 .entrada-nombre {
-  flex: 1; min-width: 0; padding: 0.4rem 0.6rem; border-radius: 6px;
+  flex: 1; min-width: 0; min-height: 44px; padding: 0.4rem 0.6rem; border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.25); color: #ecf0f1;
 }
 .bono-cuartel { color: #2ecc71; }

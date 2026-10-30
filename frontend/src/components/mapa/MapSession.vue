@@ -7,8 +7,9 @@ import MapCanvas from './MapCanvas.vue'
 import MapPlayerPanel from './MapPlayerPanel.vue'
 import MapActionBar from './MapActionBar.vue'
 import { puedeJugar } from './turno.js'
-import { textoCosto } from './recursos.js'
+import { textoCosto, textoFalta } from './recursos.js'
 import MapAlianzas from './MapAlianzas.vue'
+import MapCiudadano from './MapCiudadano.vue'
 import { amigosDe, propuestasPara } from './alianzas.js'
 import { deQuienEs } from './casilla.js'
 import { colorCssDeJugador } from '../../mapa/sprites.js'
@@ -57,6 +58,7 @@ const nombreCiudad = ref('')
 // (donde quedaban fuera de la vista y habia que scrollear para encontrarlos).
 const canvasRef = ref(null)
 const ciudadesAbierto = ref(false)
+const ciudadanoAbierto = ref(false)
 const ayudaAbierta = ref(false)
 const gobiernoAbierto = ref(false)
 const alianzasAbierto = ref(false)
@@ -82,7 +84,7 @@ const esJefeEstado = computed(() => misCargos.value.includes('estado'))
 const esJefeGobierno = computed(() => misCargos.value.includes('gobierno'))
 const esEspectador = computed(() => misCargos.value.length === 0)
 const etiquetaCargos = computed(() => (esEspectador.value
-  ? 'Espectador (la máquina lleva todo)'
+  ? 'Ciudadano (la máquina gobierna)'
   : esJefeEstado.value && esJefeGobierno.value
     ? 'Jefe de Estado y de Gobierno'
     : esJefeEstado.value ? 'Jefe de Estado (la máquina lleva el gobierno)' : 'Jefe de Gobierno (la máquina lleva el Estado)'))
@@ -95,9 +97,10 @@ const avisosGobierno = computed(() => {
 
 // La cronica se puede ocultar y la eleccion se recuerda: a quien no le interesa
 // la narrativa no tiene que cerrarla en cada partida, y a quien si le interesa
-// no se le esconde nunca.
+// no se le esconde nunca. En un telefono arranca cerrada: ahi el panel se come el mapa.
 const PREF_CRONICA = 'mapa.cronicaAbierta'
-const cronicaAbierta = ref(localStorage.getItem(PREF_CRONICA) !== 'no')
+const prefCronica = localStorage.getItem(PREF_CRONICA)
+const cronicaAbierta = ref(prefCronica ? prefCronica !== 'no' : window.innerWidth > 640)
 watch(cronicaAbierta, (abierta) => {
   localStorage.setItem(PREF_CRONICA, abierta ? 'si' : 'no')
 })
@@ -494,12 +497,11 @@ const confirmarAtaque = () => {
 const recursosPropios = computed(() =>
   vista.value.jugadores.find(j => j.id === jugadorId)?.recursos || {}
 )
-const puedeFundar = computed(() => {
-  const costo = constantes.value.costoCiudad || {}
-  return Object.entries(costo).every(([recurso, monto]) => (recursosPropios.value[recurso] || 0) >= monto)
-})
-const textoCostoCiudad = computed(() =>
-  textoCosto(constantes.value.costoCiudad, vista.value.jugadores.find(j => j.id === jugadorId)?.moneda))
+const monedaPropia = computed(() => vista.value.jugadores.find(j => j.id === jugadorId)?.moneda)
+const faltaParaFundar = computed(() =>
+  textoFalta(constantes.value.costoCiudad, recursosPropios.value, monedaPropia.value))
+const puedeFundar = computed(() => !faltaParaFundar.value)
+const textoCostoCiudad = computed(() => textoCosto(constantes.value.costoCiudad, monedaPropia.value))
 
 const confirmarFundar = () => {
   const nombre = nombreCiudad.value.trim()
@@ -685,66 +687,73 @@ onUnmounted(() => {
     </div>
 
     <div class="zona-mapa">
-      <MapCanvas
-        ref="canvasRef"
-        :vista="vista"
-        :jugador-id="jugadorId"
-        :seleccion="seleccion"
-        :alcanzables="alcanzables"
-        :constantes="constantes"
-        @click-tile="onClickTile"
-      />
-
       <div class="botonera-paneles">
         <span class="etiqueta-cargos" title="Tu cargo">🎖️ {{ etiquetaCargos }}</span>
-        <button class="btn-panel" @click="ciudadesAbierto = !ciudadesAbierto">
-          🏙️ Ciudades ({{ misCiudades.length }})
+        <button class="btn-panel" title="Ciudades" @click="ciudadesAbierto = !ciudadesAbierto">
+          <span aria-hidden="true">🏙️</span><span class="btn-texto">Ciudades ({{ misCiudades.length }})</span>
         </button>
-        <button class="btn-panel" @click="cronicaAbierta = !cronicaAbierta">
-          {{ cronicaAbierta ? '📖 Ocultar crónica' : '📖 Ver crónica' }}
+        <button v-if="narrativas.length" class="btn-panel" :title="cronicaAbierta ? 'Ocultar crónica' : 'Ver crónica'" @click="cronicaAbierta = !cronicaAbierta">
+          <span aria-hidden="true">📖</span><span class="btn-texto">{{ cronicaAbierta ? 'Ocultar crónica' : 'Ver crónica' }}</span>
+        </button>
+        <button v-if="esEspectador && hayGobierno" class="btn-panel" title="Tu vida de ciudadano" @click="ciudadanoAbierto = true">
+          <span aria-hidden="true">🧑</span><span class="btn-texto">Ciudadano</span>
         </button>
         <button v-if="esJefeGobierno && vista.reglas?.rasgos !== false" class="btn-panel" title="Rasgos culturales" @click="culturaAbierta = true">
-          🎭 Cultura
+          <span aria-hidden="true">🎭</span><span class="btn-texto">Cultura</span>
         </button>
         <button v-if="esJefeGobierno && vista.reglas?.tecnologias !== false" class="btn-panel" title="Tecnologías" @click="cienciaAbierta = true">
-          🔬 Ciencia
+          <span aria-hidden="true">🔬</span><span class="btn-texto">Ciencia</span>
         </button>
         <button v-if="esJefeGobierno && hayGobierno" class="btn-panel" title="Gobierno" @click="gobiernoAbierto = true">
-          🏛️ Gobierno<span v-if="avisosGobierno" class="insignia-aviso">{{ avisosGobierno }}</span>
+          <span aria-hidden="true">🏛️</span><span class="btn-texto">Gobierno</span><span v-if="avisosGobierno" class="insignia-aviso">{{ avisosGobierno }}</span>
         </button>
         <button v-else-if="esJefeGobierno && vista.reglas?.moneda !== false" class="btn-panel" title="Moneda" @click="gobiernoAbierto = true">
-          💰 Moneda
+          <span aria-hidden="true">💰</span><span class="btn-texto">Moneda</span>
         </button>
         <button v-if="esJefeEstado && vista.reglas?.alianzas !== false" class="btn-panel" title="Alianzas" @click="alianzasAbierto = true">
-          🤝 Alianzas<span v-if="propuestasRecibidas" class="insignia-aviso">{{ propuestasRecibidas }}</span>
+          <span aria-hidden="true">🤝</span><span class="btn-texto">Alianzas</span><span v-if="propuestasRecibidas" class="insignia-aviso">{{ propuestasRecibidas }}</span>
         </button>
         <button class="btn-panel" title="Manual de Instrucciones" @click="ayudaAbierta = true">
-          ℹ️ Manual de Instrucciones
+          <span aria-hidden="true">ℹ️</span><span class="btn-texto">Manual</span>
         </button>
         <button class="btn-panel btn-salir" title="Salir de la partida" @click="salidaAbierta = true">
-          🚪 Salir
+          <span aria-hidden="true">🚪</span><span class="btn-texto">Salir</span>
         </button>
       </div>
 
-      <aside v-if="ciudadesAbierto" class="panel-flotante panel-ciudades">
-        <h3>Mis ciudades</h3>
-        <p v-if="misCiudades.length === 0" class="panel-vacio">
-          Todavía no tenés ciudades.
-        </p>
-        <button
-          v-for="ciudad in misCiudades"
-          :key="`${ciudad.x},${ciudad.y}`"
-          class="item-ciudad"
-          @click="irACiudad(ciudad)"
-        >
-          <span>{{ ciudad.nombre }}</span>
-          <small>nivel {{ ciudad.nivel }}</small>
-        </button>
-      </aside>
+      <!-- Los paneles flotan solo sobre el mapa: si flotaran sobre toda la zona
+           taparian la botonera, como le pasaba a la cronica. -->
+      <div class="lienzo">
+        <MapCanvas
+          ref="canvasRef"
+          :vista="vista"
+          :jugador-id="jugadorId"
+          :seleccion="seleccion"
+          :alcanzables="alcanzables"
+          :constantes="constantes"
+          @click-tile="onClickTile"
+        />
 
-      <div v-if="cronicaAbierta" class="panel-flotante panel-cronica">
-        <button class="cerrar-cronica" title="Ocultar la crónica" @click="cronicaAbierta = false">✕</button>
-        <MapRoundLog :narrativas="narrativas" />
+        <aside v-if="ciudadesAbierto" class="panel-flotante panel-ciudades">
+          <h3>Mis ciudades</h3>
+          <p v-if="misCiudades.length === 0" class="panel-vacio">
+            Todavía no tenés ciudades.
+          </p>
+          <button
+            v-for="ciudad in misCiudades"
+            :key="`${ciudad.x},${ciudad.y}`"
+            class="item-ciudad"
+            @click="irACiudad(ciudad)"
+          >
+            <span>{{ ciudad.nombre }}</span>
+            <small>nivel {{ ciudad.nivel }}</small>
+          </button>
+        </aside>
+
+        <div v-if="cronicaAbierta && narrativas.length" class="panel-flotante panel-cronica">
+          <button class="cerrar-cronica" title="Ocultar la crónica" aria-label="Ocultar la crónica" @click="cronicaAbierta = false">✕</button>
+          <MapRoundLog :narrativas="narrativas" />
+        </div>
       </div>
     </div>
 
@@ -770,6 +779,15 @@ onUnmounted(() => {
         No hay vuelta atrás: abandonás esta partida y los demás siguen jugando sin vos.
       </p>
       <button class="btn-primario btn-peligro" @click="confirmarSalida">Sí, salir</button>
+    </MapDialogo>
+
+    <MapDialogo :abierto="ciudadanoAbierto" titulo="Tu vida de ciudadano" @cerrar="ciudadanoAbierto = false">
+      <MapCiudadano
+        :vista="vista"
+        :jugador-id="jugadorId"
+        :constantes="constantes"
+        @manifestarse="postura => ejecutarAccion({ tipo: 'manifestarse', postura })"
+      />
     </MapDialogo>
 
     <MapDialogo :abierto="culturaAbierta" titulo="Rasgos culturales" @cerrar="culturaAbierta = false">
@@ -838,7 +856,7 @@ onUnmounted(() => {
       <MapAyuda :constantes="constantes" :config="vista?.config" :reglas="vista?.reglas" />
     </MapDialogo>
 
-    <MapDialogo :abierto="edificioMenuAbierto !== null" titulo="Ciudad" @cerrar="cerrarMenuEdificio">
+    <MapDialogo :abierto="edificioMenuAbierto !== null" :titulo="edificioMenuAbierto ? tileEn(edificioMenuAbierto.x, edificioMenuAbierto.y)?.ciudad?.nombre || 'Ciudad' : 'Ciudad'" @cerrar="cerrarMenuEdificio">
       <MapCiudadMenu
         v-if="edificioMenuAbierto"
         :vista="vista"
@@ -864,7 +882,7 @@ onUnmounted(() => {
       <small class="costo-fundar">Costo: {{ textoCostoCiudad }}</small>
       <!-- El boton se deshabilita por dos motivos distintos y antes solo se explicaba
            uno: sin el aviso del nombre vacio, el jugador cree que le faltan recursos. -->
-      <em v-if="!puedeFundar" class="motivo-fundar">sin recursos</em>
+      <em v-if="faltaParaFundar" class="motivo-fundar">{{ faltaParaFundar }}</em>
       <em v-else-if="!nombreCiudad.trim()" class="motivo-fundar">poné un nombre para la ciudad</em>
       <button class="btn-primario" :disabled="!nombreCiudad.trim() || !puedeFundar" @click="confirmarFundar">
         Fundar
@@ -928,6 +946,8 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   /* Contiene el gesto tactil DENTRO del mapa en vez de bloquear el scroll de
      toda la pagina: bloquearlo con overflow hidden en <html> desactivaba de
      paso el "tirar para recargar" de Android, que en tablet es la unica forma
@@ -936,32 +956,39 @@ onUnmounted(() => {
   overscroll-behavior: contain;
 }
 
+.lienzo {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
 /* Los botones bajan de renglon cuando no entran. En una sola fila, en un
    telefono los ultimos (Alianzas, Manual, Salir) quedaban fuera de la pantalla
    y no habia forma de llegar a ellos: la fila no se podia deslizar. */
 .botonera-paneles {
-  position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
-  max-width: calc(100% - 1.5rem);
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
-  z-index: 2;
 }
 
 .btn-panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   background: rgba(15, 20, 25, 0.85);
   color: #ecf0f1;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   padding: 0.4rem 0.7rem;
+  min-height: 44px;
   cursor: pointer;
   font-size: 0.85rem;
   white-space: nowrap;
 }
 
-.etiqueta-cargos { font-size: 0.8rem; opacity: 0.85; align-self: center; }
+.etiqueta-cargos { font-size: 0.75rem; opacity: 0.85; align-self: center; }
 .btn-panel:hover { background: rgba(52, 152, 219, 0.35); }
 
 /* Salir es la unica accion de la botonera que no se puede deshacer: se separa
@@ -973,13 +1000,13 @@ onUnmounted(() => {
 
 /* De quien es la casilla ajena que se toco. */
 .casilla-ajena {
-  margin: 0.5rem 0 0;
+  margin: 0;
   padding: 0.45rem 0.75rem;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.07);
   border-left: 4px solid #e74c3c;
   color: #ecf0f1;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 .casilla-ajena.aliado { border-left-color: #2ecc71; }
 .casilla-ajena.tregua { border-left-color: #f1c40f; }
@@ -1009,7 +1036,7 @@ onUnmounted(() => {
 }
 
 .panel-ciudades {
-  top: 3.2rem;
+  top: 0.75rem;
   left: 0.75rem;
   width: 15rem;
   max-height: 60%;
@@ -1020,7 +1047,7 @@ onUnmounted(() => {
   gap: 0.3rem;
 }
 
-.panel-ciudades h3 { margin: 0 0 0.3rem; font-size: 0.9rem; color: #f1c40f; }
+.panel-ciudades h3 { margin: 0 0 0.3rem; font-size: 1rem; color: #f1c40f; }
 .panel-vacio { opacity: 0.6; font-style: italic; margin: 0; font-size: 0.85rem; }
 
 .item-ciudad {
@@ -1033,9 +1060,10 @@ onUnmounted(() => {
   border: 0;
   border-radius: 6px;
   padding: 0.45rem 0.6rem;
+  min-height: 44px;
   cursor: pointer;
   text-align: left;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .item-ciudad:hover { background: rgba(52, 152, 219, 0.35); }
@@ -1053,15 +1081,16 @@ onUnmounted(() => {
 
 .cerrar-cronica {
   position: absolute;
-  top: 0.35rem;
-  right: 0.4rem;
+  top: 0;
+  right: 0;
   z-index: 1;
+  width: 44px;
+  height: 44px;
   background: transparent;
   color: #bdc3c7;
   border: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
-  padding: 0.15rem 0.3rem;
 }
 
 .cerrar-cronica:hover { color: #fff; }
@@ -1074,34 +1103,31 @@ onUnmounted(() => {
 }
 
 /* En telefonos no hay lugar para paneles al costado: el 38% del ancho deja una
-   columna de texto ilegible y encima se monta sobre los botones. Pasan a ocupar
-   el ancho completo, la cronica abajo (como una hoja) y las ciudades arriba. */
+   columna de texto ilegible. Pasan a ocupar el ancho del mapa, arriba, para no
+   tapar el boton de recentrar. La botonera baja al pie, al alcance del pulgar:
+   solo iconos para que todas entren en una fila y el mapa se quede con el alto. */
 @media (max-width: 640px) {
-  .panel-cronica {
-    top: auto;
-    bottom: 0.5rem;
+  .map-session { padding: 0.4rem; gap: 0.3rem; }
+
+  .panel-cronica, .panel-ciudades {
+    top: 0.5rem;
     left: 0.5rem;
     right: 0.5rem;
     width: auto;
   }
+  .panel-ciudades { max-height: 45%; }
 
-  /* Debajo de la botonera, que en un telefono ocupa hasta tres renglones. */
-  .panel-ciudades {
-    top: 8.5rem;
-    left: 0.5rem;
-    right: 0.5rem;
-    width: auto;
-    max-height: 45%;
+  .botonera-paneles {
+    order: 1;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 0.2rem;
   }
-
-  /* En un telefono la botonera ocupa tres renglones: flotando sobre el mapa
-     tapaba las casillas de arriba y no se podian tocar las tropas ni las
-     ciudades que quedaban debajo. Pasa a tener su propio lugar ARRIBA del mapa. */
-  .zona-mapa { flex-direction: column; }
-  .botonera-paneles { position: static; order: -1; max-width: none; padding: 0 0 0.5rem; }
-  /* Alto de dedo: son los controles principales del juego. */
-  .btn-panel { font-size: 0.8rem; padding: 0.35rem 0.55rem; min-height: 36px; }
+  .etiqueta-cargos, .btn-texto { display: none; }
+  .btn-panel { position: relative; justify-content: center; padding: 0; font-size: 1.2rem; }
   .btn-salir { margin-left: 0; }
+  .insignia-aviso { position: absolute; top: 0; right: 0; margin: 0; }
 }
 
 .sala-espera {
@@ -1128,7 +1154,7 @@ onUnmounted(() => {
 
 .sala-titulo {
   margin: 0.25rem 0 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #bdc3c7;
 }
 
@@ -1143,7 +1169,7 @@ onUnmounted(() => {
 
 .sala-etiqueta {
   color: #f1c40f;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
 .sala-motivo {
@@ -1154,21 +1180,21 @@ onUnmounted(() => {
 
 .insignia-aviso {
   margin-left: 0.35rem; background: #e67e22; color: #fff; border-radius: 999px;
-  padding: 0 0.4rem; font-size: 0.7rem; font-weight: 700;
+  padding: 0 0.4rem; font-size: 0.75rem; font-weight: 700;
 }
 .entrada-nombre {
   background: rgba(0, 0, 0, 0.3); color: #ecf0f1;
   border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px;
   padding: 0.5rem 0.7rem; font-size: 1rem;
 }
-.costo-fundar { opacity: 0.7; font-size: 0.8rem; }
+.costo-fundar { opacity: 0.7; font-size: 0.75rem; }
 .motivo-fundar { color: #e67e22; font-size: 0.75rem; font-style: normal; }
 .ataque { display: flex; flex-direction: column; gap: 0.4rem; }
 .ataque-linea { display: flex; justify-content: space-between; gap: 1rem; margin: 0; }
-.ataque-nota { opacity: 0.7; font-size: 0.8rem; margin: 0.3rem 0 0.6rem; }
+.ataque-nota { opacity: 0.7; font-size: 0.75rem; margin: 0.3rem 0 0.6rem; }
 .btn-primario {
   background: #3498db; color: #fff; border: 0; border-radius: 6px;
-  padding: 0.5rem 0.9rem; cursor: pointer;
+  padding: 0.5rem 0.9rem; min-height: 44px; font-size: 0.85rem; cursor: pointer;
 }
-.btn-primario:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primario:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

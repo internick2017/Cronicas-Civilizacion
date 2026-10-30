@@ -11,6 +11,15 @@ const { crearPartida, unirse, iniciar, listarPartidas, obtenerConstantes } = use
 
 const nombrePartida = ref('')
 
+// Las tres formas de entrar. Solo se ve una: antes eran paneles apilados y
+// "Jugar contra la maquina" quedaba a tres pantallas de scroll.
+const MODOS = [
+  { valor: 'solo', etiqueta: '🤖 Jugar solo' },
+  { valor: 'crear', etiqueta: '👥 Crear partida' },
+  { valor: 'unirse', etiqueta: '🔑 Unirse' },
+]
+const modo = ref('solo')
+
 // Parametros de la partida, elegidos al crearla. Los valores por defecto son los
 // historicos (60% de la tierra, mapa de 20, sin limite), asi que quien no toca
 // nada juega exactamente lo de siempre.
@@ -71,6 +80,8 @@ const codigoUnirse = ref('')
 const partidasActivas = ref([])
 const cargando = ref(false)
 const error = ref('')
+// La espera puede durar veinte segundos: el boton tiene que decir que esta pasando algo.
+const rotulo = (texto) => (cargando.value ? 'Preparando el mundo…' : texto)
 
 // Se leen del backend (no se hardcodean acá) para no duplicar ni las
 // dificultades disponibles ni sus descripciones: si el balance cambia, esta
@@ -83,7 +94,7 @@ const dificultadIA = ref(null)
 // cambian con el balance. Se elige al unirse (crear, jugar solo o unirse con codigo).
 // Cargos: el Jefe de Estado lleva las relaciones con otros paises; el Jefe de
 // Gobierno, lo interno. Se puede asumir uno o los dos; lo que no asumas lo lleva
-// la maquina. Sin ninguno es el modo espectador (easter egg): la maquina juega todo.
+// la maquina. Sin ninguno sos un ciudadano: la maquina gobierna y vos apoyas o protestas.
 const esJefeEstado = ref(true)
 const esJefeGobierno = ref(true)
 const cargosElegidos = () => [
@@ -93,6 +104,13 @@ const cargosElegidos = () => [
 
 const razas = ref([])
 const raza = ref(null)
+const resumenPerfil = computed(() => {
+  const elegida = razas.value.find(r => r.tipo === raza.value)
+  const cargo = esJefeEstado.value && esJefeGobierno.value ? 'Estado y Gobierno'
+    : esJefeEstado.value ? 'Estado'
+      : esJefeGobierno.value ? 'Gobierno' : 'ciudadano'
+  return [elegida && `${elegida.icono} ${elegida.nombre}`, cargo].filter(Boolean).join(' · ')
+})
 
 const NOMBRE_RECURSO = {
   food: 'comida', gold: 'oro', wood: 'madera', stone: 'piedra', science: 'ciencia', culture: 'cultura'
@@ -245,9 +263,11 @@ const cargarConstantes = async () => {
   }
 }
 
-onMounted(() => {
-  cargarPartidas()
+onMounted(async () => {
   cargarConstantes()
+  await cargarPartidas()
+  // Si alguien de la casa ya creo una partida, lo probable es que vengas a unirte.
+  if (partidasActivas.value.length) modo.value = 'unirse'
 })
 </script>
 
@@ -255,7 +275,7 @@ onMounted(() => {
   <div class="map-lobby">
     <h1>🗺️ Modo mapa</h1>
 
-    <div v-if="error" class="lobby-error">{{ error }}</div>
+    <div v-if="error" class="lobby-error" role="alert">{{ error }}</div>
 
     <!-- Sala de espera: ya creo la partida, espera a los demas antes de iniciar -->
     <section v-if="salaDeEspera" class="panel">
@@ -265,19 +285,31 @@ onMounted(() => {
       <p class="ayuda">
         Cuando estén todos adentro, iniciá la partida. El mapa recién se descubre al iniciar.
       </p>
-      <button class="btn-primary" :disabled="cargando" @click="iniciarPartida">
-        Iniciar partida
+      <button class="btn-primary" :disabled="cargando" :aria-busy="cargando" @click="iniciarPartida">
+        {{ rotulo('Iniciar partida') }}
       </button>
     </section>
 
     <template v-else>
-      <label class="field">
+      <label class="field campo-nombre">
         Tu nombre / civilización
         <input v-model="nombreJugador" type="text" placeholder="Incas" />
       </label>
 
-      <section class="panel">
-        <h2>Tu cargo</h2>
+      <div class="modos" role="tablist" aria-label="Cómo querés jugar">
+        <button
+          v-for="m in MODOS"
+          :key="m.valor"
+          role="tab"
+          :aria-selected="modo === m.valor"
+          :class="['modo', { elegido: modo === m.valor }]"
+          @click="modo = m.valor"
+        >{{ m.etiqueta }}</button>
+      </div>
+
+      <details class="panel plegable">
+        <summary>Tu raza y cargo <small>{{ resumenPerfil }}</small></summary>
+        <h3 class="titulo-mecanicas">Tu cargo</h3>
         <div class="cargo-lista">
           <label class="cargo-opcion" :class="{ elegida: esJefeEstado }">
             <input v-model="esJefeEstado" type="checkbox" />
@@ -291,43 +323,44 @@ onMounted(() => {
           </label>
         </div>
         <small v-if="!esJefeEstado && !esJefeGobierno" class="cargo-nota">
-          👁️ Modo espectador: la máquina juega tu país y los turnos pasan solos. Vos mirás.
+          🧑 Ciudadano: la máquina gobierna tu país y los turnos pasan solos. Vos salís a apoyar o a protestar.
         </small>
         <small v-else class="cargo-nota">Lo que no asumas lo lleva la máquina por vos al terminar tu turno.</small>
-      </section>
 
-      <!-- La raza vale para las tres formas de entrar (solo, crear, unirse). Cada
-           una gana algo y paga algo: por eso se muestran las dos cosas. -->
-      <section v-if="razas.length" class="panel">
-        <h2>Tu raza</h2>
-        <div class="raza-lista" role="radiogroup" aria-label="Raza">
-          <label
-            v-for="r in razas"
-            :key="r.tipo"
-            class="raza-opcion"
-            :class="{ elegida: raza === r.tipo }"
-          >
-            <input type="radio" name="raza" :value="r.tipo" v-model="raza" />
-            <span class="raza-nombre">{{ r.icono }} {{ r.nombre }}</span>
-            <small>{{ r.descripcion }}</small>
-            <span class="raza-efectos">
-              <span
-                v-for="ef in efectosDe(r)"
-                :key="ef.texto"
-                :class="['efecto', ef.bueno ? 'efecto-bueno' : 'efecto-malo']"
-              >{{ ef.texto }}</span>
-            </span>
-          </label>
-        </div>
-      </section>
+        <!-- La raza vale para las tres formas de entrar (solo, crear, unirse). Cada
+             una gana algo y paga algo: por eso se muestran las dos cosas. -->
+        <template v-if="razas.length">
+          <h3 class="titulo-mecanicas">Tu raza</h3>
+          <div class="raza-lista" role="radiogroup" aria-label="Raza">
+            <label
+              v-for="r in razas"
+              :key="r.tipo"
+              class="raza-opcion"
+              :class="{ elegida: raza === r.tipo }"
+            >
+              <input type="radio" name="raza" :value="r.tipo" v-model="raza" />
+              <span class="raza-nombre">{{ r.icono }} {{ r.nombre }}</span>
+              <small>{{ r.descripcion }}</small>
+              <span class="raza-efectos">
+                <span
+                  v-for="ef in efectosDe(r)"
+                  :key="ef.texto"
+                  :class="['efecto', ef.bueno ? 'efecto-bueno' : 'efecto-malo']"
+                >{{ ef.texto }}</span>
+              </span>
+            </label>
+          </div>
+        </template>
+      </details>
 
-      <!-- Un solo estado para los dos caminos (Jugar solo y Crear partida). -->
-      <section class="panel">
-        <h2>🗺️ Mapa y mecánicas</h2>
+      <!-- Un solo estado para los dos caminos (Jugar solo y Crear partida). Al
+           unirse manda la partida ajena, asi que ahi no se ofrece. -->
+      <details v-if="modo !== 'unirse'" class="panel plegable">
+        <summary>Mapa y mecánicas <small>{{ tamanoMapa }}×{{ tamanoMapa }}, {{ resumenMecanicas }}</small></summary>
         <h3 class="titulo-mecanicas">Tamaño del mapa</h3>
         <MapTamano v-model="tamanoMapa" :min="limitesTamano.min" :max="limitesTamano.max" />
         <label class="field">
-          Territorio para ganar
+          Dominación para ganar
           <select v-model.number="porcentajeVictoria">
             <option v-for="o in OBJETIVOS" :key="o.valor" :value="o.valor">{{ o.etiqueta }}</option>
           </select>
@@ -352,10 +385,9 @@ onMounted(() => {
         </p>
         <h3 class="titulo-mecanicas">Mecánicas</h3>
         <MapMecanicas v-model="mecanicas" />
-      </section>
+      </details>
 
-      <section class="panel panel-ia">
-        <h2>🤖 Jugar solo</h2>
+      <section v-if="modo === 'solo'" class="panel panel-ia">
         <p class="ayuda">Sin esperar a nadie: la máquina controla a tus rivales.</p>
         <label class="field">
           Rivales
@@ -377,15 +409,12 @@ onMounted(() => {
           </label>
         </div>
 
-        <p class="ayuda-config">Usa el mapa y las mecánicas de arriba ({{ tamanoMapa }}×{{ tamanoMapa }}, {{ resumenMecanicas }}).</p>
-
-        <button class="btn-primary" :disabled="cargando" @click="jugarContraIA">
-          Jugar contra la máquina
+        <button class="btn-primary" :disabled="cargando" :aria-busy="cargando" @click="jugarContraIA">
+          {{ rotulo('Jugar contra la máquina') }}
         </button>
       </section>
 
-      <section class="panel">
-        <h2>Crear partida nueva</h2>
+      <section v-if="modo === 'crear'" class="panel">
         <label class="field">
           Nombre de la partida
           <input v-model="nombrePartida" type="text" placeholder="Mi partida" />
@@ -417,36 +446,37 @@ onMounted(() => {
           Todos a la vez: cada uno mueve cuando quiere y la ronda termina cuando
           todos tocaron "Terminar turno". De a uno: se juega por orden, como antes.
         </p>
-        <p class="ayuda-config">Usa el mapa y las mecánicas del panel de arriba.</p>
-        <button class="btn-primary" :disabled="cargando" @click="crear">Crear</button>
+        <button class="btn-primary" :disabled="cargando" :aria-busy="cargando" @click="crear">{{ rotulo('Crear') }}</button>
       </section>
 
-      <section class="panel">
-        <h2>Unirse con código</h2>
-        <label class="field">
-          Código
-          <input v-model="codigoUnirse" type="text" maxlength="6" placeholder="ABC123" />
-        </label>
-        <button
-          class="btn-primary"
-          :disabled="cargando || !codigoUnirse"
-          @click="unirseConCodigo(codigoUnirse)"
-        >
-          Unirse
-        </button>
-      </section>
+      <template v-if="modo === 'unirse'">
+        <section class="panel">
+          <label class="field">
+            Código
+            <input v-model="codigoUnirse" type="text" maxlength="6" placeholder="ABC123" />
+          </label>
+          <button
+            class="btn-primary"
+            :disabled="cargando || !codigoUnirse"
+            :aria-busy="cargando"
+            @click="unirseConCodigo(codigoUnirse)"
+          >
+            {{ rotulo('Unirse') }}
+          </button>
+        </section>
 
-      <section v-if="partidasActivas.length > 0" class="panel">
-        <h2>Partidas esperando jugadores</h2>
-        <ul class="partidas-lista">
-          <li v-for="p in partidasActivas" :key="p.id">
-            <span>{{ p.nombre }} ({{ p.codigo }})</span>
-            <button class="btn-secondary" :disabled="cargando" @click="unirseConCodigo(p.codigo)">
-              Unirse
-            </button>
-          </li>
-        </ul>
-      </section>
+        <section v-if="partidasActivas.length > 0" class="panel">
+          <h2>Partidas esperando jugadores</h2>
+          <ul class="partidas-lista">
+            <li v-for="p in partidasActivas" :key="p.id">
+              <span>{{ p.nombre }} ({{ p.codigo }})</span>
+              <button class="btn-secondary" :disabled="cargando" @click="unirseConCodigo(p.codigo)">
+                Unirse
+              </button>
+            </li>
+          </ul>
+        </section>
+      </template>
     </template>
   </div>
 </template>
@@ -457,8 +487,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.25rem;
-  padding: 2rem;
+  gap: 0.75rem;
+  padding: 1rem 2rem 2rem;
   color: #ecf0f1;
 }
 
@@ -479,13 +509,31 @@ onMounted(() => {
   font-size: 0.9rem;
 }
 
-.field input {
-  background: rgba(255, 255, 255, 0.1);
+.field input, .field select {
+  background: #34495e;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   padding: 0.5rem;
+  min-height: 44px;
   color: #ecf0f1;
 }
+
+.campo-nombre { width: 100%; max-width: 420px; margin-bottom: 0; }
+
+.modos { display: flex; gap: 0.3rem; width: 100%; max-width: 420px; }
+.modo {
+  flex: 1; min-height: 44px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.06); color: #ecf0f1; border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.modo.elegido { border-color: #2ecc71; background: rgba(46, 204, 113, 0.18); }
+
+.plegable { padding: 0 1.25rem; }
+.plegable[open] { padding-bottom: 1rem; }
+.plegable summary {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  min-height: 44px; padding: 0.4rem 0; cursor: pointer; font-weight: 600;
+}
+.plegable summary small { color: #bdc3c7; font-weight: 400; margin-left: auto; }
 
 .codigo {
   font-size: 2rem;
@@ -598,11 +646,13 @@ onMounted(() => {
   border: none;
   border-radius: 6px;
   padding: 0.6rem 1rem;
+  min-height: 44px;
+  width: 100%;
   cursor: pointer;
 }
 
 .btn-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.75;
   cursor: not-allowed;
 }
 
@@ -612,6 +662,7 @@ onMounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   padding: 0.4rem 0.8rem;
+  min-height: 44px;
   cursor: pointer;
 }
 
@@ -636,5 +687,9 @@ onMounted(() => {
   border-radius: 6px;
   padding: 0.6rem 1rem;
   max-width: 420px;
+}
+
+@media (max-width: 640px) {
+  .map-lobby { padding: 1rem; gap: 0.75rem; }
 }
 </style>

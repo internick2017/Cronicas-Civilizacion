@@ -72,7 +72,8 @@ const esAtajo = (atajo) =>
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   padding: 0.2rem 0.55rem;
-  font-size: 0.78rem;
+  min-height: 44px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 .atajo.elegido { border-color: #2ecc71; background: rgba(46, 204, 113, 0.18); }

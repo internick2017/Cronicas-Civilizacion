@@ -54,8 +54,8 @@ const fijar = (crudo) => {
     <p class="tamano-resumen">{{ tamano }}×{{ tamano }} = {{ casillas }} casillas ({{ min }} a {{ max }})</p>
     <!-- Medido con maquinas dificiles (300 rondas): en 36 terminó 1 de 2 partidas y en 60 ninguna. -->
     <p v-if="tamano >= AVISO_DESDE" class="tamano-aviso">
-      Mapa grande: la partida puede durar cientos de rondas. Conviene bajar el
-      territorio para ganar o poner un límite de rondas (más abajo).
+      Mapa grande: la partida puede durar cientos de rondas. Conviene bajar la
+      dominación para ganar o poner un límite de rondas (más abajo).
     </p>
     <div class="tamano-atajos">
       <button
@@ -91,6 +91,7 @@ const fijar = (crudo) => {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   padding: 0.2rem 0.5rem;
+  min-height: 44px;
   font-size: 0.75rem;
   cursor: pointer;
 }

@@ -14,7 +14,8 @@ export const RECURSO = {
 // (vista.jugadores[i].moneda). Sin moneda, como siempre.
 export const recursoDe = (recurso, moneda = null) =>
   recurso === 'gold' && moneda
-    ? { icono: moneda.simbolo, nombre: moneda.nombre }
+    // 'Oro' es la moneda por defecto del backend: en minuscula como los demas recursos.
+    ? { icono: moneda.simbolo, nombre: moneda.nombre === 'Oro' ? 'oro' : moneda.nombre }
     : RECURSO[recurso]
 
 // { gold: 40, food: 20 } -> "💰 40 de oro · 🌾 20 de comida"
@@ -25,3 +26,12 @@ export const textoCosto = (costo, moneda = null) =>
       return `${info?.icono ?? ''} ${m} de ${info?.nombre ?? r}`.trim()
     })
     .join(' · ')
+
+// { stone: 40 } teniendo 30 -> "falta: 10 de piedra". Null si alcanza.
+export const textoFalta = (costo, recursos, moneda = null) => {
+  const faltan = Object.entries(costo ?? {})
+    .map(([r, m]) => [r, m - (recursos[r] || 0)])
+    .filter(([, falta]) => falta > 0)
+    .map(([r, falta]) => `${falta} de ${recursoDe(r, moneda)?.nombre ?? r}`)
+  return faltan.length ? `falta: ${faltan.join(' y ')}` : null
+}

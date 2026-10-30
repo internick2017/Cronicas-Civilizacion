@@ -45,7 +45,7 @@ const texto = computed(() => {
 .action-bar {
   display: flex;
   gap: 0.75rem;
-  padding: 0.75rem;
+  padding: 0 0.25rem;
 }
 
 .btn-primary {
@@ -54,6 +54,8 @@ const texto = computed(() => {
   border: none;
   border-radius: 6px;
   padding: 0.6rem 1.2rem;
+  min-height: 44px;
+  font-size: 0.85rem;
   cursor: pointer;
   font-weight: bold;
 }
@@ -68,5 +70,10 @@ const texto = computed(() => {
   background: rgba(255, 255, 255, 0.1);
   color: #bdc3c7;
   cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .action-bar { padding: 0; flex-wrap: wrap; gap: 0.3rem; }
+  .btn-primary { flex: 1 1 100%; }
 }
 </style>

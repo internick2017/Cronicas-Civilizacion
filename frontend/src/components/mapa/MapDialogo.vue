@@ -1,6 +1,6 @@
 <!-- frontend/src/components/mapa/MapDialogo.vue -->
 <script setup>
-import { watch, onUnmounted } from 'vue'
+import { nextTick, ref, watch, onUnmounted } from 'vue'
 
 const props = defineProps({
   titulo: { type: String, default: '' },
@@ -15,11 +15,16 @@ const onKeydown = (evento) => {
   if (evento.key === 'Escape') emit('cerrar')
 }
 
+const dialogo = ref(null)
+
 watch(
   () => props.abierto,
   (abierto) => {
-    if (abierto) window.addEventListener('keydown', onKeydown)
-    else window.removeEventListener('keydown', onKeydown)
+    if (abierto) {
+      window.addEventListener('keydown', onKeydown)
+      // Con teclado o lector de pantalla, el foco tiene que entrar al dialogo.
+      nextTick(() => dialogo.value?.focus())
+    } else window.removeEventListener('keydown', onKeydown)
   },
   { immediate: true }
 )
@@ -29,7 +34,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 <template>
   <div v-if="abierto" class="dialogo-overlay" @click.self="$emit('cerrar')">
-    <div class="dialogo">
+    <div ref="dialogo" class="dialogo" role="dialog" aria-modal="true" :aria-label="titulo" tabindex="-1">
       <!-- Pegada arriba: en un dialogo largo (el manual) el boton de abajo queda
            a varias pantallas de distancia, y en un celular no hay tecla Escape. -->
       <div class="cabecera">
@@ -52,6 +57,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   background: #2c3e50; border-radius: 12px; padding: 1.5rem;
   min-width: 280px; max-width: 90vw; max-height: 85vh; overflow-y: auto;
   color: #ecf0f1; display: flex; flex-direction: column; gap: 0.5rem;
+  outline: none;
 }
 .cabecera {
   position: sticky; top: -1.5rem; z-index: 1;
@@ -69,7 +75,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 .btn-secundario {
   background: rgba(255, 255, 255, 0.1); color: #ecf0f1;
   border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px;
-  padding: 0.5rem 0.8rem; cursor: pointer; text-align: left;
+  padding: 0.5rem 0.8rem; min-height: 44px; cursor: pointer; text-align: left;
 }
 .btn-secundario:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
 .btn-secundario:disabled { opacity: 0.45; cursor: not-allowed; }

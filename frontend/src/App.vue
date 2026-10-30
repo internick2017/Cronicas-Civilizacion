@@ -228,7 +228,7 @@ onMounted(async () => {
       <div v-if="partidaGuardada" class="partida-guardada">
         <div class="partida-guardada-texto">
           <strong>Tenés una partida empezada</strong>
-          <span>{{ partidaGuardada.vista?.nombre || 'Partida de mapa' }} — turno {{ partidaGuardada.vista?.turno }}</span>
+          <span>{{ partidaGuardada.vista?.nombre || 'Partida de mapa' }} — ronda {{ partidaGuardada.vista?.turno }}</span>
         </div>
         <div class="partida-guardada-botones">
           <button class="btn-continuar" @click="continuarPartidaGuardada">Continuar</button>
