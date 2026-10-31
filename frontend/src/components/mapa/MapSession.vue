@@ -1034,7 +1034,8 @@ onUnmounted(() => {
   border-radius: calc(var(--t-radio) * 6px); padding: 0.5rem;
 }
 .salida-fuerte { color: rgb(var(--t-alerta)); }
-.btn-peligro { background: rgb(var(--t-peligro-fuerte)); margin-top: 0.4rem; }
+/* Dos clases: con una sola, .btn-primario (mas abajo) le pisaba el fondo. */
+.btn-primario.btn-peligro { background: rgb(var(--t-peligro-fuerte)); color: rgb(var(--t-sobre)); margin-top: 0.4rem; }
 
 .panel-flotante {
   position: absolute;
@@ -1188,7 +1189,7 @@ onUnmounted(() => {
 }
 
 .insignia-aviso {
-  margin-left: 0.35rem; background: rgb(var(--t-alerta)); color: rgb(var(--t-sobre)); border-radius: 999px;
+  margin-left: 0.35rem; background: rgb(var(--t-alerta)); color: rgb(var(--t-sobre-cta)); border-radius: 999px;
   padding: 0 0.4rem; font-size: 0.75rem; font-weight: 700;
 }
 .entrada-nombre {
@@ -1202,7 +1203,7 @@ onUnmounted(() => {
 .ataque-linea { display: flex; justify-content: space-between; gap: 1rem; margin: 0; }
 .ataque-nota { opacity: 0.7; font-size: 0.75rem; margin: 0.3rem 0 0.6rem; }
 .btn-primario {
-  background: rgb(var(--t-info)); color: rgb(var(--t-sobre)); border: 0; border-radius: calc(var(--t-radio) * 6px);
+  background: rgb(var(--t-cta)); color: rgb(var(--t-sobre-cta)); border: 0; border-radius: calc(var(--t-radio) * 6px);
   padding: 0.5rem 0.9rem; min-height: 44px; font-size: 0.85rem; cursor: pointer;
 }
 .btn-primario:disabled { opacity: 0.6; cursor: not-allowed; }

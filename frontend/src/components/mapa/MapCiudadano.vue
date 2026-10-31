@@ -63,7 +63,7 @@ const jugando = computed(() => props.vista.estado === 'jugando')
 .botones { display: flex; gap: 0.5rem; }
 .botones button {
   flex: 1; min-height: 44px; border-radius: calc(var(--t-radio) * 6px); cursor: pointer; font-size: 0.85rem; font-weight: bold;
-  color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.2);
+  color: rgb(var(--t-sobre)); border: 1px solid rgb(var(--t-tinta) / 0.2);
 }
 .btn-apoyar { background: rgb(var(--t-exito-fuerte)); }
 .btn-protestar { background: rgb(var(--t-peligro-fuerte)); }

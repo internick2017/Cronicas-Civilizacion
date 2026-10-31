@@ -144,7 +144,7 @@ const regalar = (id) => {
 }
 .btn:hover:not(:disabled) { background: rgb(var(--t-tinta) / 0.2); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-si { background: rgb(var(--t-exito-fuerte)); border-color: rgb(var(--t-exito-fuerte)); }
+.btn-si { background: rgb(var(--t-exito-fuerte)); border-color: rgb(var(--t-exito-fuerte)); color: rgb(var(--t-sobre)); }
 .btn-romper { border-color: rgb(var(--t-peligro)); color: rgb(var(--t-peligro)); }
 .romper { display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid rgb(var(--t-tinta) / 0.1); padding-top: 0.75rem; }
 </style>

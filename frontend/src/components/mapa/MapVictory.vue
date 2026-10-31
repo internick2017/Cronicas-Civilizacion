@@ -78,7 +78,7 @@ const motivoVictoria = computed(() => {
 .eliminado { opacity: 0.5; font-size: 0.8rem; margin-left: 0.4rem; }
 .corona { color: rgb(var(--t-aviso)); font-size: 0.8rem; margin-left: 0.4rem; }
 .btn-primary {
-  background: rgb(var(--t-info)); color: rgb(var(--t-sobre)); border: 0; border-radius: calc(var(--t-radio) * 6px);
+  background: rgb(var(--t-cta)); color: rgb(var(--t-sobre-cta)); border: 0; border-radius: calc(var(--t-radio) * 6px);
   padding: 0.6rem 1.2rem; cursor: pointer; font-size: 1rem;
 }
 </style>

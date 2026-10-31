@@ -59,7 +59,9 @@ La lista completa está en `temas.css`. **Un color nuevo se define en los tres t
 Reglas:
 
 - En un componente no se escribe un color fijo: se usa una variable `--t-*`.
-- El texto tiene contraste de 4,5:1 como mínimo en los tres temas.
+- El texto tiene contraste de 4,5:1 como mínimo en los tres temas. `backend/test/mapa/temas.contraste.test.js` lo mide: una pareja nueva de texto y fondo se agrega ahí.
+- **Sobre un fondo de color nunca va `--t-texto`.** Sobre `--t-cta` y `--t-alerta` va `--t-sobre-cta`; sobre `--t-exito-fuerte` y `--t-peligro-fuerte` va `--t-sobre`.
+- El botón principal de un diálogo usa `--t-cta`; el que no se puede deshacer, `--t-peligro-fuerte`.
 - Lo apagado es el botón, no el motivo: el texto de por qué está deshabilitado va a opacidad plena.
 
 ### Colores del mapa

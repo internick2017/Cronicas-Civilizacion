@@ -319,6 +319,6 @@ em { color: rgb(var(--t-alerta)); font-size: 0.75rem; font-style: normal; }
   flex: 1; min-height: 44px; border-radius: calc(var(--t-radio) * 6px); cursor: pointer; font-weight: bold;
   color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.2);
 }
-.btn-confirmar { background: rgb(var(--t-exito-fuerte)); border-color: rgb(var(--t-exito-fuerte)); }
+.btn-confirmar { background: rgb(var(--t-exito-fuerte)); border-color: rgb(var(--t-exito-fuerte)); color: rgb(var(--t-sobre)); }
 .btn-cancelar { background: rgb(var(--t-tinta) / 0.1); }
 </style>
