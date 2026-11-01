@@ -1,3 +1,4 @@
+import { PODERES_ELEGIBLES } from '../../src/domain/mapa/constantes.js';
 import { describe, it, expect } from 'vitest';
 import { crearEstado, toJSON, fromJSON, tileEn, puedePagar } from '../../src/domain/mapa/MapGame.js';
 import { ReglaError } from '../../src/domain/mapa/errores.js';
@@ -21,7 +22,8 @@ describe('crearEstado', () => {
       tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial',
       porcentajeVictoria: 60, limiteRondas: null, islas: false,
       rondasEntreElecciones: 8, // se sumó con el gobierno: solo lo usan las repúblicas
-      mecanicas: { ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true }, // se apagan en el lobby; todas prendidas por defecto
+      mecanicas: { ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true, razas: true, problemas: true, levantamientos: true, fronteras: true, niebla: true }, // se apagan en el lobby; todas prendidas por defecto
+      poderes: Object.fromEntries(PODERES_ELEGIBLES.map(p => [p, true])), // ídem, por poder
     });
     expect(e.ganador).toBeNull();
   });

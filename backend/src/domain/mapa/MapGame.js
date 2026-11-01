@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { generarMapa } from './generarMapa.js';
-import { RECURSOS, MECANICAS } from './constantes.js';
+import { RECURSOS, MECANICAS, PODERES_ELEGIBLES } from './constantes.js';
 import { ReglaError } from './errores.js';
 
 const CONFIG_DEFAULT = {
@@ -28,6 +28,8 @@ const CONFIG_DEFAULT = {
   // ciudad. Gobierno apagado: nadie tiene apoyo, elecciones, impuestos ni Estado federal.
   // Todas prendidas por defecto: una partida sin tocar nada se juega como siempre.
   mecanicas: Object.fromEntries(MECANICAS.map(m => [m, true])),
+  // Que poderes existen en la partida (ver reglas/modo.js#poderesApagadosDe).
+  poderes: Object.fromEntries(PODERES_ELEGIBLES.map(p => [p, true])),
 };
 
 // Limites duros de la config. Viven en el DOMINIO (no solo en el borde HTTP)
@@ -61,14 +63,14 @@ function validarEntero(cfg, clave) {
 
 const esObjetoPlano = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
-function validarMecanicas(mecanicas) {
+function validarCasillas(campo, casillas, validas) {
   const invalida = (detalle) => new ReglaError(
     'CONFIG_INVALIDA',
-    `config.mecanicas ${detalle} (recibido: ${JSON.stringify(mecanicas)})`
+    `config.${campo} ${detalle} (recibido: ${JSON.stringify(casillas)})`
   );
-  if (!esObjetoPlano(mecanicas)) throw invalida('debe ser un objeto');
-  for (const [clave, valor] of Object.entries(mecanicas)) {
-    if (!MECANICAS.includes(clave)) throw invalida(`no admite la clave ${clave}`);
+  if (!esObjetoPlano(casillas)) throw invalida('debe ser un objeto');
+  for (const [clave, valor] of Object.entries(casillas)) {
+    if (!validas.includes(clave)) throw invalida(`no admite la clave ${clave}`);
     if (typeof valor !== 'boolean') throw invalida(`.${clave} debe ser booleano`);
   }
 }
@@ -86,7 +88,8 @@ export function validarConfig(cfg) {
   if (typeof cfg.islas !== 'boolean') {
     throw new ReglaError('CONFIG_INVALIDA', `config.islas debe ser booleano (recibido: ${JSON.stringify(cfg.islas)})`);
   }
-  validarMecanicas(cfg.mecanicas);
+  validarCasillas('mecanicas', cfg.mecanicas, MECANICAS);
+  validarCasillas('poderes', cfg.poderes, PODERES_ELEGIBLES);
   if (!MODOS_TURNO.includes(cfg.modoTurno)) {
     throw new ReglaError(
       'CONFIG_INVALIDA',
@@ -102,6 +105,8 @@ export function crearEstado({ nombre, semilla, config = {} }) {
   // Cada partida con su propio objeto: nunca se comparte el de CONFIG_DEFAULT.
   if (esObjetoPlano(config?.mecanicas)) cfg.mecanicas = { ...CONFIG_DEFAULT.mecanicas, ...config.mecanicas };
   else if (config?.mecanicas === undefined) cfg.mecanicas = { ...CONFIG_DEFAULT.mecanicas };
+  if (esObjetoPlano(config?.poderes)) cfg.poderes = { ...CONFIG_DEFAULT.poderes, ...config.poderes };
+  else if (config?.poderes === undefined) cfg.poderes = { ...CONFIG_DEFAULT.poderes };
   validarConfig(cfg); // antes de generarMapa: nunca asignamos nada sin cota
   return {
     id: randomUUID(),

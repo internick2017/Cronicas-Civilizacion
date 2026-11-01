@@ -41,8 +41,9 @@ describe('proponerGobierno', () => {
     expect(codigo(() => proponerGobierno(e, 'p1', { gobierno: 'monarquia' }))).toBe('EN_ENFRIAMIENTO');
   });
 
+  // Con un gobierno sin poder de Control: en las repúblicas no se pueden comprar votos.
   it('el oro ofrecido puede dar vuelta una votación que iba perdida', () => {
-    p1.gobierno = 'republica_directa';
+    p1.gobierno = 'parlamentarismo';
     expect(resultadoVotacion(e, 'p1', 'despotismo', 0).aprobada).toBe(false);
     expect(resultadoVotacion(e, 'p1', 'despotismo', 60).aprobada).toBe(true);
     const evs = proponerGobierno(e, 'p1', { gobierno: 'despotismo', oro: 60 });
@@ -51,7 +52,7 @@ describe('proponerGobierno', () => {
   });
 
   it('el oro gastado en una votación fallida no se devuelve', () => {
-    p1.gobierno = 'republica_directa';
+    p1.gobierno = 'parlamentarismo';
     const evs = proponerGobierno(e, 'p1', { gobierno: 'despotismo', oro: 10 });
     expect(evs.map(x => x.tipo)).toEqual(['RecursosGastados', 'VotacionFallida']);
     aplicar(e, evs);

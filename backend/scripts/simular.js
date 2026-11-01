@@ -74,7 +74,7 @@ function leerArgs(argv) {
 
 function jugarPartida(semilla, { tamano, dificultad, turnoMaximo, islas, sinMecanicas = false, razaA = null, razaB = null }) {
   const mecanicas = sinMecanicas
-    ? Object.fromEntries(MECANICAS.map(m => [m, false]))
+    ? Object.fromEntries(MECANICAS.filter(m => !['razas', 'fronteras', 'niebla'].includes(m)).map(m => [m, false]))
     : undefined;
   const e = crearEstado({ nombre: 'sim', semilla, config: { tamanoMapa: tamano, islas, ...(mecanicas && { mecanicas }) } });
   aplicar(e, unirse(e, { id: 'a', nombre: 'A', civilizacion: 'Incas', raza: razaA, esBot: true, dificultadIA: dificultad }));

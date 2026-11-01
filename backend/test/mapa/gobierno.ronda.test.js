@@ -92,9 +92,9 @@ describe('cerrarRondaGobierno: pérdida y regreso del poder', () => {
 
   it('multiplicadorProduccion: teocracia +20% cultura, oligarquía +15% oro, tecnocracia +20% ciencia', () => {
     expect(multiplicadorProduccion({ gobierno: 'teocracia' }, 'culture')).toBeCloseTo(1.2);
-    expect(multiplicadorProduccion({ gobierno: 'oligarquia' }, 'gold')).toBeCloseTo(1.15);
-    expect(multiplicadorProduccion({ gobierno: 'tecnocracia' }, 'science')).toBeCloseTo(1.2);
-    expect(multiplicadorProduccion({ gobierno: 'tecnocracia' }, 'gold')).toBe(1);
+    expect(multiplicadorProduccion({ gobierno: 'oligarquia' }, 'gold')).toBeCloseTo(1.11); // -2% por cada uno de sus dos poderes
+    expect(multiplicadorProduccion({ gobierno: 'tecnocracia' }, 'science')).toBeCloseTo(1.35); // suma el poder de Merito
+    expect(multiplicadorProduccion({ gobierno: 'tecnocracia' }, 'gold')).toBeCloseTo(0.96);
   });
 
   it('aristocracia: vuelve con los líderes y produce +20% comida; tiranía: la echan y vuelve los militares', () => {
@@ -244,11 +244,12 @@ describe('integración con terminarTurno', () => {
 
 describe('bono de producción por gobierno', () => {
   it('multiplicadorProduccion: repúblicas +10% a todo, monarquía +20% oro, estratocracia +20% madera y piedra', () => {
-    for (const g of ['republica_directa', 'republica_indirecta', 'republica_semidirecta']) {
-      expect(multiplicadorProduccion({ gobierno: g }, 'gold')).toBeCloseTo(1.1);
+    // El oro suma el +10% del poder de Control y paga 2% por cada poder independiente.
+    for (const [g, oro] of [['republica_directa', 1.12], ['republica_indirecta', 1.04], ['republica_semidirecta', 1.1]]) {
+      expect(multiplicadorProduccion({ gobierno: g }, 'gold')).toBeCloseTo(oro);
       expect(multiplicadorProduccion({ gobierno: g }, 'food')).toBeCloseTo(1.1);
     }
-    expect(multiplicadorProduccion({ gobierno: 'monarquia' }, 'gold')).toBeCloseTo(1.2);
+    expect(multiplicadorProduccion({ gobierno: 'monarquia' }, 'gold')).toBeCloseTo(1.18);
     expect(multiplicadorProduccion({ gobierno: 'monarquia' }, 'wood')).toBe(1);
     expect(multiplicadorProduccion({ gobierno: 'estratocracia' }, 'wood')).toBeCloseTo(1.2);
     expect(multiplicadorProduccion({ gobierno: 'estratocracia' }, 'stone')).toBeCloseTo(1.2);
@@ -273,14 +274,14 @@ describe('bono de producción por gobierno', () => {
   it('el bono NO se pierde con producciones chicas: en 10 rondas suma el porcentaje exacto', () => {
     const base = produccionBruta(e, 'p1').gold;
     p1.gobierno = 'republica_directa';
-    expect(jugarRondas(10).gold).toBe(Math.floor(10 * base * 1.1 + 1e-9));
+    expect(jugarRondas(10).gold).toBe(Math.floor(10 * base * 1.12 + 1e-9));
   });
 
-  it('monarquía rinde un 20% más de oro y no toca la comida', () => {
+  it('monarquía rinde un 20% más de oro, paga su Moderador y no toca la comida', () => {
     const base = produccionBruta(e, 'p1');
     p1.gobierno = 'monarquia';
     const total = jugarRondas(10);
-    expect(total.gold).toBe(Math.floor(10 * base.gold * 1.2 + 1e-9));
+    expect(total.gold).toBe(Math.floor(10 * base.gold * 1.18 + 1e-9));
     expect(total.food).toBe(Math.floor(10 * base.food + 1e-9));
   });
 

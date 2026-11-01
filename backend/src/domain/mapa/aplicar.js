@@ -4,6 +4,7 @@ import {
   saludMaximaCiudad, saludDeCiudad, REGENERACION_CIUDAD, FRACCION_SALUD_AL_CAPTURAR
 } from './constantes.js';
 import { vecinosOrtogonales } from './reglas/comun.js';
+import { poderesApagadosDe } from './reglas/modo.js';
 import { acunadoEnRonda, inflacionAcunadaDe, inflacionTrasRonda } from './reglas/moneda.js';
 import { ReglaError } from './errores.js';
 
@@ -24,7 +25,8 @@ export function aplicar(estado, eventos) {
   for (const evento of eventos) {
     const { tipo, jugadorId, datos, turno: evento_turno } = evento;
     switch (tipo) {
-      case 'JugadorUnido':
+      case 'JugadorUnido': {
+        const poderesApagados = poderesApagadosDe(estado);
         estado.jugadores.push({
           id: datos.id,
           nombre: datos.nombre,
@@ -37,8 +39,10 @@ export function aplicar(estado, eventos) {
           activo: true,
           esBot: Boolean(datos.esBot),
           dificultadIA: datos.dificultadIA ?? null,
+          ...(poderesApagados.length > 0 ? { poderesApagados } : {}),
         });
         break;
+      }
 
       case 'PartidaIniciada':
         estado.estado = 'jugando';
@@ -87,6 +91,17 @@ export function aplicar(estado, eventos) {
 
       case 'ImpuestosFijados':
         jugadorPorId(estado, jugadorId).impuestos = datos.nivel;
+        break;
+
+      case 'EmergenciaDeclarada': {
+        const j = jugadorPorId(estado, jugadorId);
+        j.emergenciaHasta = datos.hasta;
+        j.emergenciaBloqueadaHasta = datos.bloqueadaHasta;
+        break;
+      }
+
+      case 'LevantamientoFrenado':
+        jugadorPorId(estado, jugadorId).apoyo = { ...datos.apoyo };
         break;
 
       case 'MandatoFijado':

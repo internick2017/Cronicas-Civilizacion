@@ -62,7 +62,7 @@ describe('impuestos', () => {
     expect(multiplicadorProduccion({ impuestos: 'bajos' }, 'gold')).toBeCloseTo(1 + IMPUESTOS.bajos.oro);
     expect(multiplicadorProduccion({ impuestos: 'altos' }, 'food')).toBe(1);
     // Y se acumulan con el bono del gobierno.
-    expect(multiplicadorProduccion({ impuestos: 'altos', gobierno: 'monarquia' }, 'gold')).toBeCloseTo(1.45);
+    expect(multiplicadorProduccion({ impuestos: 'altos', gobierno: 'monarquia' }, 'gold')).toBeCloseTo(1.43); // -2% del Moderador
   });
 
   it('en 10 rondas los impuestos altos rinden el 25% de oro de más', () => {

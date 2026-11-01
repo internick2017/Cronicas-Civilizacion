@@ -47,7 +47,13 @@ const limiteRondas = ref(null)
 const islas = ref(false)
 // Todas prendidas: quien quiera otro juego apaga las que no le interesan. Es un
 // solo estado para los dos paneles (Jugar solo y Crear partida).
-const mecanicas = ref({ ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true })
+const mecanicas = ref({
+  ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true,
+  razas: true, problemas: true, levantamientos: true, fronteras: true, niebla: true,
+})
+// Vacio = todos: el backend completa lo que falta. La lista llega con las constantes.
+const poderes = ref({})
+const listaPoderes = ref([])
 const resumenMecanicas = computed(() => {
   const valores = Object.values(mecanicas.value)
   const prendidas = valores.filter(Boolean).length
@@ -76,6 +82,7 @@ const configElegida = () => ({
   limiteRondas: limiteRondas.value,
   islas: islas.value,
   mecanicas: { ...mecanicas.value },
+  poderes: { ...poderes.value },
 })
 const nombreJugador = ref('')
 const codigoUnirse = ref('')
@@ -250,7 +257,8 @@ const unirseConCodigo = async (codigo) => {
 
 const cargarConstantes = async () => {
   try {
-    const { dificultadesIA: lista, razas: listaRazas, limitesTamanoMapa } = await obtenerConstantes()
+    const { dificultadesIA: lista, razas: listaRazas, limitesTamanoMapa, poderes: todosLosPoderes } = await obtenerConstantes()
+    listaPoderes.value = todosLosPoderes || []
     if (limitesTamanoMapa) limitesTamano.value = limitesTamanoMapa
     dificultadesIA.value = lista || []
     dificultadIA.value = lista?.find(d => d.porDefecto)?.tipo ?? lista?.[0]?.tipo ?? null
@@ -336,7 +344,7 @@ onMounted(async () => {
 
         <!-- La raza vale para las tres formas de entrar (solo, crear, unirse). Cada
              una gana algo y paga algo: por eso se muestran las dos cosas. -->
-        <template v-if="razas.length">
+        <template v-if="razas.length && (modo === 'unirse' || mecanicas.razas)">
           <h3 class="titulo-mecanicas">Tu raza</h3>
           <div class="raza-lista" role="radiogroup" aria-label="Raza">
             <label
@@ -391,7 +399,7 @@ onMounted(async () => {
           semilla no da dos islas grandes, la partida arranca como una normal.
         </p>
         <h3 class="titulo-mecanicas">Mecánicas</h3>
-        <MapMecanicas v-model="mecanicas" />
+        <MapMecanicas v-model="mecanicas" v-model:poderes="poderes" :lista-poderes="listaPoderes" />
       </details>
 
       <section v-if="modo === 'solo'" class="panel panel-ia">

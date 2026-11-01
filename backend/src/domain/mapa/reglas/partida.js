@@ -6,6 +6,7 @@ import { evento, radio1 } from './comun.js';
 import { MIN_JUGADORES } from '../constantes.js';
 import { validarRaza } from './razas.js';
 import { validarCargos } from './cargos.js';
+import { mecanicaActiva } from './modo.js';
 
 // esBot marca al jugador manejado por la IA (ver domain/mapa/ia.js).
 // dificultadIA solo tiene sentido junto con esBot; se acepta igual para
@@ -24,7 +25,7 @@ export function unirse(estado, { id, nombre, civilizacion, raza = null, cargos =
   if (estado.estado !== 'esperando') throw new ReglaError('PARTIDA_YA_INICIADA', 'La partida ya inició');
   if (estado.jugadores.length >= estado.config.maxJugadores) throw new ReglaError('PARTIDA_LLENA', 'La partida está llena');
   if (jugadorPorId(estado, id)) throw new ReglaError('JUGADOR_DUPLICADO', 'Ese jugador ya está en la partida');
-  const razaValida = validarRaza(raza);
+  const razaValida = mecanicaActiva(estado, 'razas') ? validarRaza(raza) : null;
   const cargosValidos = validarCargos(cargos);
   return [evento('JugadorUnido', estado, null, { id, nombre, civilizacion, raza: razaValida, cargos: cargosValidos, esBot, dificultadIA })];
 }
@@ -79,7 +80,7 @@ export function sumarMaquina(estado, { id, nombre, civilizacion, raza = null, di
   if (jugadorPorId(estado, id)) throw new ReglaError('JUGADOR_DUPLICADO', 'Ese jugador ya está en la partida');
   const lugar = lugarParaNuevaCapital(estado);
   if (!lugar) throw new ReglaError('SIN_LUGAR', 'No queda tierra libre para otra civilización');
-  const razaValida = validarRaza(raza);
+  const razaValida = mecanicaActiva(estado, 'razas') ? validarRaza(raza) : null;
   return [
     evento('JugadorUnido', estado, null, { id, nombre, civilizacion, raza: razaValida, esBot: true, dificultadIA }),
     evento('CiudadFundada', estado, id, { x: lugar.x, y: lugar.y, nombre: `${civilizacion} Capital` }),

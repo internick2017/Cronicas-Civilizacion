@@ -22,7 +22,10 @@ export const RECURSOS_DE_TILE = ['food', 'gold', 'wood', 'stone'];
 export const RECURSOS_CIVILES = ['science', 'culture'];
 
 // Las mecanicas que se eligen al crear la partida (config.mecanicas). Todas prendidas por defecto.
-export const MECANICAS = ['ciencia', 'cultura', 'armada', 'alianzas', 'moneda', 'capital', 'gobierno'];
+export const MECANICAS = [
+  'ciencia', 'cultura', 'armada', 'alianzas', 'moneda', 'capital', 'gobierno',
+  'razas', 'problemas', 'levantamientos', 'fronteras', 'niebla',
+];
 
 export const RECURSOS_INICIALES = {
   food: 100,
@@ -620,28 +623,156 @@ export const INCOMPATIBLES = [
   ...cruzar(['presidencialismo'], ['monarquia', 'regencia', 'teocracia', ...FORMAS_DE_FUERZA, 'dictadura', 'totalitarismo']),
 ];
 
-// Separacion de poderes. El Ejecutivo siempre es del jugador. Los otros tres son
-// independientes (o no) segun el gobierno: donde no estan en la lista, los
-// concentra quien manda y no dan nada. Los numeros son AJUSTABLES, como los demas.
-export const PODERES = ['legislativo', 'judiciario', 'moderador'];
+// Separacion de poderes. El Ejecutivo siempre es del jugador y paga las instituciones.
+// Cada uno de los otros diez tiene tres estados segun el gobierno: independiente (da
+// algo y ata las manos: si no costara nada, mas poderes seria siempre mejor),
+// concentrado en quien manda (PODERES_CONCENTRADOS: sin bono ni costo, salvo la
+// Emergencia) o inexistente (no esta en ninguna lista). Ademas cada partida elige cuales existen (config.poderes): el Ejecutivo no se
+// apaga. Los numeros son AJUSTABLES, como los demas.
+export const UMBRAL_EXPULSION = 25;
 export const EFECTOS_PODERES = {
-  legislativo: { apoyoPueblo: 1 },   // puntos de apoyo del pueblo por ronda: se siente representado
-  judiciario: { crisis: 0.5 },       // multiplica la probabilidad de crisis: menos corrupcion
-  moderador: { expulsion: -10 },     // baja el umbral de expulsion: arbitra y frena las caidas
+  ejecutivo: { oroPorInstitucion: -0.02 },  // por cada poder independiente que hay que mantener
+  legislativo: { apoyoPueblo: 1 },          // puntos de apoyo del pueblo por ronda
+  judiciario: { crisis: 0.5 },              // multiplica la probabilidad de crisis
+  moderador: { expulsion: -10 },            // baja el umbral de expulsion
+  federativo: { oroPorAliado: 0.05, treguaExtra: 2 },
+  // La emergencia es el unico poder que se ACTIVA. Independiente significa regulada por
+  // ley: cuesta menos apoyo, pero no protege del cargo. `apoyoPueblo` es el costo sin regular.
+  emergencia: {
+    rondas: 3, enfriamiento: 12, descuentoReclutar: 0.25, defensaCiudad: 0.25,
+    apoyoPueblo: -15, apoyoPuebloRegulada: -5,
+  },
+  tribunicio: {},
+  electoral: { legitimidad: 5, mandatoMaximo: 12 },
+  control: { produccion: { gold: 0.1 } },
+  merito: { produccion: { science: 0.15 }, respeto: { lideres: -10 } },
+  revisor: { votacion: -10 },
+};
+const E = EFECTOS_PODERES;
+const porciento = (fraccion) => Math.round(Math.abs(fraccion) * 100);
+// Lo que muestran el panel y el manual. Los numeros salen de EFECTOS_PODERES, asi el
+// texto no puede quedar desactualizado.
+export const PODERES = {
+  ejecutivo: {
+    nombre: 'Ejecutivo',
+    otrosNombres: 'Jefe de Gobierno, Jefe de Estado, Gabinete, Yuan Ejecutivo',
+    funcion: 'Administra el Estado, gestiona el presupuesto y ejecuta las leyes.',
+    gana: 'Siempre es tuyo: con él gobernás.',
+    paga: `Mantiene las instituciones: -${porciento(E.ejecutivo.oroPorInstitucion)}% de oro por cada poder independiente.`,
+  },
+  legislativo: {
+    nombre: 'Legislativo',
+    otrosNombres: 'Parlamento, Congreso, Asamblea Nacional, Dieta, Yuan Legislativo',
+    funcion: 'Discute y vota las leyes, aprueba el presupuesto y fiscaliza al Ejecutivo.',
+    gana: `+${E.legislativo.apoyoPueblo} de apoyo del pueblo por ronda.`,
+    paga: 'Solo su mantenimiento.',
+  },
+  judiciario: {
+    nombre: 'Judiciario',
+    otrosNombres: 'Tribunales, Corte Suprema, Yuan Judicial',
+    funcion: 'Interpreta las leyes, resuelve los litigios y aplica sanciones.',
+    gana: `${porciento(1 - E.judiciario.crisis)}% menos de probabilidad de perder el poder por una crisis.`,
+    paga: 'Solo su mantenimiento.',
+  },
+  moderador: {
+    nombre: 'Moderador',
+    otrosNombres: 'Poder Neutro, Poder Preservador, Árbitro Constitucional',
+    funcion: 'Interviene en los impasses entre poderes para restablecer el equilibrio.',
+    gana: `Te expulsan recién con el apoyo bajo ${UMBRAL_EXPULSION + E.moderador.expulsion}, y no bajo ${UMBRAL_EXPULSION}.`,
+    paga: 'Solo su mantenimiento.',
+  },
+  federativo: {
+    nombre: 'Federativo',
+    otrosNombres: 'Poder de Relaciones Exteriores',
+    funcion: 'Negocia tratados, declara la guerra y firma la paz.',
+    gana: `+${porciento(E.federativo.oroPorAliado)}% de oro por cada aliado.`,
+    paga: `Los tratados obligan: si rompés una alianza, la tregua dura ${E.federativo.treguaExtra} rondas más.`,
+  },
+  emergencia: {
+    nombre: 'Emergencia',
+    concentrado: `Declararla cuesta ${-E.emergencia.apoyoPueblo} de apoyo del pueblo, pero nadie te saca del cargo mientras dura, salvo un levantamiento.`,
+    otrosNombres: 'Poder Prerrogativo, Estado de Excepción, Estado de Sitio',
+    funcion: 'Actúa por el bien público ante una crisis grave, suspendiendo ritos legales por un tiempo.',
+    gana: `Si tu gobierno lo tiene, podés declarar el estado de excepción: ${E.emergencia.rondas} rondas con -${porciento(E.emergencia.descuentoReclutar)}% al reclutar y +${porciento(E.emergencia.defensaCiudad)}% de defensa en tus ciudades.`,
+    paga: `Regulada por ley cuesta ${-E.emergencia.apoyoPuebloRegulada} de apoyo del pueblo y no te protege del cargo. Se puede repetir a las ${E.emergencia.enfriamiento} rondas.`,
+  },
+  tribunicio: {
+    nombre: 'Tribunicio',
+    otrosNombres: 'Veto y Tutela Popular, Poder Eforal',
+    funcion: 'Sin iniciativa propia, veta los actos del Estado que violan los derechos civiles.',
+    gana: 'El pueblo protesta por el tribuno: no hay revoluciones.',
+    paga: 'Veta los impuestos altos y el estado de excepción.',
+  },
+  electoral: {
+    nombre: 'Electoral',
+    otrosNombres: 'Función Electoral, Poder Electoral Independiente',
+    funcion: 'Organiza, cuenta y certifica las elecciones con autonomía total.',
+    gana: `Ganar una elección da +${E.electoral.legitimidad} de apoyo de pueblo y líderes.`,
+    paga: `El mandato no puede pasar de ${E.electoral.mandatoMaximo} rondas.`,
+  },
+  control: {
+    nombre: 'Control',
+    otrosNombres: 'Poder Ciudadano, Poder Moral, Yuan de Control, Tribunal de Cuentas',
+    funcion: 'Audita las cuentas públicas y combate la corrupción de los gobernantes.',
+    gana: `+${porciento(E.control.produccion.gold)}% de oro, y la corrupción no te quita oro.`,
+    paga: 'No podés comprar votos con oro.',
+  },
+  merito: {
+    nombre: 'Mérito',
+    otrosNombres: 'Yuan de Examen, Exámenes Imperiales (Keju)',
+    funcion: 'Selecciona a los funcionarios por concurso público, sin padrinos políticos.',
+    gana: `+${porciento(E.merito.produccion.science)}% de ciencia.`,
+    paga: `Se acaba el clientelismo: ${E.merito.respeto.lideres} de respeto de los líderes.`,
+  },
+  revisor: {
+    nombre: 'Revisor',
+    otrosNombres: 'Poder Corrector, Jurado Constitucional',
+    funcion: 'Juzga si las leyes respetan la Constitución y anula los desvíos de poder.',
+    gana: 'Anula los golpes de Estado de líderes y militares.',
+    paga: `La Constitución es rígida: ${E.revisor.votacion} puntos en cada votación para cambiar de gobierno.`,
+  },
 };
 export const PODERES_SEPARADOS = {
   monarquia: ['moderador'],
-  teocracia: ['moderador'],
+  teocracia: ['moderador', 'revisor'],
   regencia: ['moderador'],
-  oligarquia: ['legislativo'],
-  aristocracia: ['legislativo'],
-  tecnocracia: ['judiciario'],
-  parlamentarismo: ['legislativo', 'moderador'],
-  presidencialismo: ['legislativo', 'judiciario'],
-  republica_directa: ['legislativo'],
-  republica_semidirecta: ['legislativo', 'judiciario'],
-  republica_indirecta: ['legislativo', 'judiciario', 'moderador'],
+  oligarquia: ['legislativo', 'federativo'],
+  aristocracia: ['legislativo', 'tribunicio'],
+  tecnocracia: ['judiciario', 'merito'],
+  absolutismo: ['merito'],
+  parlamentarismo: ['legislativo', 'moderador', 'federativo'],
+  presidencialismo: ['legislativo', 'judiciario', 'revisor'],
+  republica_directa: ['legislativo', 'tribunicio', 'electoral', 'control'],
+  republica_semidirecta: ['legislativo', 'judiciario', 'electoral', 'emergencia', 'control'],
+  republica_indirecta: [
+    'legislativo', 'judiciario', 'moderador', 'federativo', 'electoral', 'emergencia', 'control', 'revisor',
+  ],
 };
+// Lo que cada pieza deja en manos de quien manda (si otra pieza lo separa, gana
+// independiente). Tribunicio, Electoral, Moderador y Revisor no se concentran: un
+// arbitro o un tribuno del propio gobernante no controla a nadie.
+export const PODERES_CONCENTRADOS = {
+  despotismo: ['federativo', 'emergencia'],
+  monarquia: ['legislativo', 'judiciario', 'federativo', 'emergencia'],
+  estratocracia: ['federativo', 'emergencia', 'control'],
+  teocracia: ['legislativo', 'judiciario', 'federativo'],
+  regencia: ['legislativo', 'judiciario', 'federativo'],
+  tirania: ['judiciario', 'federativo', 'emergencia', 'control'],
+  parlamentarismo: ['judiciario', 'emergencia'],
+  presidencialismo: ['federativo', 'emergencia'],
+  absolutismo: ['legislativo', 'judiciario', 'federativo', 'emergencia', 'control'],
+  tecnocracia: ['legislativo', 'federativo', 'emergencia'],
+  republica_directa: ['judiciario', 'federativo'],
+  republica_semidirecta: ['federativo'],
+  republica_indirecta: ['merito'],
+  oligarquia: ['judiciario', 'emergencia', 'merito'],
+  aristocracia: ['judiciario', 'federativo', 'merito'],
+  autoritarismo: ['legislativo', 'judiciario', 'federativo', 'emergencia', 'control'],
+  dictadura: ['legislativo', 'judiciario', 'federativo', 'emergencia', 'control'],
+  totalitarismo: ['legislativo', 'judiciario', 'federativo', 'emergencia', 'control', 'merito'],
+};
+// Los que una partida puede apagar: todos menos el Ejecutivo.
+export const PODERES_ELEGIBLES = Object.keys(PODERES).filter(p => p !== 'ejecutivo');
 export const GRUPOS_DE_APOYO = ['pueblo', 'lideres', 'militares'];
 
 // Un turno son 6 meses: 159 turnos son ~80 años de vida, y 1/159 es el 0,63%
@@ -682,7 +813,6 @@ export const ORO_A_VOTOS = 0.5;      // puntos de voto por oro ofrecido
 export const UMBRAL_APROBACION = 50;
 export const ENFRIAMIENTO_VOTO = 3;  // turnos sin volver a proponer tras perder
 export const PROBABILIDAD_CRISIS = 0.02;
-export const UMBRAL_EXPULSION = 25;
 // Por debajo de este apoyo un grupo se puede alzar, sin importar el gobierno. La
 // probabilidad por ronda crece lineal desde 0 en el umbral hasta PROBABILIDAD_LEVANTAMIENTO con apoyo 0.
 export const UMBRAL_LEVANTAMIENTO = 25;

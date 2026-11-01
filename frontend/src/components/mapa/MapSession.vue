@@ -838,6 +838,7 @@ onUnmounted(() => {
         @acunar="(oro) => ejecutarAccion({ tipo: 'acunarMoneda', oro })"
         @nombrar-gobierno="(nombre) => ejecutarAccion({ tipo: 'nombrarGobierno', nombre })"
         @impuestos="(nivel) => ejecutarAccion({ tipo: 'fijarImpuestos', nivel })"
+        @emergencia="ejecutarAccion({ tipo: 'declararEmergencia' })"
         @mandato="(rondas) => ejecutarAccion({ tipo: 'fijarMandato', rondas })"
         @cerrar="gobiernoAbierto = false"
       />

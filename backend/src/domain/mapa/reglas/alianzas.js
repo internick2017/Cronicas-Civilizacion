@@ -1,10 +1,11 @@
 import { jugadorPorId } from '../MapGame.js';
-import { RECURSOS } from '../constantes.js';
+import { RECURSOS, EFECTOS_PODERES } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { evento } from './comun.js';
 import { exigirMecanica, recursoApagado } from './modo.js';
 import { controlTerritorial } from './dominacion.js';
 import { alianzaDe, aliadosDe, sonAliados, propuestasDe } from './bandos.js';
+import { tienePoder } from './poderes.js';
 
 /**
  * Alianzas: proponer, retirar, responder, romper y regalar recursos.
@@ -102,7 +103,9 @@ export function romperAlianza(estado, jugadorId) {
   jugadorActivo(estado, jugadorId);
   const exAliados = aliadosDe(estado, jugadorId);
   if (exAliados.length === 0) throw new ReglaError('SIN_ALIANZA', 'No tenés ninguna alianza');
-  return [evento('AlianzaRota', estado, jugadorId, { exAliados, hasta: estado.turno })];
+  // Con un poder Federativo independiente el tratado obliga por mas tiempo.
+  const extra = tienePoder(jugadorPorId(estado, jugadorId), 'federativo') ? EFECTOS_PODERES.federativo.treguaExtra : 0;
+  return [evento('AlianzaRota', estado, jugadorId, { exAliados, hasta: estado.turno + extra })];
 }
 
 export function regalarRecursos(estado, jugadorId, { para, recurso, cantidad }) {

@@ -7,7 +7,7 @@ import { evento } from './comun.js';
 import { formaEstadoDe } from './gobierno.js';
 import { subdivisionResolutora, nivelDe, cabeceraDe } from './subdivisiones.js';
 import { perdidaPoblacion } from './efectosProblemas.js';
-import { problemaApagado } from './modo.js';
+import { problemaApagado, mecanicaActiva } from './modo.js';
 
 // Problemas sociales por zona (ver docs/superpowers/specs/2026-10-12-subdivisiones-problemas-design.md).
 // Solo existen en el Estado FEDERAL. Cada ciudad tiene un medidor por problema; al
@@ -191,6 +191,7 @@ function pasada(estado, jugador, rng) {
 // Se llama al cerrar CADA ronda (ver terminarTurno). Idempotente por ronda: una
 // peticion que cierra varias rondas da lo mismo que varias peticiones.
 export function cerrarRondaProblemas(estado, rng) {
+  if (!mecanicaActiva(estado, 'problemas')) return [];
   const eventos = [];
   for (const jugador of estado.jugadores) {
     if (!jugador.activo) continue;

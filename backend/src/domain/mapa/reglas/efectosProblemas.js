@@ -1,5 +1,6 @@
 import { EFECTOS_PROBLEMAS, ESCALA_GRAVEDAD } from '../constantes.js';
 import { inflacionAcunadaDe } from './moneda.js';
+import { tienePoder } from './poderes.js';
 
 // Como cada problema social castiga mientras esta ACTIVO (ver problemas.js). Todas
 // puras, aceptan un jugador viejo sin el campo y devuelven la identidad (1 o 0) si
@@ -26,8 +27,8 @@ export function factorProduccionCiudad(jugador, x, y, recurso) {
 const sumaPorCiudad = (jugador, tipo) =>
   Math.round(activos(jugador, tipo).reduce((s, p) => s + EFECTOS_PROBLEMAS[tipo] * escala(p.gravedad) * p.ciudades.length, 0));
 
-// Corrupcion: se pierde oro fijo por ciudad afectada y por ronda.
-export const perdidaFijaOro = (jugador) => sumaPorCiudad(jugador, 'corrupcion');
+// Corrupcion: se pierde oro fijo por ciudad afectada y por ronda, salvo que lo audite el Control.
+export const perdidaFijaOro = (jugador) => (tienePoder(jugador, 'control') ? 0 : sumaPorCiudad(jugador, 'corrupcion'));
 // Inmigracion: mas gente que mantener, o sea comida que se va.
 export const consumoExtraComida = (jugador) => sumaPorCiudad(jugador, 'inmigracion');
 

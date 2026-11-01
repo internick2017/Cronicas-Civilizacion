@@ -6,6 +6,7 @@ import { ReglaError } from '../domain/mapa/errores.js';
 import { unirse as unirseRegla, iniciar as iniciarRegla, sumarMaquina } from '../domain/mapa/reglas/partida.js';
 import {
   proponerGobierno, cambiarFormaEstado, darVentajas, manifestarse, estaEnPoder, fijarImpuestos, fijarMandato, nombrarGobierno,
+  declararEmergencia,
 } from '../domain/mapa/reglas/gobierno.js';
 import {
   crearSubdivision, quitarSubdivision, renombrarSubdivision, asignarCiudades, desasignarCiudades, elegirCabecera,
@@ -115,6 +116,7 @@ const REGLAS_POR_TIPO = {
   manifestarse: (estado, jugadorId, accion) => manifestarse(estado, jugadorId, accion),
   fijarImpuestos: (estado, jugadorId, accion) => fijarImpuestos(estado, jugadorId, accion),
   fijarMandato: (estado, jugadorId, accion) => fijarMandato(estado, jugadorId, accion),
+  declararEmergencia: (estado, jugadorId) => declararEmergencia(estado, jugadorId),
   nombrarGobierno: (estado, jugadorId, accion) => nombrarGobierno(estado, jugadorId, accion),
   crearSubdivision: (estado, jugadorId, accion) => crearSubdivision(estado, jugadorId, accion),
   quitarSubdivision: (estado, jugadorId, accion) => quitarSubdivision(estado, jugadorId, accion),

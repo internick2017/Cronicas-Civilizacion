@@ -1,6 +1,6 @@
 import {
   GOBIERNOS, EJES_GOBIERNO, INCOMPATIBLES, RESPETO, BONO_PRODUCCION_GOBIERNO, PODERES_SEPARADOS, PREFERENCIAS,
-  GRUPOS_DE_APOYO,
+  GRUPOS_DE_APOYO, EFECTOS_PODERES, PODERES_CONCENTRADOS,
 } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 
@@ -60,35 +60,46 @@ const sumar = (a, b) => {
 const memoria = new Map();
 
 // Todo lo que el resto de las reglas necesita saber de un gobierno, ya mezclado.
-//  - respeto y bono de produccion: suma de las piezas.
-//  - poderes independientes: union.
+//  - respeto: suma de las piezas y de sus poderes; bono de produccion: suma de las piezas.
+//  - poderes: union de los independientes; concentrados: union de los demas que existen.
+//    `apagados` son los que esta partida no tiene: no existen para ningun gobierno.
 //  - electorado: el primero que no sea `jugador`, mirando Regimen, Sistema y Forma.
 //  - sostenidoPor: los militares si CUALQUIER pieza se apoya en ellos.
 //  - inmortal: el Despotismo que nadie vota nunca pierde el poder.
 //  - republica: hay elecciones (Regimen democratico); monarquia: hay sucesion.
-export function perfilDeGobierno(clave) {
+export function perfilDeGobierno(clave, apagados = []) {
   const piezas = piezasDeClave(clave) ?? [GOBIERNO_POR_DEFECTO];
   const id = claveDePiezas(piezas);
-  if (memoria.has(id)) return memoria.get(id);
+  const memo = `${id}|${apagados.join()}`;
+  if (memoria.has(memo)) return memoria.get(memo);
 
   const porEje = [...piezas].sort((a, b) => ORDEN.indexOf(EJE_DE[b]) - ORDEN.indexOf(EJE_DE[a]));
   const electorado = porEje.map(p => GOBIERNOS[p].electorado).find(e => e !== 'jugador') ?? 'jugador';
+  const lista = (tabla) => [...new Set(piezas.flatMap(p => tabla[p] ?? []))].filter(p => !apagados.includes(p));
+  const poderes = lista(PODERES_SEPARADOS);
+  const concentrados = lista(PODERES_CONCENTRADOS).filter(p => !poderes.includes(p));
   const perfil = {
     clave: id,
     piezas,
     nombre: nombreDeGobierno(id),
     electorado,
     sostenidoPor: piezas.some(p => GOBIERNOS[p].sostenidoPor === 'militares') ? 'militares' : 'lideres',
-    respeto: piezas.reduce((acc, p) => sumar(acc, RESPETO[p]), {}),
+    respeto: [...piezas.map(p => RESPETO[p]), ...poderes.map(p => EFECTOS_PODERES[p].respeto)]
+      .reduce((acc, r) => sumar(acc, r), {}),
     bono: piezas.reduce((acc, p) => sumar(acc, BONO_PRODUCCION_GOBIERNO[p]), {}),
-    poderes: [...new Set(piezas.flatMap(p => PODERES_SEPARADOS[p] ?? []))],
+    poderes,
+    concentrados,
     republica: piezas.some(p => p.startsWith('republica_')),
     monarquia: piezas.includes('monarquia'),
     inmortal: piezas.includes('despotismo') && electorado === 'jugador',
   };
-  memoria.set(id, perfil);
+  memoria.set(memo, perfil);
   return perfil;
 }
+
+// Los poderes apagados viajan en el jugador (ver aplicar.js#JugadorUnido): el gobierno
+// se lee sin el estado de la partida en decenas de lugares.
+export const perfilDeJugador = (jugador) => perfilDeGobierno(jugador?.gobierno, jugador?.poderesApagados);
 
 // Lo que cada grupo piensa de una combinacion: el promedio de sus piezas.
 export function preferenciaDe(clave, grupo) {

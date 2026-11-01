@@ -9,7 +9,7 @@ const props = defineProps({
   jugadorId: { type: String, required: true },
   constantes: { type: Object, required: true } // {gobiernos, gruposDeApoyo, enfriamientoVoto, ...}
 })
-const emit = defineEmits(['proponer', 'ventajas', 'forma', 'crearSubdivision', 'renombrarSubdivision', 'asignarCiudades', 'desasignarCiudades', 'quitarSubdivision', 'elegirCabecera', 'nombrarMoneda', 'acunar', 'nombrarGobierno', 'impuestos', 'mandato', 'cerrar'])
+const emit = defineEmits(['proponer', 'ventajas', 'forma', 'crearSubdivision', 'renombrarSubdivision', 'asignarCiudades', 'desasignarCiudades', 'quitarSubdivision', 'elegirCabecera', 'nombrarMoneda', 'acunar', 'nombrarGobierno', 'impuestos', 'mandato', 'emergencia', 'cerrar'])
 
 const NOMBRE_GRUPO = { pueblo: 'Pueblo', lideres: 'Líderes', militares: 'Militares' }
 const QUIEN_APRUEBA = {
@@ -43,7 +43,8 @@ const apoyoQueExpulsa = computed(() => yo.value?.apoyo?.[grupoQueExpulsa.value] 
 // El grupo mas descontento: bajo el umbral se puede alzar, sea cual sea el gobierno.
 const grupoDescontento = computed(() => Object.entries(yo.value?.apoyo ?? {}).sort((a, b) => a[1] - b[1])[0] ?? null)
 const riesgoLevantamiento = computed(() =>
-  enPoder.value && grupoDescontento.value?.[1] < (props.constantes.umbralesGobierno?.levantamiento ?? 25))
+  props.vista.reglas?.levantamientos !== false
+    && enPoder.value && grupoDescontento.value?.[1] < (props.constantes.umbralesGobierno?.levantamiento ?? 25))
 const enPeligro = computed(
   () => enPoder.value && !perfil.value.inmortal && apoyoQueExpulsa.value < 40
 )
@@ -102,25 +103,40 @@ const efectosElegido = computed(() => {
     .filter(([, n]) => n !== 0)
     .map(([g, n]) => `${n > 0 ? '+' : ''}${n} respeto de ${NOMBRE_GRUPO[g].toLowerCase()}`)
   const poderes = [...new Set(piezasElegidas.value.flatMap(p => poderesSeparadosDe(p)))]
-    .map(p => `${NOMBRE_PODER[p]} independiente`)
+    .map(p => `${nombrePoder(p)} independiente`)
   return [...partes, ...respeto, ...poderes].join(', ') || 'Sin bonos.'
 })
 
-// --- Separacion de poderes: el Ejecutivo siempre es tuyo; los otros tres son
-// independientes o no segun el gobierno, y cada uno separado da un efecto.
-const NOMBRE_PODER = { legislativo: 'Legislativo', judiciario: 'Judiciario', moderador: 'Moderador' }
-const EXPLICACION_PODER = (poder) => {
-  const e = props.constantes.efectosPoderes?.[poder] || {}
-  if (poder === 'legislativo') return `+${e.apoyoPueblo ?? 0} de apoyo del pueblo por ronda`
-  if (poder === 'judiciario') return `${Math.round((1 - (e.crisis ?? 1)) * 100)}% menos de probabilidad de crisis`
-  return `te echan recién con el apoyo bajo ${(props.constantes.umbralesGobierno?.expulsion ?? 25) + (e.expulsion ?? 0)}`
+// --- Separacion de poderes: el Ejecutivo siempre es tuyo; los otros diez son
+// independientes o no segun el gobierno. El texto de cada uno lo manda el servidor.
+const nombrePoder = (clave) => (props.constantes.poderes || []).find(p => p.clave === clave)?.nombre || clave
+const tengoPoder = (clave) => (perfil.value.poderes || []).includes(clave)
+// Sin la lista (backend viejo) estan todos.
+const enLaPartida = (clave) => clave === 'ejecutivo' || !props.vista.reglas?.poderes || props.vista.reglas.poderes.includes(clave)
+const poderesSeparadosDe = (tipo) => (props.constantes.poderesGobierno?.[tipo] || []).filter(enLaPartida)
+const estadoDePoder = (clave) => {
+  if (clave === 'ejecutivo') return 'tuyo'
+  if (tengoPoder(clave)) return 'independiente'
+  return (perfil.value.concentrados || []).includes(clave) ? 'concentrado' : 'no existe'
 }
-const poderesSeparadosDe = (tipo) => props.constantes.poderesGobierno?.[tipo] || []
-const poderesDelGobierno = computed(() => {
-  const separados = perfil.value.poderes || []
-  return (props.constantes.poderes || []).map(p => ({
-    poder: p, nombre: NOMBRE_PODER[p] || p, separado: separados.includes(p), efecto: EXPLICACION_PODER(p)
-  }))
+const poderesDelGobierno = computed(() => (props.constantes.poderes || [])
+  .filter(p => enLaPartida(p.clave))
+  .map(p => ({ ...p, estado: estadoDePoder(p.clave) })))
+const costoInstituciones = computed(() =>
+  Math.round(Math.abs(props.constantes.efectosPoderes?.ejecutivo?.oroPorInstitucion ?? 0) * (perfil.value.poderes || []).length * 100))
+
+// --- Estado de excepcion ---
+const reglasEmergencia = computed(() => props.constantes.efectosPoderes?.emergencia || {})
+const emergenciaActiva = computed(() => (yo.value?.emergenciaHasta ?? -1) >= props.vista.turno)
+const costoEmergencia = computed(() =>
+  -(tengoPoder('emergencia') ? reglasEmergencia.value.apoyoPuebloRegulada : reglasEmergencia.value.apoyoPueblo))
+const motivoEmergencia = computed(() => {
+  if (!enPoder.value) return 'perdiste el poder'
+  if (tengoPoder('tribunicio')) return 'el Tribuno la veta'
+  if (estadoDePoder('emergencia') === 'no existe') return 'tu gobierno no tiene este poder'
+  if (emergenciaActiva.value) return `dura hasta la ronda ${yo.value.emergenciaHasta}`
+  const bloqueada = yo.value?.emergenciaBloqueadaHasta ?? 0
+  return bloqueada > props.vista.turno ? `podés volver a declararla en la ronda ${bloqueada}` : null
 })
 const umbralExpulsionActual = computed(() => {
   const base = props.constantes.umbralesGobierno?.expulsion ?? 25
@@ -137,6 +153,8 @@ const motivoProponer = computed(() => {
   if (oroOfrecido.value > oroDisponible.value) return 'sin oro suficiente'
   return null
 })
+// Con un poder de Control independiente no se compran votos.
+const puedeComprarVotos = computed(() => hayVotacion.value && !tengoPoder('control'))
 const motivoVentajas = computed(() =>
   (oroVentajas.value > oroDisponible.value ? 'sin oro suficiente' : null)
 )
@@ -150,7 +168,9 @@ const nombrarGobierno = () => emit('nombrarGobierno', nombreGobiernoNuevo.value.
 
 const NIVELES_IMPUESTOS = { bajos: 'Bajos', normales: 'Normales', altos: 'Altos' }
 const impuestos = computed(() => props.constantes.impuestos || {})
+const impuestoVetado = (nivel) => nivel === 'altos' && tengoPoder('tribunicio')
 const efectoImpuestos = (nivel) => {
+  if (impuestoVetado(nivel)) return 'vetados por el Tribuno'
   const { oro = 0, apoyoPueblo = 0 } = impuestos.value[nivel] || {}
   if (!oro && !apoyoPueblo) return 'sin efecto'
   const signo = (n) => (n > 0 ? `+${n}` : `${n}`)
@@ -158,7 +178,12 @@ const efectoImpuestos = (nivel) => {
 }
 
 const esRepublica = computed(() => perfil.value.republica === true)
-const limitesMandato = computed(() => props.constantes.limitesMandato || { min: 2, max: 50 })
+const limitesMandato = computed(() => {
+  const limites = props.constantes.limitesMandato || { min: 2, max: 50 }
+  return tengoPoder('electoral')
+    ? { ...limites, max: props.constantes.efectosPoderes?.electoral?.mandatoMaximo ?? limites.max }
+    : limites
+})
 const mandatoNuevo = ref(yo.value?.mandato ?? 8)
 const motivoMandato = computed(() => {
   const r = Number(mandatoNuevo.value)
@@ -201,7 +226,7 @@ const acunar = () => {
 
 const proponer = (tipo) => {
   if (motivoProponer.value) return
-  emit('proponer', tipo, hayVotacion.value ? Math.max(0, Math.floor(Number(oroOfrecido.value) || 0)) : 0)
+  emit('proponer', tipo, puedeComprarVotos.value ? Math.max(0, Math.floor(Number(oroOfrecido.value) || 0)) : 0)
 }
 const ventajas = (grupo) => {
   if (motivoVentajas.value) return
@@ -243,10 +268,35 @@ const ventajas = (grupo) => {
 
     <section v-if="hayGobierno && poderesDelGobierno.length">
       <h4>Poderes</h4>
-      <small>Ejecutivo: decidís vos.</small>
-      <small v-for="p in poderesDelGobierno" :key="p.poder">
-        {{ p.nombre }}: {{ p.separado ? `independiente (${p.efecto})` : 'concentrado en quien manda' }}
+      <small>Mantener las instituciones cuesta {{ costoInstituciones }}% de oro.</small>
+      <details v-for="p in poderesDelGobierno" :key="p.clave" class="poder">
+        <summary>
+          <span>{{ p.nombre }}</span>
+          <small :class="{ independiente: p.estado === 'independiente' }">{{ p.estado }}</small>
+        </summary>
+        <small>{{ p.funcion }}</small>
+        <small v-if="p.estado === 'no existe'">Tu gobierno no tiene este poder.</small>
+        <small v-else-if="p.estado === 'concentrado'">
+          Lo ejercés vos, sin bono ni costo. {{ p.concentrado }}
+        </small>
+        <template v-else>
+          <small class="gana">{{ p.gana }}</small>
+          <small class="paga">{{ p.paga }}</small>
+        </template>
+      </details>
+    </section>
+
+    <section v-if="hayGobierno && enLaPartida('emergencia')">
+      <h4>Estado de excepción</h4>
+      <small>
+        {{ reglasEmergencia.rondas }} rondas con -{{ Math.round((reglasEmergencia.descuentoReclutar ?? 0) * 100) }}% al
+        reclutar y +{{ Math.round((reglasEmergencia.defensaCiudad ?? 0) * 100) }}% de defensa en tus ciudades.
+        {{ tengoPoder('emergencia') ? 'Regulado por ley: no te protege del cargo.' : 'Sin controles: nadie te saca del cargo salvo un levantamiento.' }}
       </small>
+      <button class="btn-secundario" :disabled="motivoEmergencia !== null" @click="emit('emergencia')">
+        <strong>Declarar</strong><small>Cuesta {{ costoEmergencia }} de apoyo del pueblo</small>
+      </button>
+      <em v-if="motivoEmergencia">{{ motivoEmergencia }}</em>
     </section>
 
     <section v-if="hayGobierno">
@@ -278,7 +328,8 @@ const ventajas = (grupo) => {
 
     <section v-if="hayGobierno">
       <h4>Proponer otro gobierno</h4>
-      <template v-if="hayVotacion">
+      <small v-if="hayVotacion && !puedeComprarVotos">El poder de Control no deja comprar votos: se vota sin oro.</small>
+      <template v-else-if="hayVotacion">
         <small>Oro para comprar votos (se pierde aunque la votación falle): tenés {{ oroDisponible }}.</small>
         <input v-model.number="oroOfrecido" class="entrada-oro" type="number" min="0" step="5">
       </template>
@@ -318,7 +369,7 @@ const ventajas = (grupo) => {
           :key="nivel"
           class="btn-secundario"
           :class="{ activo: (yo.impuestos || 'normales') === nivel }"
-          :disabled="!enPoder || (yo.impuestos || 'normales') === nivel"
+          :disabled="!enPoder || (yo.impuestos || 'normales') === nivel || impuestoVetado(nivel)"
           @click="emit('impuestos', nivel)"
         >
           <strong>{{ etiqueta }}</strong><small>{{ efectoImpuestos(nivel) }}</small>
@@ -391,7 +442,7 @@ const ventajas = (grupo) => {
       </div>
     </section>
 
-    <section v-if="hayGobierno && yo.formaEstado === 'federal'">
+    <section v-if="hayGobierno && yo.formaEstado === 'federal' && vista.reglas?.problemas !== false">
       <h4>Problemas sociales</h4>
       <MapProblemas :vista="vista" :jugador-id="jugadorId" :constantes="constantes" />
     </section>
@@ -422,6 +473,14 @@ section { display: flex; flex-direction: column; gap: 0.35rem; }
 .barra { height: 0.55rem; border-radius: calc(var(--t-radio) * 4px); background: rgb(var(--t-tinta) / 0.12); overflow: hidden; }
 .barra-llena { height: 100%; background: rgb(var(--t-exito)); }
 .valor { text-align: right; opacity: 0.8; }
+.poder summary {
+  min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  cursor: pointer; font-size: 0.85rem; border-bottom: 1px solid rgb(var(--t-tinta) / 0.1);
+}
+.poder[open] { display: flex; flex-direction: column; gap: 0.2rem; padding-bottom: 0.5rem; }
+.poder .independiente { color: rgb(var(--t-exito)); opacity: 1; }
+.poder .gana { color: rgb(var(--t-exito)); opacity: 1; }
+.poder .paga { color: rgb(var(--t-alerta)); opacity: 1; }
 .selector-gobierno {
   width: 100%; padding: 0.45rem 0.5rem; border-radius: calc(var(--t-radio) * 6px); border: 1px solid rgb(var(--t-tinta) / 0.25);
   background: rgb(var(--t-tinta) / 0.1); color: inherit; font: inherit;

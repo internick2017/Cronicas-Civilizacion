@@ -16,7 +16,10 @@ import { jugadorQueNombra } from './pais.js';
 import { cargosDe } from './cargos.js';
 import { exigirMecanica, mecanicaActiva } from './modo.js';
 import {
-  piezasDeClave, claveDePiezas, perfilDeGobierno, preferenciaDe, validarClaveDeGobierno, GOBIERNO_POR_DEFECTO,
+  poderesDe, tienePoder, poderExiste, blindadoPorEmergencia, poderQueFrena, bonoProduccionPorPoderes,
+} from './poderes.js';
+import {
+  piezasDeClave, claveDePiezas, perfilDeJugador, preferenciaDe, validarClaveDeGobierno, GOBIERNO_POR_DEFECTO,
 } from './composicionGobierno.js';
 
 // Toda lectura de los campos de gobierno pasa por estos accesores: una partida
@@ -28,7 +31,7 @@ export const gobiernoDe = (jugador) => {
   const piezas = piezasDeClave(jugador?.gobierno);
   return piezas ? claveDePiezas(piezas) : GOBIERNO_POR_DEFECTO;
 };
-const perfilDe = (jugador) => perfilDeGobierno(gobiernoDe(jugador));
+const perfilDe = perfilDeJugador;
 export { perfilDe as perfilGobiernoDe };
 
 export const formaEstadoDe = (jugador) =>
@@ -36,20 +39,24 @@ export const formaEstadoDe = (jugador) =>
 
 export const estaEnPoder = (jugador) => jugador?.enPoder !== false;
 
-// Los poderes que el gobierno del jugador mantiene independientes (constantes.js).
-export const poderesDe = (jugador) => perfilDe(jugador).poderes;
-const tienePoder = (jugador, poder) => poderesDe(jugador).includes(poder);
+export { poderesDe };
 
 // Con un Moderador independiente cuesta mas echarte.
 const umbralExpulsion = (jugador) =>
   UMBRAL_EXPULSION + (tienePoder(jugador, 'moderador') ? EFECTOS_PODERES.moderador.expulsion : 0);
 
-export const impuestosDe = (jugador) =>
-  (Object.hasOwn(IMPUESTOS, jugador?.impuestos) ? jugador.impuestos : 'normales');
+// El Tribuno veta los impuestos altos aunque vengan del gobierno anterior.
+export const impuestosDe = (jugador) => {
+  const nivel = Object.hasOwn(IMPUESTOS, jugador?.impuestos) ? jugador.impuestos : 'normales';
+  return nivel === 'altos' && tienePoder(jugador, 'tribunicio') ? 'normales' : nivel;
+};
 
-// Rondas entre elecciones de una republica: la que eligio el jugador o la de la partida.
-export const mandatoDe = (estado, jugador) =>
-  (Number.isInteger(jugador?.mandato) ? jugador.mandato : (estado.config.rondasEntreElecciones ?? 8));
+// Rondas entre elecciones de una republica: la que eligio el jugador o la de la
+// partida, con el tope que le pone un poder Electoral independiente.
+export const mandatoDe = (estado, jugador) => {
+  const mandato = Number.isInteger(jugador?.mandato) ? jugador.mandato : (estado.config.rondasEntreElecciones ?? 8);
+  return tienePoder(jugador, 'electoral') ? Math.min(mandato, EFECTOS_PODERES.electoral.mandatoMaximo) : mandato;
+};
 
 // null = el nombre por defecto del tipo de gobierno (la interfaz lo resuelve).
 export const nombreGobiernoDe = (jugador) => jugador?.nombreGobierno || null;
@@ -103,7 +110,8 @@ export function resultadoVotacion(estado, jugadorId, nuevoGobierno, oro = 0) {
     const preferencia = acotar(50 + diferencia / 2);
     return acotar(PESO_APOYO * apoyoEfectivo(jugador, grupo) + PESO_PREFERENCIA * preferencia + oro * ORO_A_VOTOS);
   });
-  const porcentaje = porGrupo.reduce((a, b) => a + b, 0) / porGrupo.length;
+  const rigidez = tienePoder(jugador, 'revisor') ? EFECTOS_PODERES.revisor.votacion : 0;
+  const porcentaje = porGrupo.reduce((a, b) => a + b, 0) / porGrupo.length + rigidez;
   return { aprobada: porcentaje >= UMBRAL_APROBACION, porcentaje };
 }
 
@@ -128,6 +136,9 @@ export function proponerGobierno(estado, jugadorId, { gobierno, oro = 0 }) {
   // Donde nadie vota (despotismo, monarquia) no hay votos que comprar: el oro
   // ofrecido no se gasta.
   if (gruposQueVotan(jugador).length === 0) oro = 0;
+  if (oro > 0 && tienePoder(jugador, 'control')) {
+    throw new ReglaError('VOTOS_AUDITADOS', 'El poder de Control no deja comprar votos');
+  }
 
   const eventos = [];
   if (oro > 0) eventos.push(evento('RecursosGastados', estado, jugadorId, { costo: { gold: oro } }));
@@ -185,6 +196,9 @@ export function fijarImpuestos(estado, jugadorId, { nivel }) {
   const jugador = jugadorDeGobierno(estado, jugadorId);
   if (!estaEnPoder(jugador)) throw new ReglaError('SIN_PODER', 'No tenés el poder para fijar los impuestos');
   if (!Object.hasOwn(IMPUESTOS, nivel)) throw new ReglaError('IMPUESTOS_INVALIDOS', 'Nivel de impuestos inválido');
+  if (nivel === 'altos' && tienePoder(jugador, 'tribunicio')) {
+    throw new ReglaError('VETO_TRIBUNICIO', 'El Tribuno veta los impuestos altos');
+  }
   return [evento('ImpuestosFijados', estado, jugadorId, { nivel })];
 }
 
@@ -192,11 +206,36 @@ export function fijarMandato(estado, jugadorId, { rondas }) {
   const jugador = jugadorDeGobierno(estado, jugadorId);
   if (!estaEnPoder(jugador)) throw new ReglaError('SIN_PODER', 'No tenés el poder para cambiar el mandato');
   if (!esRepublica(jugador)) throw new ReglaError('NO_ES_REPUBLICA', 'Solo las repúblicas tienen elecciones');
-  const { min, max } = LIMITES_CONFIG.rondasEntreElecciones;
+  const { min } = LIMITES_CONFIG.rondasEntreElecciones;
+  const max = tienePoder(jugador, 'electoral')
+    ? EFECTOS_PODERES.electoral.mandatoMaximo : LIMITES_CONFIG.rondasEntreElecciones.max;
   if (!Number.isInteger(rondas) || rondas < min || rondas > max) {
     throw new ReglaError('MANDATO_INVALIDO', `El mandato dura de ${min} a ${max} rondas`);
   }
   return [evento('MandatoFijado', estado, jugadorId, { rondas })];
+}
+
+// El estado de excepcion: lo declara el gobierno que tiene el poder, salvo que lo vete
+// el Tribuno. Lo pagan el pueblo y una espera larga para repetirlo.
+export function declararEmergencia(estado, jugadorId) {
+  const jugador = jugadorDeGobierno(estado, jugadorId);
+  if (!estaEnPoder(jugador)) throw new ReglaError('SIN_PODER', 'No tenés el poder para declarar la emergencia');
+  if (tienePoder(jugador, 'tribunicio')) throw new ReglaError('VETO_TRIBUNICIO', 'El Tribuno veta el estado de excepción');
+  if (!poderExiste(jugador, 'emergencia')) {
+    throw new ReglaError('PODER_INEXISTENTE', 'Tu gobierno no tiene poder de Emergencia');
+  }
+  if ((jugador.emergenciaBloqueadaHasta ?? 0) > estado.turno) {
+    throw new ReglaError('EN_ENFRIAMIENTO', `No podés volver a declararla hasta la ronda ${jugador.emergenciaBloqueadaHasta}`);
+  }
+  const { rondas, enfriamiento, apoyoPueblo, apoyoPuebloRegulada } = EFECTOS_PODERES.emergencia;
+  const apoyo = apoyoDe(jugador);
+  apoyo.pueblo = acotar(apoyo.pueblo + (tienePoder(jugador, 'emergencia') ? apoyoPuebloRegulada : apoyoPueblo));
+  return [
+    evento('EmergenciaDeclarada', estado, jugadorId, {
+      hasta: estado.turno + rondas - 1, bloqueadaHasta: estado.turno + enfriamiento,
+    }),
+    evento('ApoyoActualizado', estado, jugadorId, { apoyo }),
+  ];
 }
 
 // Vacio vuelve al nombre por defecto del tipo de gobierno.
@@ -221,11 +260,11 @@ export function nombrarGobierno(estado, jugadorId, { nombre }) {
 // multiplicador, y no en aplicarBonosPorcentuales (tecnologia.js): aquel
 // redondea por turno y con valores chicos (2 de cultura por ciudad) un -25% se
 // perdia entero. Este camino arrastra el decimal al turno siguiente.
-export function multiplicadorProduccion(jugador, recurso) {
+export function multiplicadorProduccion(jugador, recurso, aliados = 0) {
   const republica = esRepublica(jugador) ? BONO_PRODUCCION_REPUBLICA : 0;
   const impuestos = recurso === 'gold' ? IMPUESTOS[impuestosDe(jugador)].oro : 0;
   return 1 + republica + (perfilDe(jugador).bono[recurso] ?? 0)
-    + produccionPorcentualDeRaza(jugador, recurso) + impuestos;
+    + produccionPorcentualDeRaza(jugador, recurso) + impuestos + bonoProduccionPorPoderes(jugador, recurso, aliados);
 }
 
 // Quien tiene que sostenerte en el cargo: el grupo del electorado de tu
@@ -296,6 +335,12 @@ export function cerrarRondaGobierno(estado, rng) {
     // y los impuestos lo suben (bajos) o lo bajan (altos).
     apoyo.pueblo = acotar(apoyo.pueblo - caidaApoyoPueblo(jugador) + IMPUESTOS[impuestosDe(jugador)].apoyoPueblo
       + (tienePoder(jugador, 'legislativo') ? EFECTOS_PODERES.legislativo.apoyoPueblo : 0));
+    const haceElecciones = esRepublica(jugador) && estado.turno % mandatoDe(estado, jugador) === 0;
+    // Una eleccion limpia y ganada legitima a quien manda.
+    if (haceElecciones && estaEnPoder(jugador) && tienePoder(jugador, 'electoral')
+      && apoyoDelElectorado({ ...jugador, apoyo }) >= UMBRAL_ELECCION) {
+      for (const g of ['pueblo', 'lideres']) apoyo[g] = acotar(apoyo[g] + EFECTOS_PODERES.electoral.legitimidad);
+    }
     if (GRUPOS_DE_APOYO.some(g => apoyo[g] !== apoyoAntes[g])) {
       eventos.push(evento('ApoyoActualizado', estado, jugador.id, { apoyo }));
     }
@@ -303,19 +348,28 @@ export function cerrarRondaGobierno(estado, rng) {
     // evento todavia no se haya aplicado.
     const j = { ...jugador, apoyo };
     const perfil = perfilDe(j);
-    const haceElecciones = esRepublica(j) && estado.turno % mandatoDe(estado, j) === 0;
 
     if (estaEnPoder(j)) {
       // Antes que todo: ni el despota esta a salvo, y el grupo alzado se calma con
       // el gobierno que impuso (si no, volveria a alzarse apenas regreses).
-      const alzado = levantamiento(j, rng);
+      const alzado = mecanicaActiva(estado, 'levantamientos') ? levantamiento(j, rng) : null;
+      const freno = alzado && poderQueFrena(j, alzado);
+      if (freno) {
+        // El reclamo se canaliza: el grupo se calma justo en el umbral, y por eso no se
+        // repite cada ronda.
+        eventos.push(evento('LevantamientoFrenado', estado, jugador.id, {
+          grupo: alzado, poder: freno, apoyo: { ...apoyo, [alzado]: Math.max(apoyo[alzado], UMBRAL_LEVANTAMIENTO) },
+        }));
+        continue;
+      }
       if (alzado) {
         eventos.push(evento('Levantamiento', estado, jugador.id, {
           ...LEVANTAMIENTOS[alzado], grupo: alzado, apoyo: { ...apoyo, [alzado]: APOYO_INICIAL },
         }));
         continue;
       }
-      if (perfil.inmortal) continue; // el despota no cae por crisis ni por expulsion
+      // El despota no cae por crisis ni por expulsion, y la emergencia sin controles tampoco.
+      if (perfil.inmortal || blindadoPorEmergencia(estado, j)) continue;
       let motivo = null;
       if (apoyoEfectivo(j, grupoQueExpulsa(j)) < umbralExpulsion(j)) motivo = 'expulsion';
       else if (haceElecciones && apoyoDelElectorado(j) < UMBRAL_ELECCION) motivo = 'eleccion';

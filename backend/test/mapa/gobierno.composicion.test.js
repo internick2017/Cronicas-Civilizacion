@@ -88,16 +88,17 @@ describe('gobierno combinable: contradicciones', () => {
 });
 
 describe('gobierno combinable: los efectos se suman', () => {
-  it('monarquia (+20% oro) + oligarquia (+15%) suman 1,35; oligarquia + presidencialismo (+10%) suman 1,25', () => {
-    expect(multiplicadorProduccion({ gobierno: 'monarquia+oligarquia' }, 'gold')).toBeCloseTo(1.35);
-    expect(multiplicadorProduccion({ gobierno: 'oligarquia+presidencialismo' }, 'gold')).toBeCloseTo(1.25);
+  // Cada poder independiente cuesta 2% de oro: tres poderes en la primera, cuatro en la segunda.
+  it('monarquia (+20% oro) + oligarquia (+15%) dan 1,29; oligarquia + presidencialismo (+10%) dan 1,17', () => {
+    expect(multiplicadorProduccion({ gobierno: 'monarquia+oligarquia' }, 'gold')).toBeCloseTo(1.29);
+    expect(multiplicadorProduccion({ gobierno: 'oligarquia+presidencialismo' }, 'gold')).toBeCloseTo(1.17);
   });
 
   it('el respeto y los poderes se suman y unen', () => {
     p1.apoyo = { pueblo: 50, lideres: 50, militares: 50 };
     p1.gobierno = 'monarquia+parlamentarismo'; // lideres +10 y +10
     expect(apoyoEfectivo(p1, 'lideres')).toBe(70);
-    expect(poderesDe(p1).sort()).toEqual(['legislativo', 'moderador']);
+    expect(poderesDe(p1).sort()).toEqual(['federativo', 'legislativo', 'moderador']);
   });
 
   it('las democracias suman el bono de las republicas', () => {

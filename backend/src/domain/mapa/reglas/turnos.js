@@ -8,7 +8,7 @@ import { validarTurno, evento, esSimultaneo, listosDe } from './comun.js';
 import { produccionPorRasgos } from './cultura.js';
 import { aplicarBonosPorcentuales } from './tecnologia.js';
 import { controlTerritorial } from './dominacion.js';
-import { bandosDe } from './bandos.js';
+import { aliadosDe, bandosDe } from './bandos.js';
 import { recuperarFronteras } from './fronteras.js';
 import { estaSaqueada } from './saqueo.js';
 import { capitalDe, estaEnMudanza } from './capital.js';
@@ -92,7 +92,7 @@ export function produccionConResto(estado, jugadorId) {
   const produccion = {};
   const resto = {};
   for (const [recurso, valor] of Object.entries(bruta)) {
-    const factor = multiplicadorProduccion(jugador, recurso);
+    const factor = multiplicadorProduccion(jugador, recurso, aliadosDe(estado, jugadorId).length);
     // Un valor fraccionario (por un problema social) tambien lleva su decimal al turno siguiente.
     if (factor === 1 && Number.isInteger(valor)) { produccion[recurso] = valor; continue; }
     const exacto = valor * factor + (previo[recurso] ?? 0);

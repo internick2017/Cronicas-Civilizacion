@@ -277,7 +277,7 @@ export function narrarRonda(eventos, jugadores = []) {
       }
 
       case 'AlianzaRota': {
-        frases.push(`${quien} rompio su alianza. Hay tregua hasta la proxima ronda.`);
+        frases.push(`${quien} rompio su alianza. Hay tregua hasta la ronda ${datos.hasta + 1}.`);
         break;
       }
 
@@ -285,6 +285,18 @@ export function narrarRonda(eventos, jugadores = []) {
         frases.push(datos.tipo === 'revolucion'
           ? `El pueblo de ${quien} hizo la revolucion y derroco a su gobierno.`
           : `Los ${datos.grupo === 'militares' ? 'militares' : 'lideres'} de ${quien} dieron un golpe de Estado.`);
+        break;
+      }
+
+      case 'LevantamientoFrenado': {
+        frases.push(datos.grupo === 'pueblo'
+          ? `El tribuno de ${quien} calmo al pueblo y freno la revolucion.`
+          : `El tribunal de ${quien} anulo el golpe de Estado de los ${datos.grupo === 'militares' ? 'militares' : 'lideres'}.`);
+        break;
+      }
+
+      case 'EmergenciaDeclarada': {
+        frases.push(`${quien} declaro el estado de excepcion.`);
         break;
       }
 

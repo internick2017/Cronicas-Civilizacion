@@ -7,7 +7,7 @@ import { DIFICULTAD_IA_DEFAULT, GRUPOS_DE_APOYO, saludDeCiudad, saludMaximaCiuda
 import { subdivisionesDe, nivelDe, cabeceraDe } from './subdivisiones.js';
 import { problemasParaLaVista, senalesDe } from './problemas.js';
 import { multiplicadorCostos } from './efectosProblemas.js';
-import { reglasDelModo } from './modo.js';
+import { reglasDelModo, mecanicaActiva } from './modo.js';
 import {
   gobiernoDe, perfilGobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo, impuestosDe, mandatoDe, nombreGobiernoDe,
 } from './gobierno.js';
@@ -19,8 +19,8 @@ import { monedaDe, inflacionAcunadaDe, acunadoEnRonda } from './moneda.js';
 // `capitales`: claves "x,y" de la capital de cada jugador. Viajan marcadas EN la
 // ciudad y no como coordenadas sueltas, asi la capital de un rival solo se ve si
 // esa casilla ya esta descubierta.
-function vistaTile(tile, videntes, capitales) {
-  if (!videntes.some(id => tile.descubiertoPor.includes(id))) {
+function vistaTile(tile, videntes, capitales, conNiebla) {
+  if (conNiebla && !videntes.some(id => tile.descubiertoPor.includes(id))) {
     return { x: tile.x, y: tile.y, descubierto: false };
   }
   const { descubiertoPor: _descubiertoPor, ...resto } = structuredClone(tile);
@@ -76,13 +76,15 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       // mapa oculto tiene tomado el rival.
       dominacion: dominacionParaLaVista(estado, jugador.id),
       gobierno: gobiernoDe(jugador),
-      perfilGobierno: (({ electorado, sostenidoPor, poderes, republica, inmortal }) =>
-        ({ electorado, sostenidoPor, poderes, republica, inmortal }))(perfilGobiernoDe(jugador)),
+      perfilGobierno: (({ electorado, sostenidoPor, poderes, concentrados, republica, inmortal }) =>
+        ({ electorado, sostenidoPor, poderes, concentrados, republica, inmortal }))(perfilGobiernoDe(jugador)),
       nombreGobierno: nombreGobiernoDe(jugador),
       formaEstado: formaEstadoDe(jugador),
       enPoder: estaEnPoder(jugador),
       impuestos: impuestosDe(jugador),
       mandato: mandatoDe(estado, jugador),
+      emergenciaHasta: jugador.emergenciaHasta ?? null,
+      emergenciaBloqueadaHasta: jugador.emergenciaBloqueadaHasta ?? 0,
       // Apoyo EFECTIVO (con el respeto del gobierno ya sumado): es lo que
       // cuenta en una votacion. Privado, como los recursos.
       apoyo: Object.fromEntries(GRUPOS_DE_APOYO.map(g => [g, apoyoEfectivo(jugador, g)])),
@@ -125,6 +127,7 @@ export function vistaJugador(estado, jugadorId) {
     throw new ReglaError('JUGADOR_DESCONOCIDO', `Jugador desconocido: ${jugadorId}`);
   }
   const videntes = [jugadorId, ...aliadosDe(estado, jugadorId)];
+  const conNiebla = mecanicaActiva(estado, 'niebla');
   const capitales = new Set(estado.jugadores
     .map(j => capitalDe(estado, j)).filter(Boolean).map(c => `${c.x},${c.y}`));
   return {
@@ -142,7 +145,7 @@ export function vistaJugador(estado, jugadorId) {
     reglas: reglasDelModo(estado),
     ganador: estado.ganador,
     jugadores: estado.jugadores.map(j => vistaJugadorPublica(j, jugadorId, estado)),
-    mapa: estado.mapa.map(t => vistaTile(t, videntes, capitales)),
+    mapa: estado.mapa.map(t => vistaTile(t, videntes, capitales, conNiebla)),
     // Quien esta aliado con quien es publico: hay que saber contra quien se juega.
     alianzas: alianzasDe(estado).map(a => ({ miembros: [...a.miembros] })),
     // Las propuestas solo las ven quien propone y quien tiene que responder.

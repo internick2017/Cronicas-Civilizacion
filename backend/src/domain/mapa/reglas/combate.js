@@ -2,9 +2,10 @@ import { tileEn } from '../MapGame.js';
 import {
   UNIDADES, bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, CUARTEL,
   DANO_COMBATE, FACTOR_REPLICA, DANO_MINIMO, REPLICA_MINIMA, esNaval, puedeAtacar, saludDeCiudad,
-  BONO_DEFENSA_CAPITAL
+  BONO_DEFENSA_CAPITAL, EFECTOS_PODERES
 } from '../constantes.js';
 import { penalizacionDefensa } from './efectosProblemas.js';
+import { enEmergencia } from './poderes.js';
 import { esCapital } from './capital.js';
 import { mecanicaActiva } from './modo.js';
 import { ReglaError } from '../errores.js';
@@ -95,6 +96,7 @@ export function atacar(estado, jugadorId, { desde, hasta }, rng) {
   const defensor = estado.jugadores.find(j => j.id === tileHasta.dueno);
   const bonoCiudad = ciudadPropia
     ? BONO_DEFENSA_CIUDAD * bonoDefensaPorRasgos(defensor) * multiplicadorDefensaCiudadPorRaza(defensor)
+      * (enEmergencia(estado, defensor) ? 1 + EFECTOS_PODERES.emergencia.defensaCiudad : 1)
     : 1;
   // Los bonos de UNIDAD son de quien manda el ejercito, no de quien es dueno de
   // la casilla: un ejercito que defiende en tierra libre o ajena (el dueno de la

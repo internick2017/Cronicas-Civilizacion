@@ -1,5 +1,5 @@
 import { ReglaError } from '../errores.js';
-import { PROBLEMAS, RECURSOS, MECANICAS } from '../constantes.js';
+import { PROBLEMAS, RECURSOS, MECANICAS, PODERES_ELEGIBLES } from '../constantes.js';
 
 // Que existe en la partida segun las mecanicas elegidas al crearla (config.mecanicas). Es el
 // UNICO lugar que lee esa config (y la vieja config.guerraPura): las reglas, la IA y la vista
@@ -41,6 +41,9 @@ export const edificioApagado = (estado, definicion) => {
 // jugador pagaria oro por resolver algo que no hace nada (ver PROBLEMAS[tipo].recurso).
 export const problemaApagado = (estado, tipo) => recursoApagado(estado, PROBLEMAS[tipo]?.recurso);
 
+// Los poderes que esta partida no tiene. Sin config.poderes (partida vieja) estan todos.
+export const poderesApagadosDe = (estado) => PODERES_ELEGIBLES.filter(p => estado?.config?.poderes?.[p] === false);
+
 // Lo que la interfaz necesita saber para no ofrecer lo apagado, sin conocer las opciones.
 export function reglasDelModo(estado) {
   const m = mecanicasDe(estado);
@@ -54,5 +57,10 @@ export function reglasDelModo(estado) {
     moneda: m.moneda,
     capital: m.capital,
     gobierno: m.gobierno,
+    razas: m.razas,
+    problemas: m.problemas,
+    levantamientos: m.levantamientos,
+    niebla: m.niebla,
+    poderes: PODERES_ELEGIBLES.filter(p => !poderesApagadosDe(estado).includes(p)),
   };
 }

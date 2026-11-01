@@ -1,6 +1,7 @@
 import { evento, radio1 } from './comun.js';
 import { tileEn } from '../MapGame.js';
 import { enPaz } from './bandos.js';
+import { mecanicaActiva } from './modo.js';
 
 /**
  * Presion de frontera: al cerrar la ronda, cada casilla que un rival te tomo
@@ -27,6 +28,7 @@ import { enPaz } from './bandos.js';
  *   cambie de manos todas las rondas.
  */
 export function recuperarFronteras(estado) {
+  if (!mecanicaActiva(estado, 'fronteras')) return [];
   const porJugador = new Map();
 
   for (const tile of estado.mapa) {

@@ -1,6 +1,7 @@
 import { escalarCosto, multiplicadorCostos } from './efectosProblemas.js';
+import { enEmergencia } from './poderes.js';
 import { tileEn, jugadorPorId, puedePagar } from '../MapGame.js';
-import { UNIDADES, CUARTEL, esNaval } from '../constantes.js';
+import { UNIDADES, CUARTEL, EFECTOS_PODERES, esNaval } from '../constantes.js';
 import { ReglaError } from '../errores.js';
 import { validarTurno, evento, marAdyacente } from './comun.js';
 import { tieneTecnologiaRequerida } from './tecnologia.js';
@@ -69,8 +70,12 @@ export function reclutar(estado, jugadorId, { x, y, unidad }) {
     ? Object.fromEntries(Object.entries(definicion.costo).map(
       ([recurso, monto]) => [recurso, Math.round(monto * (1 - CUARTEL.descuentoReclutar))]))
     : definicion.costo;
-  // La inflacion (problema social) encarece lo reclutado, despues del descuento del cuartel.
-  const costo = escalarCosto(costoConCuartel, multiplicadorCostos(jugador));
+  // La inflacion (problema social) encarece lo reclutado, despues de los descuentos.
+  const costoConDescuentos = enEmergencia(estado, jugador)
+    ? Object.fromEntries(Object.entries(costoConCuartel).map(
+      ([recurso, monto]) => [recurso, Math.round(monto * (1 - EFECTOS_PODERES.emergencia.descuentoReclutar))]))
+    : costoConCuartel;
+  const costo = escalarCosto(costoConDescuentos, multiplicadorCostos(jugador));
 
   if (!puedePagar(jugador, costo)) {
     throw new ReglaError('RECURSOS_INSUFICIENTES', 'Recursos insuficientes');

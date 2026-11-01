@@ -108,10 +108,16 @@ const cuartel = computed(() => props.constantes.cuartel || null)
 // un cuartel entrena tropa, no marineros. Si la vista lo aplicara igual,
 // mostraria un precio que el backend no va a cobrar.
 const conBonoCuartel = (u) => tieneBarracks.value && cuartel.value && !u.naval
+const conDescuento = (costo, fraccion) =>
+  Object.fromEntries(Object.entries(costo).map(([r, m]) => [r, Math.round(m * (1 - fraccion))]))
+// El estado de excepcion abarata la tropa despues del cuartel, igual que reglas/militar.js.
+const enEmergencia = computed(() =>
+  (props.vista.jugadores.find(j => j.id === props.jugadorId)?.emergenciaHasta ?? -1) >= props.vista.turno)
 const costoReal = (costoBase, u) => {
-  if (!conBonoCuartel(u)) return escalar(costoBase)
-  return escalar(Object.fromEntries(Object.entries(costoBase).map(
-    ([r, m]) => [r, Math.round(m * (1 - cuartel.value.descuentoReclutar))])))
+  const conCuartel = conBonoCuartel(u) ? conDescuento(costoBase, cuartel.value.descuentoReclutar) : costoBase
+  return escalar(enEmergencia.value
+    ? conDescuento(conCuartel, props.constantes.efectosPoderes.emergencia.descuentoReclutar)
+    : conCuartel)
 }
 const movimientoReal = (u) =>
   u.movimiento + (conBonoCuartel(u) ? cuartel.value.bonoMovimiento : 0)

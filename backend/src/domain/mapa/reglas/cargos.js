@@ -14,6 +14,7 @@ export const ACCIONES_DE_CARGO = {
   gobierno: [
     'fundarCiudad', 'construir', 'adoptarRasgo', 'investigar', 'mejorarCiudad', 'renombrarCiudad', 'moverCapital',
     'proponerGobierno', 'cambiarFormaEstado', 'darVentajas', 'fijarImpuestos', 'fijarMandato', 'nombrarGobierno',
+    'declararEmergencia',
     'crearSubdivision', 'quitarSubdivision', 'renombrarSubdivision', 'asignarCiudades', 'desasignarCiudades',
     'elegirCabecera', 'renombrarPais', 'nombrarMoneda', 'acunarMoneda',
   ],
