@@ -1,5 +1,6 @@
 import axios from 'axios'
 import config from '../config/env.js'
+import { transporteActivo } from '../online/transporte.js'
 
 const api = axios.create({
   baseURL: `${config.api.baseUrl}/api/map`,
@@ -42,5 +43,20 @@ export function useMapApi() {
 
   const obtenerConstantes = () => api.get('/constantes')
 
-  return { crearPartida, unirse, iniciar, accion, vista, listarPartidas, obtenerConstantes }
+  // En el modo online (ver online/transporte.js) las mismas llamadas viajan por WebRTC al
+  // navegador del anfitrion; el resto de la interfaz no se entera.
+  const via = (metodo, http) => (...args) => {
+    const t = transporteActivo()
+    return t ? t.llamar(metodo, args) : http(...args)
+  }
+
+  return {
+    crearPartida: via('crearPartida', crearPartida),
+    unirse: via('unirse', unirse),
+    iniciar: via('iniciar', iniciar),
+    accion: via('accion', accion),
+    vista: via('vista', vista),
+    listarPartidas: via('listarPartidas', listarPartidas),
+    obtenerConstantes: via('obtenerConstantes', obtenerConstantes),
+  }
 }

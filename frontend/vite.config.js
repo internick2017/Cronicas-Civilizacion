@@ -30,10 +30,15 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // El modo online corre el servicio de partidas del backend DENTRO del navegador del
+      // anfitrion: se importa desde aca y 'crypto' de Node se cambia por una version web.
+      '@backend': fileURLToPath(new URL('../backend/src', import.meta.url)),
+      crypto: fileURLToPath(new URL('./src/online/crypto-navegador.js', import.meta.url)),
     },
   },
   server: {
+    fs: { allow: ['..'] },
     host: true,
     port: 5173,
     https,

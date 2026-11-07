@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { io } from 'socket.io-client'
 import config from '../config/env.js'
+import { transporteActivo } from '../online/transporte.js'
 
 const socket = ref(null)
 
@@ -15,6 +16,8 @@ export function useMapSocket() {
   // pida la vista de nuevo: lo que el servidor emitio durante el corte no se
   // reenvia.
   const seguirPartida = (gameId, jugadorId, token, { alEstado, alNarrativa, alUnirse }) => {
+    const t = transporteActivo()
+    if (t) return t.seguir(gameId, jugadorId, token, { alEstado, alNarrativa, alUnirse })
     if (!socket.value) {
       socket.value = io(config.socket.url, config.socket.options)
     }
@@ -30,6 +33,7 @@ export function useMapSocket() {
   }
 
   const desconectar = () => {
+    transporteActivo()?.dejar()
     if (socket.value) {
       socket.value.disconnect()
       socket.value = null

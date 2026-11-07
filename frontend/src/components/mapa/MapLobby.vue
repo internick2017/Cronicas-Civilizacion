@@ -5,6 +5,7 @@ import { useMapApi } from '../../composables/useMapApi.js'
 import MapMecanicas from './MapMecanicas.vue'
 import MapTamano from './MapTamano.vue'
 import MapTema from './MapTema.vue'
+import MapSalaOnline from './MapSalaOnline.vue'
 import { TEMAS, tema } from '../../mapa/temas.js'
 
 const emit = defineEmits(['partida-unida'])
@@ -273,6 +274,13 @@ const cargarConstantes = async () => {
   }
 }
 
+// Al entrar o salir de una sala online cambia QUIEN responde (el servidor o el navegador del
+// anfitrion), asi que las constantes y la lista de partidas se piden de nuevo.
+const alCambiarSala = async () => {
+  cargarConstantes()
+  await cargarPartidas()
+}
+
 onMounted(async () => {
   cargarConstantes()
   await cargarPartidas()
@@ -305,6 +313,8 @@ onMounted(async () => {
         Tu nombre / civilización
         <input v-model="nombreJugador" type="text" placeholder="Incas" />
       </label>
+
+      <MapSalaOnline @cambio="alCambiarSala" />
 
       <div class="modos" role="tablist" aria-label="Cómo querés jugar">
         <button
