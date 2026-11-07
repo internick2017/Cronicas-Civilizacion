@@ -20,3 +20,17 @@ export function esSalaAbandonada({ estado, actualizado }, ahora = new Date()) {
   if (!fecha) return false;
   return ahora.getTime() - fecha.getTime() > HORAS_SALA_VIGENTE * 60 * 60 * 1000;
 }
+
+// Una partida "viva" es la que ocupa un cupo del servidor: una sala de espera
+// reciente, o una partida en juego que alguien toco hace poco. Las terminadas y
+// las abandonadas no cuentan (aunque sigan en la base de datos).
+const HORAS_PARTIDA_VIVA = 6;
+
+export function estaViva({ estado, actualizado }, ahora = new Date()) {
+  if (estado === 'esperando') return !esSalaAbandonada({ estado, actualizado }, ahora);
+  if (estado !== 'jugando') return false;
+  const fecha = aFecha(actualizado);
+  // Sin fecha legible se cuenta como viva: es lo que protege al servidor.
+  if (!fecha) return true;
+  return ahora.getTime() - fecha.getTime() <= HORAS_PARTIDA_VIVA * 60 * 60 * 1000;
+}

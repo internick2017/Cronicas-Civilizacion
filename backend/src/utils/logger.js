@@ -8,9 +8,11 @@ const LogLevel = {
   DEBUG: 3
 };
 
-const logLevel = process.env.LOG_LEVEL ? 
-  LogLevel[process.env.LOG_LEVEL.toUpperCase()] || LogLevel.INFO : 
-  (process.env.NODE_ENV === 'production' ? LogLevel.INFO : LogLevel.DEBUG);
+// `process` no existe en el navegador (el modo online corre el servicio de partidas alla).
+const env = globalThis.process?.env ?? {};
+const logLevel = env.LOG_LEVEL ?
+  LogLevel[env.LOG_LEVEL.toUpperCase()] || LogLevel.INFO :
+  (env.NODE_ENV === 'production' ? LogLevel.INFO : LogLevel.DEBUG);
 
 const logger = {
   error: (message, ...args) => {

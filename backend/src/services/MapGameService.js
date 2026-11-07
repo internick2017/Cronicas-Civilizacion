@@ -3,6 +3,7 @@ import { crearEstado } from '../domain/mapa/MapGame.js';
 import { aplicar } from '../domain/mapa/aplicar.js';
 import { crearRng } from '../domain/mapa/rng.js';
 import { ReglaError } from '../domain/mapa/errores.js';
+import { estaViva } from '../domain/mapa/salas.js';
 import { unirse as unirseRegla, iniciar as iniciarRegla, sumarMaquina } from '../domain/mapa/reglas/partida.js';
 import {
   proponerGobierno, cambiarFormaEstado, darVentajas, manifestarse, estaEnPoder, fijarImpuestos, fijarMandato, nombrarGobierno,
@@ -228,7 +229,19 @@ export class MapGameService {
     this.cache.set(estado.id, estado);
   }
 
+  // Tope de partidas vivas a la vez (MAX_PARTIDAS_ACTIVAS, 30 por defecto; 0 = sin tope).
+  // La IA calcula en el mismo proceso: sin tope, un pico de gente congela a todos.
+  async _exigirCupo() {
+    const tope = Number(globalThis.process?.env?.MAX_PARTIDAS_ACTIVAS ?? 30);
+    if (!(tope > 0)) return;
+    const vivas = (await this.repo.listarActivas()).filter(p => estaViva(p)).length;
+    if (vivas >= tope) {
+      throw new ReglaError('SALA_LLENA', 'Hay muchas partidas en curso ahora mismo. Probá de nuevo en unos minutos.');
+    }
+  }
+
   async crearPartida({ nombre, semilla, config, contraIA, dificultadIA, bots }) {
+    await this._exigirCupo();
     const codigo = await this._generarCodigoUnico();
     // dificultadIA se valida ACA (contra la lista blanca) y no en el dominio:
     // es una preferencia de configuracion, no una regla de juego, y asi
