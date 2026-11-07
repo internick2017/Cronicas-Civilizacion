@@ -6,6 +6,8 @@ import ModeSelect from './components/mapa/ModeSelect.vue'
 import MapLobby from './components/mapa/MapLobby.vue'
 import MapSession from './components/mapa/MapSession.vue'
 import { useMapApi } from './composables/useMapApi.js'
+import { restaurarLocal } from './online/anfitrion.js'
+import { transporteActivo, usarTransporte } from './online/transporte.js'
 
 // App state
 const currentMode = ref(null) // null | 'narrativo' | 'mapa'
@@ -92,6 +94,12 @@ const loadSavedMapSession = async () => {
   if (!id || !codigo || !jugadorId || !token) return false
 
   try {
+    // Una partida "sin conexion" vive en la copia de este navegador: hay que reabrir su anfitrion
+    // antes de pedir la vista, porque no existe ningun servidor al que preguntarle.
+    if (!transporteActivo()) {
+      const local = await restaurarLocal(id)
+      if (local) usarTransporte(local)
+    }
     const vista = await pedirVistaMapa(id, jugadorId, token)
 
     // Una partida terminada, o una donde a este jugador ya lo eliminaron, no es

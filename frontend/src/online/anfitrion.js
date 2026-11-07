@@ -9,6 +9,21 @@ import { PREFIJO, codigoDeSala } from './sala.js'
 
 // Mismo formato de error que el servidor HTTP (manejarError en mapRoutes.js): la interfaz
 // lee `err.mensaje` y `err.codigo`.
+const CLAVE_LOCAL = 'cronicas-local-copia'
+
+// Sin conexion no hay amigos que guarden la copia: queda en este navegador, para sobrevivir a F5.
+function guardarLocal(datos) {
+  try { localStorage.setItem(CLAVE_LOCAL, JSON.stringify(datos)) } catch { /* sin espacio o bloqueado: solo se pierde el respaldo */ }
+}
+
+/** Reabre el anfitrion sin conexion con la copia guardada, solo si contiene la partida `gameId`. */
+export async function restaurarLocal(gameId) {
+  let copia
+  try { copia = JSON.parse(localStorage.getItem(CLAVE_LOCAL)) } catch { return null }
+  if (!copia?.partidas?.some(([id]) => id === gameId)) return null
+  return crearAnfitrion({ local: true, copia })
+}
+
 const MUTAN = new Set(['crearPartida', 'unirse', 'iniciar', 'accion'])
 
 function aErrorPlano(err) {
@@ -64,6 +79,7 @@ export async function crearAnfitrion({ codigo: fijo, copia, local = false } = {}
   const difundirCopia = () => {
     clearTimeout(pausa)
     pausa = setTimeout(() => {
+      if (local) return guardarLocal(repo.exportar())
       if (!conexiones.size) return
       const ordenes = [...conexiones.values()]
       const datos = repo.exportar()
@@ -144,6 +160,11 @@ export async function crearAnfitrion({ codigo: fijo, copia, local = false } = {}
       }).catch(() => {})
     },
     dejar() { propias.splice(0).forEach(c => suscriptores.delete(c)) },
-    cerrar() { clearTimeout(pausa); suscriptores.clear(); peer?.destroy() },
+    cerrar() {
+      clearTimeout(pausa)
+      suscriptores.clear()
+      peer?.destroy()
+      if (local) try { localStorage.removeItem(CLAVE_LOCAL) } catch { /* nada que borrar */ }
+    },
   }
 }
