@@ -525,7 +525,7 @@ onMounted(async () => {
       <template v-if="modo === 'unirse'">
         <section class="panel">
           <label class="field">
-            Código
+            Código de la partida
             <input v-model="codigoUnirse" type="text" maxlength="6" placeholder="ABC123" />
           </label>
           <button

@@ -75,7 +75,7 @@ const salir = () => {
         Jugar sin conexión
       </button>
       <label class="field">
-        Código de la sala
+        Código de la sala de tu amigo (anfitrión)
         <input v-model="codigo" type="text" maxlength="6" placeholder="ABC123" />
       </label>
       <button
