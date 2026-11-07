@@ -41,11 +41,18 @@ const salir = () => {
 
 <template>
   <details class="panel plegable" :open="Boolean(sala)">
-    <summary>🌐 Online con amigos <small>{{ sala ? `sala ${sala.codigo}` : 'sin servidor' }}</small></summary>
+    <summary>🌐 Online con amigos <small>{{ sala ? (sala.codigo ? `sala ${sala.codigo}` : 'sin conexión') : 'sin servidor' }}</small></summary>
 
     <div v-if="error" class="online-error" role="alert">{{ error }}</div>
 
-    <template v-if="sala">
+    <template v-if="sala && !sala.codigo">
+      <p class="ayuda">
+        Jugando sin conexión: tu navegador es el servidor y no hace falta internet. Si recargás o cerrás la página, la partida se pierde.
+      </p>
+      <button class="btn-secondary" @click="salir">Volver al servidor</button>
+    </template>
+
+    <template v-else-if="sala">
       <p class="ayuda">
         <template v-if="sala.anfitrion">
           Sos el anfitrión. Pasales este código a tus amigos. <strong>Mientras tengas esta página abierta,
@@ -63,6 +70,9 @@ const salir = () => {
       </p>
       <button class="btn-primary" :disabled="trabajando" :aria-busy="trabajando" @click="abrir(crearAnfitrion)">
         {{ trabajando ? 'Abriendo…' : 'Ser el anfitrión' }}
+      </button>
+      <button class="btn-secondary" :disabled="trabajando" @click="abrir(() => crearAnfitrion({ local: true }))">
+        Jugar sin conexión
       </button>
       <label class="field">
         Código de la sala

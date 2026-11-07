@@ -46,8 +46,9 @@ function abrirPeer(fijo) {
  * Devuelve un transporte (ver transporte.js) para que la interfaz del anfitrion tambien
  * juegue a traves de el, sin red.
  */
-export async function crearAnfitrion({ codigo: fijo, copia } = {}) {
-  const { peer, codigo } = await abrirPeer(fijo)
+// Con `local` no se abre ninguna sala: es un anfitrion sin amigos, para jugar solo sin conexion.
+export async function crearAnfitrion({ codigo: fijo, copia, local = false } = {}) {
+  const { peer, codigo } = local ? { peer: null, codigo: null } : await abrirPeer(fijo)
   const repo = new MemoriaRepo()
   if (copia) repo.importar(copia)
   // `${gameId}:${jugadorId}` -> funcion que recibe (evento, payload). Es el equivalente
@@ -63,6 +64,7 @@ export async function crearAnfitrion({ codigo: fijo, copia } = {}) {
   const difundirCopia = () => {
     clearTimeout(pausa)
     pausa = setTimeout(() => {
+      if (!conexiones.size) return
       const ordenes = [...conexiones.values()]
       const datos = repo.exportar()
       conexiones.forEach((orden, conn) => { if (conn.open) conn.send({ k: 'copia', orden, ordenes, datos }) })
@@ -103,7 +105,7 @@ export async function crearAnfitrion({ codigo: fijo, copia } = {}) {
   }
 
   // Un amigo se conecta: atiende sus llamadas y le empuja los cambios de su vista.
-  peer.on('connection', (conn) => {
+  peer?.on('connection', (conn) => {
     const mias = new Map() // clave -> funcion registrada por ESTA conexion
     conexiones.set(conn, proximoOrden++)
     conn.on('open', difundirCopia)
@@ -142,6 +144,6 @@ export async function crearAnfitrion({ codigo: fijo, copia } = {}) {
       }).catch(() => {})
     },
     dejar() { propias.splice(0).forEach(c => suscriptores.delete(c)) },
-    cerrar() { clearTimeout(pausa); suscriptores.clear(); peer.destroy() },
+    cerrar() { clearTimeout(pausa); suscriptores.clear(); peer?.destroy() },
   }
 }
