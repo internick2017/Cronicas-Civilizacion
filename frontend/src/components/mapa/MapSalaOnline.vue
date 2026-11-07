@@ -91,6 +91,30 @@ const salir = () => {
 </template>
 
 <style scoped>
+/* Los estilos de MapLobby son "scoped": no llegan a los hijos (salvo a su elemento raiz), asi que
+   lo que este panel usa por dentro se repite aqui. */
+summary {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  min-height: 44px; padding: 0.4rem 0; cursor: pointer; font-weight: 600;
+}
+summary small { color: rgb(var(--t-texto-suave)); font-weight: 400; margin-left: auto; }
+.ayuda { color: rgb(var(--t-texto-suave)); font-size: 0.85rem; margin: 0.25rem 0 0.75rem; }
+.codigo {
+  font-size: 2rem; font-weight: bold; letter-spacing: 0.3rem;
+  color: rgb(var(--t-info)); margin: 0.5rem 0; text-align: center;
+}
+.field { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.75rem 0; font-size: 0.9rem; }
+.field input {
+  background: rgb(var(--t-control)); border: 1px solid rgb(var(--t-tinta) / 0.15);
+  border-radius: calc(var(--t-radio) * 6px); padding: 0.5rem; min-height: 44px; color: rgb(var(--t-texto));
+}
+.btn-primary, .btn-secondary {
+  display: block; width: 100%; margin-bottom: 0.5rem; min-height: 44px; padding: 0.5rem 1rem;
+  border-radius: calc(var(--t-radio) * 6px); cursor: pointer;
+}
+.btn-primary { background: rgb(var(--t-cta)); color: rgb(var(--t-sobre-cta)); border: none; }
+.btn-secondary { background: rgb(var(--t-tinta) / 0.1); color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.15); }
+.btn-primary:disabled, .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
 .online-error {
   color: rgb(var(--t-texto));
   background: rgb(var(--t-tinta) / 0.08);
