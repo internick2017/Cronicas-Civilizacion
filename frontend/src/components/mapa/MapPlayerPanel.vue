@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { esSimultaneo, puedeJugar, yaTermino } from './turno.js'
 import { aliadosDe } from './alianzas.js'
 import { colorCssDeJugador } from '../../mapa/sprites.js'
+import MapClasificacion from './MapClasificacion.vue'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -165,6 +166,8 @@ const RECURSOS_ICONOS = {
         ⚠️ {{ rival.civilizacion }} domina el {{ pct(rival.porcentaje) }}% del mundo
       </p>
     </div>
+
+    <MapClasificacion :vista="vista" :jugador-id="jugadorId" />
 
     <div :class="['jugadores', { plegada: !jugadoresAbiertos }]">
     <ul class="jugadores-lista">

@@ -39,10 +39,11 @@ const tienePuerto = computed(() => (tile.value?.ciudad?.edificios || []).include
 // el rio NO cuenta, porque se vadea y no se navega.
 const marAdyacente = computed(() => {
   const t = props.vista.config.tamanoMapa
+  const h = props.vista.config.altoMapa ?? t
   const { x, y } = props.posicion
   return [[0, -1], [0, 1], [-1, 0], [1, 0]]
     .map(([dx, dy]) => ({ x: x + dx, y: y + dy }))
-    .filter(p => p.x >= 0 && p.y >= 0 && p.x < t && p.y < t)
+    .filter(p => p.x >= 0 && p.y >= 0 && p.x < t && p.y < h)
     .map(p => props.vista.mapa[p.y * t + p.x])
     .filter(tile => tile?.terreno === 'water')
 })

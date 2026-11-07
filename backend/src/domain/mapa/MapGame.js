@@ -1,10 +1,14 @@
 import { randomUUID } from 'crypto';
 import { generarMapa } from './generarMapa.js';
-import { RECURSOS, MECANICAS, PODERES_ELEGIBLES } from './constantes.js';
+import { RECURSOS, MECANICAS, PODERES_ELEGIBLES, CRITERIOS_FINALES } from './constantes.js';
 import { ReglaError } from './errores.js';
 
 const CONFIG_DEFAULT = {
   tamanoMapa: 20,
+  // Alto del mapa. `tamanoMapa` es el ANCHO; null = cuadrado (alto igual al ancho).
+  // Se resuelve al LEER con altoDe, asi una partida guardada antes de que existiera
+  // (sin el campo) y un estado armado a mano cambiando solo el ancho siguen siendo cuadrados.
+  altoMapa: null,
   maxJugadores: 4,
   modoTurno: 'secuencial',
   // Cuanta tierra hay que controlar para ganar, en POR CIENTO entero (no
@@ -15,6 +19,8 @@ const CONFIG_DEFAULT = {
   // Rondas antes del final forzado, o null para "sin limite". Con limite, al
   // llegar gana quien mas territorio tenga.
   limiteRondas: null,
+  // Quien gana al llegar al limite de rondas: ver CRITERIOS_FINALES.
+  criterioFinal: 'territorio',
   // Reparte las capitales entre islas distintas en vez de todas en el mismo
   // continente. Apagado por defecto: solo tiene sentido cuando hay transportes
   // Y la maquina sabe usarlos, asi que el default lo decide la medicion, no el
@@ -33,21 +39,25 @@ const CONFIG_DEFAULT = {
 };
 
 // Limites duros de la config. Viven en el DOMINIO (no solo en el borde HTTP)
-// porque `generarMapa` asigna tamanoMapa^2 objetos: sin cota, un `config`
+// porque `generarMapa` asigna tamanoMapa * altoMapa objetos: sin cota, un `config`
 // arbitrario (venga de una request, de un test o de otro servicio) puede
 // tumbar el proceso entero. El limite es una regla del juego, no una
 // validacion de transporte.
 export const LIMITES_CONFIG = {
   tamanoMapa: { min: 10, max: 60 },
+  altoMapa: { min: 10, max: 60 },
   maxJugadores: { min: 2, max: 8 },
-  // Menos del 30% seria ganar casi sin jugar; mas del 90% es practicamente
-  // imposible con varios jugadores en el mapa.
-  porcentajeVictoria: { min: 30, max: 90 },
+  // Menos del 10% seria ganar casi sin jugar. El 100% se permite (lo pidio el
+  // usuario) pero hay que ganarlo todo: con varios jugadores la partida puede no
+  // terminar nunca, para eso existe el limite de rondas.
+  porcentajeVictoria: { min: 10, max: 100 },
   // El limite es opcional (null), pero si se fija tiene que dar para una
   // partida de verdad: 5 rondas no alcanzan ni para fundar la segunda ciudad.
   limiteRondas: { min: 10, max: 500 },
   rondasEntreElecciones: { min: 2, max: 50 },
 };
+// El alto de una partida, incluso de una guardada antes de que hubiera mapas rectangulares.
+export const altoDe = (config) => config.altoMapa ?? config.tamanoMapa;
 const MODOS_TURNO = ['secuencial', 'simultaneo'];
 
 function validarEntero(cfg, clave) {
@@ -77,6 +87,7 @@ function validarCasillas(campo, casillas, validas) {
 
 export function validarConfig(cfg) {
   validarEntero(cfg, 'tamanoMapa');
+  if (cfg.altoMapa !== null && cfg.altoMapa !== undefined) validarEntero(cfg, 'altoMapa');
   validarEntero(cfg, 'maxJugadores');
   validarEntero(cfg, 'porcentajeVictoria');
   validarEntero(cfg, 'rondasEntreElecciones');
@@ -84,6 +95,12 @@ export function validarConfig(cfg) {
   // valida como entero en rango.
   if (cfg.limiteRondas !== null && cfg.limiteRondas !== undefined) {
     validarEntero(cfg, 'limiteRondas');
+  }
+  if (!CRITERIOS_FINALES.includes(cfg.criterioFinal)) {
+    throw new ReglaError(
+      'CONFIG_INVALIDA',
+      `config.criterioFinal debe ser uno de: ${CRITERIOS_FINALES.join(', ')} (recibido: ${JSON.stringify(cfg.criterioFinal)})`
+    );
   }
   if (typeof cfg.islas !== 'boolean') {
     throw new ReglaError('CONFIG_INVALIDA', `config.islas debe ser booleano (recibido: ${JSON.stringify(cfg.islas)})`);
@@ -118,7 +135,7 @@ export function crearEstado({ nombre, semilla, config = {} }) {
     indiceJugadorActual: 0,
     config: cfg,
     jugadores: [],
-    mapa: generarMapa(semilla, cfg.tamanoMapa, { islas: cfg.islas === true }),
+    mapa: generarMapa(semilla, cfg.tamanoMapa, { islas: cfg.islas === true, alto: altoDe(cfg) }),
     ganador: null,
   };
 }
@@ -128,9 +145,9 @@ export const toJSON = (estado) => structuredClone(estado);
 export const fromJSON = (json) => structuredClone(json);
 
 export function tileEn(estado, x, y) {
-  const t = estado.config.tamanoMapa;
-  if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || x >= t || y < 0 || y >= t) return null;
-  return estado.mapa[y * t + x];
+  const ancho = estado.config.tamanoMapa;
+  if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || x >= ancho || y < 0 || y >= altoDe(estado.config)) return null;
+  return estado.mapa[y * ancho + x];
 }
 
 export const jugadorPorId = (estado, id) => estado.jugadores.find(j => j.id === id) ?? null;

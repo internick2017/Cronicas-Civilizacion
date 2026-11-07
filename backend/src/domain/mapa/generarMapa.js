@@ -64,7 +64,12 @@ const RECURSO_POR_TERRENO = {
   river: ['food']
 };
 
-const dentro = (x, y, tamano) => x >= 0 && x < tamano && y >= 0 && y < tamano;
+// `alto` omitido = mapa cuadrado (todo lo de antes). Un mapa rectangular guarda las casillas
+// fila por fila: el indice de (x, y) es y * ancho + x.
+const dentro = (x, y, ancho, alto = ancho) => x >= 0 && x < ancho && y >= 0 && y < alto;
+// Lado de un cuadrado con la misma area: lo que antes era "el tamano" en las cuentas que no
+// dependen de la forma. En un mapa cuadrado da exactamente el lado.
+const ladoEquivalente = (ancho, alto) => Math.sqrt(ancho * alto);
 const VECINOS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 // Traza rios desde puntos altos: se baja siempre al vecino de menor elevacion
@@ -77,7 +82,7 @@ const VECINOS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 // de los cuantiles del mapa completo permite verificar sus propiedades reales
 // (camino contiguo, nacimiento en terreno alto) con mapas y elevaciones
 // sinteticas y controladas.
-export function trazarRios(mapa, tamano, elevacion, umbralAlto, rng) {
+export function trazarRios(mapa, ancho, elevacion, umbralAlto, rng, alto = ancho) {
   // El objetivo es un MINIMO GARANTIZADO, no un numero de intentos: mismo
   // patron que sembrarRecursos mas abajo, y por el mismo motivo. Antes esto
   // era un `for` de `cantidad` vueltas donde un nacimiento sorteado en terreno
@@ -86,8 +91,8 @@ export function trazarRios(mapa, tamano, elevacion, umbralAlto, rng) {
   // basura. Medido con 40 semillas por tamano: en tamano 30 solo 20 de 40
   // mapas tenian algun rio, con un promedio de 2 casillas de rio en 900. O sea
   // que el rio existia en el codigo y no en las partidas.
-  const objetivo = Math.max(1, Math.floor(tamano / 8));
-  const largoMax = tamano * 2;
+  const objetivo = Math.max(1, Math.floor(ladoEquivalente(ancho, alto) / 8));
+  const largoMax = ladoEquivalente(ancho, alto) * 2;
   // Tope generoso para no colgarse si la semilla tiene mala suerte reiterada
   // (mapa sin terreno alto, elevacion pareja, etc).
   const intentosMax = objetivo * 30;
@@ -98,8 +103,8 @@ export function trazarRios(mapa, tamano, elevacion, umbralAlto, rng) {
   while (trazados < objetivo && intentos < intentosMax) {
     intentos++;
 
-    let x = entero(rng, tamano);
-    let y = entero(rng, tamano);
+    let x = entero(rng, ancho);
+    let y = entero(rng, alto);
     // Solo nacen en terreno alto; si el sorteo cayo bajo, se REINTENTA.
     if (elevacion(x, y) < umbralAlto) continue;
 
@@ -110,7 +115,7 @@ export function trazarRios(mapa, tamano, elevacion, umbralAlto, rng) {
       if (visitados.has(clave)) break; // se mordio la cola
       visitados.add(clave);
 
-      const tile = mapa[y * tamano + x];
+      const tile = mapa[y * ancho + x];
       if (tile.terreno === 'water') break; // llego al mar
       // 'river', no 'water': el rio es tierra vadeable (ver constantes.js).
       // Si el descenso cae sobre otro rio no se corta, se sigue bajando: los
@@ -121,7 +126,7 @@ export function trazarRios(mapa, tamano, elevacion, umbralAlto, rng) {
       let mejorElev = Infinity;
       for (const [dx, dy] of VECINOS) {
         const nx = x + dx, ny = y + dy;
-        if (!dentro(nx, ny, tamano)) { mejor = null; break; } // llego al borde
+        if (!dentro(nx, ny, ancho, alto)) { mejor = null; break; } // llego al borde
         const e = elevacion(nx, ny);
         if (e < mejorElev) { mejorElev = e; mejor = { x: nx, y: ny }; }
       }
@@ -142,8 +147,8 @@ export function trazarRios(mapa, tamano, elevacion, umbralAlto, rng) {
 // producir. El piso de 6 se eligio para que, incluso perdiendo alguno por
 // mala suerte de adyacencia, tamano 10 siga con varios yacimientos jugables;
 // en tamanos grandes el termino tamano^2/40 ya lo supera y manda el.
-function sembrarRecursos(mapa, tamano, rng) {
-  const focosObjetivo = Math.max(6, Math.floor((tamano * tamano) / 40));
+function sembrarRecursos(mapa, ancho, rng, alto = ancho) {
+  const focosObjetivo = Math.max(6, Math.floor((ancho * alto) / 40));
   // Tope de intentos generoso para no colgarse si el sorteo tiene mala
   // suerte reiterada (mapa casi todo agua, semilla desfavorable, etc).
   const intentosMax = focosObjetivo * 30;
@@ -154,9 +159,9 @@ function sembrarRecursos(mapa, tamano, rng) {
   while (colocados < focosObjetivo && intentos < intentosMax) {
     intentos++;
 
-    const x = entero(rng, tamano);
-    const y = entero(rng, tamano);
-    const semillaTile = mapa[y * tamano + x];
+    const x = entero(rng, ancho);
+    const y = entero(rng, alto);
+    const semillaTile = mapa[y * ancho + x];
     if (semillaTile.recurso !== null) continue; // tile ya ocupado: reintentar
 
     const opciones = RECURSO_POR_TERRENO[semillaTile.terreno];
@@ -177,7 +182,7 @@ function sembrarRecursos(mapa, tamano, rng) {
 
       for (const [dx, dy] of VECINOS) {
         const nx = actual.x + dx, ny = actual.y + dy;
-        if (dentro(nx, ny, tamano)) pendientes.push(mapa[ny * tamano + nx]);
+        if (dentro(nx, ny, ancho, alto)) pendientes.push(mapa[ny * ancho + nx]);
       }
     }
 
@@ -200,12 +205,12 @@ function sembrarRecursos(mapa, tamano, rng) {
 // La mascara invierte el orden causal: primero se decide donde van las islas,
 // despues el ruido les da forma de costa. El corte por cuantil sigue igual, o
 // sea que la proporcion de agua no cambia; lo que cambia es como se reparte.
-function crearMascaraIslas(semilla, tamano) {
+function crearMascaraIslas(semilla, ancho, alto = ancho) {
   const rng = crearRng(`islas:${semilla}`);
   // Cuantas islas. Crece con el lado del mapa, no con el area: lo que importa
   // es que haya lugar para separarlas. Piso de 3 para que siempre haya mas
   // islas que jugadores (hoy son 2) y el reparto tenga de donde elegir.
-  const cantidad = Math.max(2, Math.round(tamano / 7));
+  const cantidad = Math.max(2, Math.round(ladoEquivalente(ancho, alto) / 7));
   // El radio NO es un factor inventado: sale de la tierra que va a haber. El
   // corte por cuantil deja PROPORCION_AGUA_ISLAS de agua, o sea que la tierra
   // es (1 - esa proporcion) del mapa, repartida entre `cantidad` islas. De
@@ -213,7 +218,7 @@ function crearMascaraIslas(semilla, tamano) {
   // grande que eso, las mascaras se solapan, el cuantil no llega a separarlas
   // y vuelve el continente dominante: fue exactamente lo que paso al primer
   // intento (funcionaba en 28x28 y no movia nada en 20x20 ni 14x14).
-  const tierraPorIsla = (1 - PROPORCION_AGUA_ISLAS) * tamano * tamano / cantidad;
+  const tierraPorIsla = (1 - PROPORCION_AGUA_ISLAS) * ancho * alto / cantidad;
   const radio = Math.sqrt(tierraPorIsla / Math.PI);
   // Separacion minima entre centros: dos radios, o sea que dos islas vecinas
   // apenas se tocan en el peor caso. Con menos se funden.
@@ -226,8 +231,8 @@ function crearMascaraIslas(semilla, tamano) {
     // Margen para que el centro no caiga pegado al borde y quede media isla
     // fuera del mapa.
     const margen = radio * 0.45;
-    const x = margen + rng() * (tamano - 2 * margen);
-    const y = margen + rng() * (tamano - 2 * margen);
+    const x = margen + rng() * (ancho - 2 * margen);
+    const y = margen + rng() * (alto - 2 * margen);
     const lejos = centros.every(c => Math.hypot(c.x - x, c.y - y) >= separacionMin);
     if (lejos) centros.push({ x, y });
   }
@@ -260,27 +265,27 @@ function terrenoDe(elevacion, humedad, cortes) {
 // existente. Se usa desde los tests para aislar el efecto del trazado de
 // rios sobre la conectividad del terreno, comparando el mismo mapa base con
 // y sin ese paso.
-export function generarMapa(semilla, tamano, { rios = true, islas = false } = {}) {
+export function generarMapa(semilla, ancho, { rios = true, islas = false, alto = ancho } = {}) {
   // Dos campos independientes: el relieve decide mar/colina/montana, la
   // humedad decide que crece en la tierra baja. Pasos distintos para que los
   // biomas no calquen la forma del relieve.
-  const ruidoElevacion = crearRuido(`elev:${semilla}`, tamano, 4);
-  const humedad = crearRuido(`humedad:${semilla}`, tamano, 6);
+  const ruidoElevacion = crearRuido(`elev:${semilla}`, ancho, 4, alto);
+  const humedad = crearRuido(`humedad:${semilla}`, ancho, 6, alto);
 
   // En el modo islas la elevacion no es solo ruido: se le suma una mascara que
   // decide DONDE van las islas (ver crearMascaraIslas). Fuera del modo islas el
   // mapa se genera exactamente como antes.
   const elevacion = islas
     ? (() => {
-        const mascara = crearMascaraIslas(semilla, tamano);
+        const mascara = crearMascaraIslas(semilla, ancho, alto);
         return (x, y) => ruidoElevacion(x, y) * (1 - PESO_MASCARA_ISLAS) + mascara(x, y) * PESO_MASCARA_ISLAS;
       })()
     : ruidoElevacion;
 
   const elevaciones = [];
   const humedades = [];
-  for (let y = 0; y < tamano; y++) {
-    for (let x = 0; x < tamano; x++) {
+  for (let y = 0; y < alto; y++) {
+    for (let x = 0; x < ancho; x++) {
       elevaciones.push(elevacion(x, y));
       humedades.push(humedad(x, y));
     }
@@ -299,8 +304,8 @@ export function generarMapa(semilla, tamano, { rios = true, islas = false } = {}
 
   const mapa = [];
   let i = 0;
-  for (let y = 0; y < tamano; y++) {
-    for (let x = 0; x < tamano; x++) {
+  for (let y = 0; y < alto; y++) {
+    for (let x = 0; x < ancho; x++) {
       mapa.push({
         x,
         y,
@@ -316,16 +321,16 @@ export function generarMapa(semilla, tamano, { rios = true, islas = false } = {}
   }
 
   const rng = crearRng(`mapa:${semilla}`);
-  if (rios) trazarRios(mapa, tamano, elevacion, cortes.colina, rng);
-  sembrarRecursos(mapa, tamano, rng);
+  if (rios) trazarRios(mapa, ancho, elevacion, cortes.colina, rng, alto);
+  sembrarRecursos(mapa, ancho, rng, alto);
   return mapa;
 }
 
 // Todas las masas de tierra conectadas por vecinos ortogonales, de la mas
 // grande a la mas chica. El rio cuenta como tierra (ver ADR 0001), asi que un
 // arroyo ya no parte un continente en dos.
-export function masasDeTierra(mapa, tamano) {
-  const visitado = new Uint8Array(tamano * tamano);
+export function masasDeTierra(mapa, ancho, alto = ancho) {
+  const visitado = new Uint8Array(ancho * alto);
   const masas = [];
 
   for (let i = 0; i < mapa.length; i++) {
@@ -338,13 +343,13 @@ export function masasDeTierra(mapa, tamano) {
     while (cola.length > 0) {
       const idx = cola.pop();
       componente.add(idx);
-      const x = idx % tamano;
-      const y = Math.floor(idx / tamano);
+      const x = idx % ancho;
+      const y = Math.floor(idx / ancho);
 
       for (const [dx, dy] of VECINOS) {
         const nx = x + dx, ny = y + dy;
-        if (!dentro(nx, ny, tamano)) continue;
-        const vecino = ny * tamano + nx;
+        if (!dentro(nx, ny, ancho, alto)) continue;
+        const vecino = ny * ancho + nx;
         if (visitado[vecino] || mapa[vecino].terreno === 'water') continue;
         visitado[vecino] = 1;
         cola.push(vecino);
@@ -360,8 +365,8 @@ export function masasDeTierra(mapa, tamano) {
 // La masa de tierra mas grande. Es donde se reparten las capitales cuando la
 // partida NO usa islas: sin transportes, un jugador en otra isla no podria ser
 // alcanzado ni alcanzar a nadie, y la partida no podria terminar.
-export function masaPrincipal(mapa, tamano) {
-  return masasDeTierra(mapa, tamano)[0] ?? new Set();
+export function masaPrincipal(mapa, ancho, alto = ancho) {
+  return masasDeTierra(mapa, ancho, alto)[0] ?? new Set();
 }
 
 // Que fraccion de la tierra tiene que tener una masa para que valga la pena
@@ -382,13 +387,13 @@ const FRACCION_MINIMA_MASA = 0.10;
  * no estar disponible en un mapa dado, y eso es preferible a arrancar una
  * partida donde alguien nace en un peñasco de cuatro casillas.
  */
-export function posicionesIniciales(mapa, tamano, cantidad, rng, { islas = false } = {}) {
-  const masa = masaPrincipal(mapa, tamano);
+export function posicionesIniciales(mapa, ancho, cantidad, rng, { islas = false, alto = ancho } = {}) {
+  const masa = masaPrincipal(mapa, ancho, alto);
   let porMasa = null;
 
   if (islas) {
     const tierra = mapa.filter(t => t.terreno !== 'water').length;
-    const grandes = masasDeTierra(mapa, tamano)
+    const grandes = masasDeTierra(mapa, ancho, alto)
       .filter(m => m.size >= tierra * FRACCION_MINIMA_MASA);
     // Hacen falta al menos dos masas jugables para que "islas" signifique algo.
     if (grandes.length >= 2) porMasa = grandes;
@@ -399,10 +404,10 @@ export function posicionesIniciales(mapa, tamano, cantidad, rng, { islas = false
     const pos = [];
     for (let i = 0; i < cantidad; i++) {
       const candidatos = [...porMasa[i % porMasa.length]]
-        .filter(idx => !mapa[idx].ciudad && !pos.some(p => p.x === idx % tamano && p.y === Math.floor(idx / tamano)));
+        .filter(idx => !mapa[idx].ciudad && !pos.some(p => p.x === idx % ancho && p.y === Math.floor(idx / ancho)));
       if (candidatos.length === 0) { pos.length = 0; break; }
       const idx = candidatos[entero(rng, candidatos.length)];
-      pos.push({ x: idx % tamano, y: Math.floor(idx / tamano) });
+      pos.push({ x: idx % ancho, y: Math.floor(idx / ancho) });
     }
     if (pos.length === cantidad) return pos;
     // Si no se pudo, sigue de largo al reparto de siempre.
@@ -416,9 +421,9 @@ export function posicionesIniciales(mapa, tamano, cantidad, rng, { islas = false
   // Se intenta la separacion ideal y se va aflojando. Antes eran 500 intentos
   // ciegos con una distancia fija: en mapas ajustados fallaba de mas.
   const distancias = [
-    Math.floor(tamano / 4),
-    Math.floor(tamano / 5),
-    Math.floor(tamano / 6),
+    Math.floor(ladoEquivalente(ancho, alto) / 4),
+    Math.floor(ladoEquivalente(ancho, alto) / 5),
+    Math.floor(ladoEquivalente(ancho, alto) / 6),
     2,
     0
   ];
@@ -427,8 +432,8 @@ export function posicionesIniciales(mapa, tamano, cantidad, rng, { islas = false
     const pos = [];
     for (let intentos = 0; intentos < 2000 && pos.length < cantidad; intentos++) {
       const idx = candidatos[entero(rng, candidatos.length)];
-      const x = idx % tamano;
-      const y = Math.floor(idx / tamano);
+      const x = idx % ancho;
+      const y = Math.floor(idx / ancho);
       const noDuplicado = !pos.some(p => p.x === x && p.y === y);
       const lejos = pos.every(p => Math.abs(p.x - x) + Math.abs(p.y - y) >= minDist);
       if (noDuplicado && lejos) pos.push({ x, y });

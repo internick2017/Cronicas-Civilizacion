@@ -26,23 +26,35 @@ const modo = ref('solo')
 // Parametros de la partida, elegidos al crearla. Los valores por defecto son los
 // historicos (60% de la tierra, mapa de 20, sin limite), asi que quien no toca
 // nada juega exactamente lo de siempre.
-const OBJETIVOS = [
-  { valor: 50, etiqueta: '50% — partida corta' },
-  { valor: 60, etiqueta: '60% — equilibrada' },
-  { valor: 75, etiqueta: '75% — larga' },
-]
-const DURACIONES = [
-  { valor: null, etiqueta: 'Sin límite' },
-  { valor: 40, etiqueta: '40 rondas' },
-  { valor: 60, etiqueta: '60 rondas' },
-  { valor: 100, etiqueta: '100 rondas' },
-]
+// Numero libre dentro de los limites del backend (llegan con las constantes).
+const limitesPorcentaje = ref({ min: 10, max: 100 })
+const limitesRondas = ref({ min: 10, max: 500 })
 const porcentajeVictoria = ref(60)
 const tamanoMapa = ref(20)
+// Mapa rectangular: sin la casilla tildada el alto no se manda y el mapa sale cuadrado.
+const rectangular = ref(false)
+const altoMapa = ref(20)
 // Los limites reales los manda el backend (llegan con las constantes); estos son
 // solo el respaldo si esa llamada falla.
 const limitesTamano = ref({ min: 10, max: 60 })
 const limiteRondas = ref(null)
+const CRITERIOS = [
+  { valor: 'territorio', etiqueta: 'Más territorio' },
+  { valor: 'economia', etiqueta: 'Mejor economía' },
+  { valor: 'fortificaciones', etiqueta: 'Mejores fortificaciones' },
+]
+const criterioFinal = ref('territorio')
+// Casilla "Sin limite": mientras esta tildada limiteRondas vale null; al destildarla
+// arranca en 60, que da para una partida de verdad.
+const sinLimite = computed({
+  get: () => limiteRondas.value === null,
+  set: (v) => { limiteRondas.value = v ? null : 60 },
+})
+// Al salir del campo se corrige al rango, igual que MapTamano.
+const fijarEntero = (crudo, { min, max }, defecto) => {
+  const n = Math.round(Number(crudo))
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : defecto
+}
 // Apagado por defecto: un mapa de islas es otro juego (mitad del mundo es mar y
 // hay que cruzarlo en transporte), asi que se elige, no se hereda.
 const islas = ref(false)
@@ -80,7 +92,9 @@ const configElegida = () => ({
   modoTurno: modoTurno.value,
   porcentajeVictoria: porcentajeVictoria.value,
   tamanoMapa: tamanoMapa.value,
+  altoMapa: rectangular.value ? altoMapa.value : null,
   limiteRondas: limiteRondas.value,
+  criterioFinal: criterioFinal.value,
   islas: islas.value,
   mecanicas: { ...mecanicas.value },
   poderes: { ...poderes.value },
@@ -258,9 +272,14 @@ const unirseConCodigo = async (codigo) => {
 
 const cargarConstantes = async () => {
   try {
-    const { dificultadesIA: lista, razas: listaRazas, limitesTamanoMapa, poderes: todosLosPoderes } = await obtenerConstantes()
+    const {
+      dificultadesIA: lista, razas: listaRazas, limitesTamanoMapa, poderes: todosLosPoderes,
+      limitesPorcentajeVictoria, limitesRondas: limitesDeRondas,
+    } = await obtenerConstantes()
     listaPoderes.value = todosLosPoderes || []
     if (limitesTamanoMapa) limitesTamano.value = limitesTamanoMapa
+    if (limitesPorcentajeVictoria) limitesPorcentaje.value = limitesPorcentajeVictoria
+    if (limitesDeRondas) limitesRondas.value = limitesDeRondas
     dificultadesIA.value = lista || []
     dificultadIA.value = lista?.find(d => d.porDefecto)?.tipo ?? lista?.[0]?.tipo ?? null
     razas.value = listaRazas || []
@@ -381,23 +400,52 @@ onMounted(async () => {
       <!-- Un solo estado para los dos caminos (Jugar solo y Crear partida). Al
            unirse manda la partida ajena, asi que ahi no se ofrece. -->
       <details v-if="modo !== 'unirse'" class="panel plegable">
-        <summary>Mapa y mecánicas <small>{{ tamanoMapa }}×{{ tamanoMapa }}, {{ resumenMecanicas }}</small></summary>
+        <summary>Mapa y mecánicas <small>{{ tamanoMapa }}×{{ rectangular ? altoMapa : tamanoMapa }}, {{ resumenMecanicas }}</small></summary>
         <h3 class="titulo-mecanicas">Tamaño del mapa</h3>
-        <MapTamano v-model="tamanoMapa" :min="limitesTamano.min" :max="limitesTamano.max" />
-        <label class="field">
-          Dominación para ganar
-          <select v-model.number="porcentajeVictoria">
-            <option v-for="o in OBJETIVOS" :key="o.valor" :value="o.valor">{{ o.etiqueta }}</option>
-          </select>
+        <MapTamano
+          v-model="tamanoMapa" :min="limitesTamano.min" :max="limitesTamano.max"
+          :lado="rectangular ? 'ancho' : null" :otro="rectangular ? altoMapa : null"
+        />
+        <label class="field field-check">
+          <input v-model="rectangular" type="checkbox" />
+          <span>Mapa rectangular (ancho y alto distintos)</span>
         </label>
+        <MapTamano
+          v-if="rectangular"
+          v-model="altoMapa" :min="limitesTamano.min" :max="limitesTamano.max"
+          lado="alto" :otro="tamanoMapa"
+        />
         <label class="field">
-          Duración
-          <select v-model="limiteRondas">
-            <option v-for="d in DURACIONES" :key="String(d.valor)" :value="d.valor">{{ d.etiqueta }}</option>
+          Dominación para ganar (% del mundo, {{ limitesPorcentaje.min }} a {{ limitesPorcentaje.max }})
+          <input
+            type="number" inputmode="numeric" :min="limitesPorcentaje.min" :max="limitesPorcentaje.max"
+            :value="porcentajeVictoria"
+            @change="porcentajeVictoria = fijarEntero($event.target.value, limitesPorcentaje, 60); $event.target.value = porcentajeVictoria"
+          />
+        </label>
+        <p v-if="porcentajeVictoria >= 90" class="ayuda-config">
+          Con un porcentaje tan alto la partida puede no terminar nunca: conviene poner un límite de rondas.
+        </p>
+        <label class="field field-check">
+          <input v-model="sinLimite" type="checkbox" />
+          <span>Sin límite de rondas</span>
+        </label>
+        <label v-if="!sinLimite" class="field">
+          Rondas exactas ({{ limitesRondas.min }} a {{ limitesRondas.max }})
+          <input
+            type="number" inputmode="numeric" :min="limitesRondas.min" :max="limitesRondas.max"
+            :value="limiteRondas"
+            @change="limiteRondas = fijarEntero($event.target.value, limitesRondas, 60); $event.target.value = limiteRondas"
+          />
+        </label>
+        <label v-if="!sinLimite" class="field">
+          Al llegar al límite gana quien tenga
+          <select v-model="criterioFinal">
+            <option v-for="c in CRITERIOS" :key="c.valor" :value="c.valor">{{ c.etiqueta }}</option>
           </select>
         </label>
         <p class="ayuda-config">
-          Al llegar al límite de rondas gana quien controle más territorio.
+          Sin límite de rondas la partida solo termina por dominación o siendo el último en pie.
         </p>
         <label class="field field-check">
           <input v-model="islas" type="checkbox" />

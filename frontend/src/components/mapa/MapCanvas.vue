@@ -99,7 +99,9 @@ let terrenoDibujado = null
 // a proposito.
 let yaSeCentroEnCapital = false
 
-const tamano = () => props.vista.config.tamanoMapa
+// tamanoMapa es el ANCHO; altoMapa es null (o no existe, en una partida vieja) si el mapa es cuadrado.
+const ancho = () => props.vista.config.tamanoMapa
+const alto = () => props.vista.config.altoMapa ?? props.vista.config.tamanoMapa
 
 // Salud maxima de un tipo de unidad, segun las constantes del backend. Si
 // todavia no cargaron, no hay forma de saber el maximo real: no se inventa.
@@ -686,9 +688,10 @@ function destellar(x, y, color) {
 // contra el lado MAS EXIGENTE de la pantalla, asi ningun eje queda corto.
 function zoomMinimo() {
   if (!app) return ZOOM_MIN
-  const mundoCasillas = tamano() * TILE
-  if (!mundoCasillas) return ZOOM_MIN
-  return Math.max(app.screen.width / mundoCasillas, app.screen.height / mundoCasillas)
+  const anchoPx = ancho() * TILE
+  const altoPx = alto() * TILE
+  if (!anchoPx || !altoPx) return ZOOM_MIN
+  return Math.max(app.screen.width / anchoPx, app.screen.height / altoPx)
 }
 
 // Empuja la camara de vuelta adentro si quedo mostrando fuera del mapa. Se
@@ -696,15 +699,14 @@ function zoomMinimo() {
 // mas confiable que tratar de prevenirlo en cada gesto por separado.
 function limitarCamara() {
   if (!app || !mundo) return
-  const mundoPx = tamano() * TILE * mundo.scale.x
-  const ajustar = (pos, pantalla) =>
+  const ajustar = (pos, pantalla, mundoPx) =>
     // Si el mundo entra entero en la pantalla no hay nada que recortar: se
     // centra. Si no, se lo mantiene tapando el lienzo de borde a borde.
     mundoPx <= pantalla
       ? (pantalla - mundoPx) / 2
       : Math.min(0, Math.max(pantalla - mundoPx, pos))
-  mundo.x = ajustar(mundo.x, app.screen.width)
-  mundo.y = ajustar(mundo.y, app.screen.height)
+  mundo.x = ajustar(mundo.x, app.screen.width, ancho() * TILE * mundo.scale.x)
+  mundo.y = ajustar(mundo.y, app.screen.height, alto() * TILE * mundo.scale.x)
 }
 
 // Multiplica el zoom por un factor, anclado a un punto del lienzo. Es la base
@@ -822,7 +824,7 @@ function calcularEncuadre() {
 function reencuadrarZonaDescubierta() {
   const encuadre = calcularEncuadre()
   if (!encuadre) {
-    centrarEn(tamano() / 2, tamano() / 2)
+    centrarEn(ancho() / 2, alto() / 2)
     return
   }
   centrarEn(encuadre.x, encuadre.y, encuadre.zoom)
@@ -904,7 +906,7 @@ function claveNiebla(vista) {
 function actualizarDesdeVista() {
   if (!app) return
   const vista = props.vista
-  const tam = vista.config.tamanoMapa
+  const tam = `${ancho()}x${alto()}`
 
   if (tam !== tamanoAnterior) {
     tamanoAnterior = tam
@@ -987,7 +989,7 @@ function onPointerUp(evento) {
   const local = mundo.toLocal(evento.global)
   const x = Math.floor(local.x / TILE)
   const y = Math.floor(local.y / TILE)
-  if (x < 0 || y < 0 || x >= tamano() || y >= tamano()) return
+  if (x < 0 || y < 0 || x >= ancho() || y >= alto()) return
   emit('click-tile', { x, y })
 }
 
@@ -1090,7 +1092,7 @@ onMounted(async () => {
     reencuadrarZonaDescubierta()
     yaSeCentroEnCapital = true
   } else {
-    centrarEn(tamano() / 2, tamano() / 2)
+    centrarEn(ancho() / 2, alto() / 2)
   }
 })
 

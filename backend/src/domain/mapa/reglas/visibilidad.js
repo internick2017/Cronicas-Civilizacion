@@ -12,6 +12,7 @@ import {
   gobiernoDe, perfilGobiernoDe, formaEstadoDe, estaEnPoder, apoyoEfectivo, impuestosDe, mandatoDe, nombreGobiernoDe,
 } from './gobierno.js';
 import { capitalDe } from './capital.js';
+import { clasificacionPara } from './poder.js';
 import { cargosDe } from './cargos.js';
 import { monedaDe, inflacionAcunadaDe, acunadoEnRonda } from './moneda.js';
 
@@ -144,6 +145,8 @@ export function vistaJugador(estado, jugadorId) {
     // Que existe en este modo (tecnologias, rasgos, mejoras, recursos): la interfaz pregunta por esto, no por el nombre del modo.
     reglas: reglasDelModo(estado),
     ganador: estado.ganador,
+    // Tabla de poder: con niebla solo trae la del propio jugador (ver reglas/poder.js).
+    clasificacion: clasificacionPara(estado, jugadorId),
     jugadores: estado.jugadores.map(j => vistaJugadorPublica(j, jugadorId, estado)),
     mapa: estado.mapa.map(t => vistaTile(t, videntes, capitales, conNiebla)),
     // Quien esta aliado con quien es publico: hay que saber contra quien se juega.

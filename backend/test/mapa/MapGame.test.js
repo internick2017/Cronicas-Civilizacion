@@ -19,7 +19,8 @@ describe('crearEstado', () => {
     // entre islas solo tiene sentido si hay cómo cruzar Y la máquina sabe
     // hacerlo, así que el default lo decide la medición.
     expect(e.config).toEqual({
-      tamanoMapa: 20, maxJugadores: 4, modoTurno: 'secuencial',
+      tamanoMapa: 20, altoMapa: null, maxJugadores: 4, modoTurno: 'secuencial',
+      criterioFinal: 'territorio', // se sumo con las condiciones de final de partida
       porcentajeVictoria: 60, limiteRondas: null, islas: false,
       rondasEntreElecciones: 8, // se sumó con el gobierno: solo lo usan las repúblicas
       mecanicas: { ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true, razas: true, problemas: true, levantamientos: true, fronteras: true, niebla: true }, // se apagan en el lobby; todas prendidas por defecto

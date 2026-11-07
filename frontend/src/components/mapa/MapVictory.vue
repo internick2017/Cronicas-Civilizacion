@@ -13,6 +13,8 @@ const NOMBRE_VICTORIA = {
   dominacion: 'dominación',
   ultimo_en_pie: 'ser el último en pie',
   limite_rondas: 'tener más territorio al llegar al límite de rondas',
+  limite_rondas_economia: 'tener la mejor economía al llegar al límite de rondas',
+  limite_rondas_fortificaciones: 'tener las mejores fortificaciones al llegar al límite de rondas',
   sin_humanos: 'quedar con más territorio cuando no quedó ningún jugador humano'
 }
 

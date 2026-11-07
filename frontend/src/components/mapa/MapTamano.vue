@@ -6,6 +6,10 @@ import { computed } from 'vue'
 const props = defineProps({
   min: { type: Number, default: 10 },
   max: { type: Number, default: 60 },
+  // Mapa rectangular: `otro` es la otra dimension. Con `lado` = 'ancho' este slider
+  // fija el ancho; con 'alto', el alto. Sin `otro` el mapa es cuadrado.
+  lado: { type: String, default: null },
+  otro: { type: Number, default: null },
 })
 const tamano = defineModel({ type: Number, required: true })
 
@@ -20,7 +24,12 @@ const ATAJOS = [
 
 const AVISO_DESDE = 36
 
-const casillas = computed(() => (tamano.value * tamano.value).toLocaleString('es'))
+const medidas = computed(() => {
+  const otro = props.otro ?? tamano.value
+  return props.lado === 'alto' ? { ancho: otro, alto: tamano.value } : { ancho: tamano.value, alto: otro }
+})
+const casillas = computed(() => (medidas.value.ancho * medidas.value.alto).toLocaleString('es'))
+const nombre = computed(() => (props.lado === 'alto' ? 'Alto del mapa' : props.lado === 'ancho' ? 'Ancho del mapa' : 'Tamaño del mapa'))
 
 // Al escribir se acepta cualquier cosa; al salir del campo se corrige al rango.
 const fijar = (crudo) => {
@@ -51,9 +60,9 @@ const fijar = (crudo) => {
         @change="fijar($event.target.value); $event.target.value = tamano"
       />
     </div>
-    <p class="tamano-resumen">{{ tamano }}×{{ tamano }} = {{ casillas }} casillas ({{ min }} a {{ max }})</p>
+    <p class="tamano-resumen">{{ nombre }}: {{ medidas.ancho }}×{{ medidas.alto }} = {{ casillas }} casillas ({{ min }} a {{ max }})</p>
     <!-- Medido con maquinas dificiles (300 rondas): en 36 terminó 1 de 2 partidas y en 60 ninguna. -->
-    <p v-if="tamano >= AVISO_DESDE" class="tamano-aviso">
+    <p v-if="medidas.ancho * medidas.alto >= AVISO_DESDE * AVISO_DESDE" class="tamano-aviso">
       Mapa grande: la partida puede durar cientos de rondas. Conviene bajar la
       dominación para ganar o poner un límite de rondas (más abajo).
     </p>

@@ -8,6 +8,7 @@ import { validarTurno, evento, esSimultaneo, listosDe } from './comun.js';
 import { produccionPorRasgos } from './cultura.js';
 import { aplicarBonosPorcentuales } from './tecnologia.js';
 import { controlTerritorial } from './dominacion.js';
+import { poderDe } from './poder.js';
 import { aliadosDe, bandosDe } from './bandos.js';
 import { recuperarFronteras } from './fronteras.js';
 import { estaSaqueada } from './saqueo.js';
@@ -153,13 +154,19 @@ export function evaluarVictoria(estado, jugadorId, activosPostEliminacion, turno
   if (bandos.length === 1) return victoriaDe(bandos[0], 'ultimo_en_pie');
 
   // Limite de rondas: final garantizado para quien no quiere una partida
-  // abierta. Gana el que mas territorio tenga; si van iguales NO se inventa un
-  // ganador (mismo criterio que cuando no queda nadie activo).
+  // abierta. Gana quien tenga mas segun config.criterioFinal (territorio por
+  // defecto; una partida guardada antes de que existiera cae a territorio); si
+  // van iguales NO se inventa un ganador (mismo criterio que cuando no queda
+  // nadie activo). Los aliados suman: el bando compite junto.
   if (estado.config.limiteRondas && turnoCierre >= estado.config.limiteRondas) {
-    const porTerritorio = [...bandos].sort((a, b) => b.tiles - a.tiles);
-    const hayEmpate = porTerritorio.length > 1 && porTerritorio[0].tiles === porTerritorio[1].tiles;
+    const criterio = estado.config.criterioFinal ?? 'territorio';
+    const puntaje = (bando) => criterio === 'territorio'
+      ? bando.tiles
+      : bando.miembros.reduce((s, id) => s + poderDe(estado, id)[criterio], 0);
+    const ranking = bandos.map(b => ({ b, puntos: puntaje(b) })).sort((x, y) => y.puntos - x.puntos);
+    const hayEmpate = ranking.length > 1 && ranking[0].puntos === ranking[1].puntos;
     if (hayEmpate) return evento('PartidaTerminada', estado, jugadorId, { ganador: null });
-    return victoriaDe(porTerritorio[0], 'limite_rondas');
+    return victoriaDe(ranking[0].b, criterio === 'territorio' ? 'limite_rondas' : `limite_rondas_${criterio}`);
   }
 
   return null;

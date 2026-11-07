@@ -1,6 +1,6 @@
 import { posicionesIniciales } from '../generarMapa.js';
 import { crearRng } from '../rng.js';
-import { jugadorPorId } from '../MapGame.js';
+import { jugadorPorId, altoDe } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
 import { evento, radio1 } from './comun.js';
 import { MIN_JUGADORES } from '../constantes.js';
@@ -35,7 +35,7 @@ export function iniciar(estado) {
   if (estado.jugadores.length < MIN_JUGADORES) throw new ReglaError('JUGADORES_INSUFICIENTES', `Se necesitan al menos ${MIN_JUGADORES} jugadores`);
   const rng = crearRng(`inicio:${estado.semilla}`);
   const pos = posicionesIniciales(estado.mapa, estado.config.tamanoMapa, estado.jugadores.length, rng,
-    { islas: estado.config.islas === true });
+    { islas: estado.config.islas === true, alto: altoDe(estado.config) });
   const eventos = [{ tipo: 'PartidaIniciada', turno: 1, jugadorId: null, datos: {} }];
   estado.jugadores.forEach((jug, i) => {
     const { x, y } = pos[i];

@@ -208,7 +208,8 @@ const alcanzables = computed(() => {
     .map(([dx, dy]) => ({ x: x + dx, y: y + dy }))
     .filter(p => {
       const t = vista.value.config.tamanoMapa
-      if (p.x < 0 || p.y < 0 || p.x >= t || p.y >= t) return false
+      const h = vista.value.config.altoMapa ?? t
+      if (p.x < 0 || p.y < 0 || p.x >= t || p.y >= h) return false
       const tile = tileEn(p.x, p.y)
       if (!tile) return false
       // Niebla: sin datos para filtrar nada. Candidata (ver comentario arriba).

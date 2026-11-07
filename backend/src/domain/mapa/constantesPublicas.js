@@ -7,7 +7,7 @@ import {
   BONO_PRODUCCION_CAPITAL, BONO_DEFENSA_CAPITAL, COSTO_MOVER_CAPITAL, RONDAS_SIN_PRODUCIR_MUDANZA,
   BONO_PRODUCCION_CABECERA, DESCUENTO_RESOLUCION_CABECERA,
   MONEDA_POR_DEFECTO, LARGO_MAXIMO_NOMBRE_MONEDA, LARGO_MAXIMO_SIMBOLO_MONEDA, ACUNACION,
-  IMPUESTOS, LARGO_MAXIMO_NOMBRE_GOBIERNO,
+  IMPUESTOS, LARGO_MAXIMO_NOMBRE_GOBIERNO, CRITERIOS_FINALES,
 } from './constantes.js';
 import { LIMITES_CONFIG } from './MapGame.js';
 import {
@@ -189,6 +189,10 @@ export function constantesPublicas() {
     impuestos: IMPUESTOS,
     limitesMandato: LIMITES_CONFIG.rondasEntreElecciones,
     limitesTamanoMapa: LIMITES_CONFIG.tamanoMapa,
+    limitesAltoMapa: LIMITES_CONFIG.altoMapa,
+    limitesPorcentajeVictoria: LIMITES_CONFIG.porcentajeVictoria,
+    limitesRondas: LIMITES_CONFIG.limiteRondas,
+    criteriosFinales: CRITERIOS_FINALES,
     largoNombreGobierno: LARGO_MAXIMO_NOMBRE_GOBIERNO,
   };
 }

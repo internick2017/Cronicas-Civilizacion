@@ -377,3 +377,21 @@ describe('generarMapa: rios', () => {
     }
   });
 });
+
+describe('mapa rectangular', () => {
+  it('un mapa cuadrado sale igual con o sin alto explicito', () => {
+    const a = generarMapa('rect', 16);
+    const b = generarMapa('rect', 16, { alto: 16 });
+    expect(b).toEqual(a);
+  });
+
+  it('un mapa de 24x12 tiene 288 casillas, bien ubicadas fila por fila', () => {
+    const m = generarMapa('rect', 24, { alto: 12 });
+    expect(m).toHaveLength(24 * 12);
+    m.forEach((t, i) => { expect(t.x).toBe(i % 24); expect(t.y).toBe(Math.floor(i / 24)); });
+  });
+
+  it('un mapa alto y angosto tambien se genera', () => {
+    expect(generarMapa('rect', 10, { alto: 40 })).toHaveLength(400);
+  });
+});

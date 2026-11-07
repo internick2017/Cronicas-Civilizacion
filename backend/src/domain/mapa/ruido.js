@@ -6,16 +6,17 @@ import { crearRng } from './rng.js';
 const suavizar = (t) => t * t * (3 - 2 * t);
 const lerp = (a, b, t) => a + (b - a) * t;
 
-export function crearRuido(semilla, tamano, paso = 4) {
+export function crearRuido(semilla, tamano, paso = 4, alto = tamano) {
   const rng = crearRng(`ruido:${semilla}:${paso}`);
-  const lado = Math.ceil(tamano / paso) + 2;
-  const puntos = new Float64Array(lado * lado);
+  const ladoX = Math.ceil(tamano / paso) + 2;
+  const ladoY = Math.ceil(alto / paso) + 2;
+  const puntos = new Float64Array(ladoX * ladoY);
   for (let i = 0; i < puntos.length; i++) puntos[i] = rng();
 
   const puntoEn = (gx, gy) => {
-    const cx = Math.min(Math.max(gx, 0), lado - 1);
-    const cy = Math.min(Math.max(gy, 0), lado - 1);
-    return puntos[cy * lado + cx];
+    const cx = Math.min(Math.max(gx, 0), ladoX - 1);
+    const cy = Math.min(Math.max(gy, 0), ladoY - 1);
+    return puntos[cy * ladoX + cx];
   };
 
   return function ruido(x, y) {

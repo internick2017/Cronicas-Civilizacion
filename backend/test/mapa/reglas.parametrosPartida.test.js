@@ -42,9 +42,14 @@ const cerrarRonda = (e) => {
 
 describe('config: porcentaje de victoria por partida', () => {
   it('rechaza valores fuera de rango', () => {
-    expect(() => crearEstado({ nombre: 'T', semilla: 's', config: { porcentajeVictoria: 10 } })).toThrow(/porcentajeVictoria/);
-    expect(() => crearEstado({ nombre: 'T', semilla: 's', config: { porcentajeVictoria: 99 } })).toThrow(/porcentajeVictoria/);
+    expect(() => crearEstado({ nombre: 'T', semilla: 's', config: { porcentajeVictoria: 9 } })).toThrow(/porcentajeVictoria/);
+    expect(() => crearEstado({ nombre: 'T', semilla: 's', config: { porcentajeVictoria: 101 } })).toThrow(/porcentajeVictoria/);
     expect(() => crearEstado({ nombre: 'T', semilla: 's', config: { porcentajeVictoria: 60.5 } })).toThrow(/porcentajeVictoria/);
+  });
+
+  it('acepta los extremos 10 y 100', () => {
+    expect(() => crearEstado({ nombre: 'T', semilla: 's', config: { porcentajeVictoria: 10 } })).not.toThrow();
+    expect(() => crearEstado({ nombre: 'T', semilla: 's', config: { porcentajeVictoria: 100 } })).not.toThrow();
   });
 
   it('una partida al 50% se gana al 50%, no al 60%', () => {
