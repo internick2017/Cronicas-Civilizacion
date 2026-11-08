@@ -116,6 +116,35 @@ const probSucesion = computed(() => {
   return esperanza ? `${(100 / esperanza).toFixed(2).replace('.', ',')}%` : ''
 })
 
+// Las piezas sumadas desde las paginas de "forma de gobierno". Solo el texto esta escrito
+// aca; bonos y nombres salen del servidor.
+const piezasNuevas = [
+  ['gerontocracia', 'Forma', 'Los líderes', 'Los ancianos arbitran (Moderador) y la gente los respeta.'],
+  ['junta_personalista', 'Forma', 'Vos', 'Un solo militar manda. Te sostiene el ejército y te echa si te abandona.'],
+  ['junta_colegial', 'Forma', 'Los militares', 'Un directorio de militares con un Legislativo propio. Mucho respeto del ejército.'],
+  ['junta_civico_militar', 'Forma', 'Los líderes', 'Civiles y militares comparten el poder. Se sostiene por el ejército.'],
+  ['monarquia_semiconstitucional', 'Forma', 'Vos', 'Rey con parlamento y constitución otorgada: conserva casi todo el poder. Hay sucesión.'],
+  ['monarquia_parlamentaria', 'Forma', 'Los líderes', 'El rey reina pero no gobierna: Legislativo y Moderador independientes. Hay sucesión.'],
+  ['semipresidencialismo', 'Sistema', 'Pueblo y líderes', 'Presidente y primer ministro: la doble confianza reparte la votación entre pueblo y líderes.'],
+  ['plutocracia', 'Régimen', 'Los líderes', 'Manda quien tiene la plata. Los tratados (Federativo) se pagan solos, pero el pueblo lo ve mal.'],
+  ['meritocracia', 'Régimen', 'Los líderes', 'Los cargos van por concurso (poder de Mérito) y el pueblo lo valora.'],
+  ['cleptocracia', 'Régimen', 'Vos', 'Saqueás el Estado: el mejor bono de oro, pero el pueblo te odia.'],
+  ['partido_estado', 'Régimen', 'Vos', 'Un partido es el Estado. Se sostiene por la fuerza y el pueblo te quiere menos.'],
+  ['partido_masas', 'Régimen', 'Los líderes', 'Un partido que controla a las masas, con un poder de Control interno.'],
+  ['partido_fachada', 'Régimen', 'Vos', 'Un partido de adorno: las decisiones son tuyas.'],
+  ['democracia_vigilada', 'Régimen', 'Los líderes', 'Instituciones democráticas (Electoral y Revisor) con el ejército como reserva: si lo perdés, te echan.'],
+  ['republica_sorteo', 'Régimen', 'La mitad del pueblo', 'Los cargos se sortean entre ciudadanos aptos. Es una república: mismo +10% en todo y hay elecciones.'],
+  ['gobierno_mixto', 'Régimen', 'Pueblo y líderes', 'Monarquía, aristocracia y pueblo en equilibrio: Legislativo, Tribunicio y Moderador.'],
+  ['etnocracia', 'Régimen', 'Vos', 'Un grupo se impone a los demás por la fuerza. Se sostiene por el ejército; el pueblo lo sufre.'],
+]
+const filasNuevas = computed(() => piezasNuevas
+  .filter(([tipo]) => props.constantes?.gobiernos?.some(g => g.tipo === tipo))
+  .map(([tipo, eje, aprueba, texto]) => ({
+    tipo, eje, aprueba, texto,
+    nombre: props.constantes.gobiernos.find(g => g.tipo === tipo).nombre,
+    bono: listaBono(bonosGobierno.value[tipo]),
+  })))
+
 // Los poderes de esta partida. Sin la lista (backend viejo) estan todos.
 const poderesDeLaPartida = computed(() => (props.constantes?.poderes || []).filter(p =>
   p.clave === 'ejecutivo' || !props.reglas?.poderes || props.reglas.poderes.includes(p.clave)))
@@ -434,9 +463,9 @@ const umbralAviso = computed(() =>
           </p>
           <p>
             Un gobierno <strong>combina</strong> hasta tres piezas, una por eje: la <strong>forma de jefatura</strong>
-            (despotismo, monarquía, estratocracia, teocracia, regencia, tiranía), el <strong>sistema</strong>
-            (parlamentarismo, presidencialismo, absolutismo, tecnocracia) y el <strong>régimen</strong> (las tres democracias,
-            oligarquía, aristocracia, autoritarismo, dictadura, totalitarismo). Por ejemplo, <em>Monarquía + Parlamentarismo +
+            (despotismo, monarquía, estratocracia, teocracia, regencia, tiranía, gerontocracia, juntas, monarquías limitadas), el <strong>sistema</strong>
+            (parlamentarismo, presidencialismo, semipresidencialismo, absolutismo, tecnocracia) y el <strong>régimen</strong> (las tres democracias,
+            oligarquía, aristocracia, autoritarismo, dictadura, totalitarismo, plutocracia, meritocracia, partidos únicos y más). Por ejemplo, <em>Monarquía + Parlamentarismo +
             Democracia representativa</em> es una monarquía constitucional. Los bonos, el respeto y los poderes de las piezas se
             <strong>suman</strong>; solo las que se contradicen (como una democracia con un despotismo, o el presidencialismo con
             una monarquía) no se pueden juntar. La tabla describe cada pieza.
@@ -538,6 +567,20 @@ const umbralAviso = computed(() =>
                 <td>Democracia directa</td>
                 <td>La mitad del pueblo</td>
                 <td>El mismo bono; decide la población.</td>
+              </tr>
+            </tbody>
+          </table>
+          <h5>Piezas sumadas</h5>
+          <table>
+            <thead>
+              <tr><th>Pieza</th><th>Eje</th><th>Quién aprueba un cambio</th><th>Qué te da</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="f in filasNuevas" :key="f.tipo">
+                <td>{{ f.nombre }}</td>
+                <td>{{ f.eje }}</td>
+                <td>{{ f.aprueba }}</td>
+                <td><template v-if="f.bono">{{ f.bono }}. </template>{{ f.texto }}</td>
               </tr>
             </tbody>
           </table>

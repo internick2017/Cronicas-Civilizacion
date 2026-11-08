@@ -90,7 +90,7 @@ export function perfilDeGobierno(clave, apagados = []) {
     poderes,
     concentrados,
     republica: piezas.some(p => p.startsWith('republica_')),
-    monarquia: piezas.includes('monarquia'),
+    monarquia: piezas.some(p => p === 'monarquia' || p.startsWith('monarquia_')),
     inmortal: piezas.includes('despotismo') && electorado === 'jugador',
   };
   memoria.set(memo, perfil);

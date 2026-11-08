@@ -602,6 +602,24 @@ export const GOBIERNOS = {
   republica_indirecta: { nombre: 'Democracia representativa', electorado: 'lideres' },
   republica_semidirecta: { nombre: 'Democracia semidirecta', electorado: 'mixto' },
   republica_directa: { nombre: 'Democracia directa', electorado: 'pueblo' },
+  // Sumados el 2026-11-08 a partir de las paginas de "forma de gobierno" (es/en/pt de Wikipedia).
+  gerontocracia: { nombre: 'Gerontocracia', electorado: 'lideres' },
+  junta_personalista: { nombre: 'Junta personalista', electorado: 'jugador', sostenidoPor: 'militares' },
+  junta_colegial: { nombre: 'Junta colegial', electorado: 'militares', sostenidoPor: 'militares' },
+  junta_civico_militar: { nombre: 'Junta cívico-militar', electorado: 'lideres', sostenidoPor: 'militares' },
+  monarquia_semiconstitucional: { nombre: 'Monarquía semiconstitucional', electorado: 'jugador' },
+  monarquia_parlamentaria: { nombre: 'Monarquía parlamentaria', electorado: 'lideres' },
+  semipresidencialismo: { nombre: 'Semipresidencialismo', electorado: 'mixto' },
+  plutocracia: { nombre: 'Plutocracia', electorado: 'lideres' },
+  meritocracia: { nombre: 'Meritocracia', electorado: 'lideres' },
+  cleptocracia: { nombre: 'Cleptocracia', electorado: 'jugador' },
+  partido_estado: { nombre: 'Partido-Estado', electorado: 'jugador', sostenidoPor: 'militares' },
+  partido_masas: { nombre: 'Partido de masas', electorado: 'lideres' },
+  partido_fachada: { nombre: 'Partido fachada', electorado: 'jugador' },
+  democracia_vigilada: { nombre: 'Democracia vigilada', electorado: 'lideres', sostenidoPor: 'militares' },
+  republica_sorteo: { nombre: 'Democracia por sorteo', electorado: 'pueblo' },
+  gobierno_mixto: { nombre: 'Gobierno mixto', electorado: 'mixto' },
+  etnocracia: { nombre: 'Etnocracia', electorado: 'jugador', sostenidoPor: 'militares' },
 };
 export const FORMAS_ESTADO = ['unitario', 'federal'];
 
@@ -610,21 +628,36 @@ export const FORMAS_ESTADO = ['unitario', 'federal'];
 // es una entrada de GOBIERNOS (y de RESPETO, PREFERENCIAS, etc.); los efectos de
 // las que se combinan se suman (ver reglas/composicionGobierno.js).
 export const EJES_GOBIERNO = {
-  forma: ['despotismo', 'monarquia', 'estratocracia', 'teocracia', 'regencia', 'tirania'],
-  sistema: ['parlamentarismo', 'presidencialismo', 'absolutismo', 'tecnocracia'],
+  forma: [
+    'despotismo', 'monarquia', 'estratocracia', 'teocracia', 'regencia', 'tirania',
+    'gerontocracia', 'junta_personalista', 'junta_colegial', 'junta_civico_militar',
+    'monarquia_semiconstitucional', 'monarquia_parlamentaria',
+  ],
+  sistema: ['parlamentarismo', 'presidencialismo', 'semipresidencialismo', 'absolutismo', 'tecnocracia'],
   regimen: [
-    'republica_directa', 'republica_semidirecta', 'republica_indirecta', 'oligarquia', 'aristocracia',
+    'republica_directa', 'republica_semidirecta', 'republica_indirecta', 'republica_sorteo', 'oligarquia', 'aristocracia',
     'autoritarismo', 'dictadura', 'totalitarismo',
+    'plutocracia', 'meritocracia', 'cleptocracia', 'gobierno_mixto', 'democracia_vigilada',
+    'partido_estado', 'partido_masas', 'partido_fachada', 'etnocracia',
   ],
 };
-const DEMOCRACIAS = ['republica_directa', 'republica_semidirecta', 'republica_indirecta'];
-const FORMAS_DE_FUERZA = ['despotismo', 'estratocracia', 'tirania'];
+const DEMOCRACIAS = ['republica_directa', 'republica_semidirecta', 'republica_indirecta', 'republica_sorteo'];
+const FORMAS_DE_FUERZA = ['despotismo', 'estratocracia', 'tirania', 'junta_personalista', 'junta_colegial'];
+const MONARQUIAS = ['monarquia', 'monarquia_semiconstitucional', 'monarquia_parlamentaria'];
 const cruzar = (as, bs) => as.flatMap(a => bs.map(b => [a, b]));
 // Parejas que NO pueden ir juntas (el resto se combina libremente).
 export const INCOMPATIBLES = [
   ...cruzar(DEMOCRACIAS, [...FORMAS_DE_FUERZA, 'teocracia', 'absolutismo']),
-  ...cruzar(['parlamentarismo'], [...FORMAS_DE_FUERZA, 'autoritarismo', 'dictadura', 'totalitarismo']),
-  ...cruzar(['presidencialismo'], ['monarquia', 'regencia', 'teocracia', ...FORMAS_DE_FUERZA, 'dictadura', 'totalitarismo']),
+  ...cruzar(['parlamentarismo'], [...FORMAS_DE_FUERZA, 'autoritarismo', 'dictadura', 'totalitarismo', 'partido_estado', 'etnocracia']),
+  ...cruzar(['presidencialismo'], [
+    ...MONARQUIAS, 'regencia', 'teocracia', 'gerontocracia', ...FORMAS_DE_FUERZA, 'dictadura', 'totalitarismo', 'partido_estado',
+  ]),
+  ...cruzar(['semipresidencialismo'], [
+    ...MONARQUIAS, 'regencia', 'teocracia', ...FORMAS_DE_FUERZA, 'dictadura', 'totalitarismo', 'partido_estado',
+  ]),
+  ...cruzar(['monarquia_parlamentaria'], ['dictadura', 'totalitarismo', 'partido_estado', 'etnocracia', 'absolutismo']),
+  ...cruzar(['gobierno_mixto'], [...FORMAS_DE_FUERZA, 'absolutismo', 'totalitarismo']),
+  ...cruzar(['democracia_vigilada'], ['absolutismo', 'teocracia']),
 ];
 
 // Separacion de poderes. El Ejecutivo siempre es del jugador y paga las instituciones.
@@ -751,6 +784,17 @@ export const PODERES_SEPARADOS = {
   republica_indirecta: [
     'legislativo', 'judiciario', 'moderador', 'federativo', 'electoral', 'emergencia', 'control', 'revisor',
   ],
+  gerontocracia: ['moderador'],
+  junta_colegial: ['legislativo'],
+  monarquia_semiconstitucional: ['legislativo'],
+  monarquia_parlamentaria: ['legislativo', 'moderador'],
+  semipresidencialismo: ['legislativo', 'judiciario', 'moderador'],
+  plutocracia: ['federativo'],
+  meritocracia: ['merito'],
+  partido_masas: ['control'],
+  democracia_vigilada: ['electoral', 'revisor'],
+  republica_sorteo: ['legislativo', 'tribunicio', 'electoral'],
+  gobierno_mixto: ['legislativo', 'tribunicio', 'moderador'],
 };
 // Lo que cada pieza deja en manos de quien manda (si otra pieza lo separa, gana
 // independiente). Tribunicio, Electoral, Moderador y Revisor no se concentran: un
@@ -774,6 +818,23 @@ export const PODERES_CONCENTRADOS = {
   autoritarismo: ['legislativo', 'judiciario', 'federativo', 'emergencia', 'control'],
   dictadura: ['legislativo', 'judiciario', 'federativo', 'emergencia', 'control'],
   totalitarismo: ['legislativo', 'judiciario', 'federativo', 'emergencia', 'control', 'merito'],
+  gerontocracia: ['legislativo', 'judiciario', 'federativo'],
+  junta_personalista: ['legislativo', 'judiciario', 'federativo', 'emergencia', 'control'],
+  junta_colegial: ['judiciario', 'federativo', 'emergencia', 'control'],
+  junta_civico_militar: ['judiciario', 'federativo', 'emergencia'],
+  monarquia_semiconstitucional: ['judiciario', 'federativo', 'emergencia'],
+  monarquia_parlamentaria: ['judiciario'],
+  semipresidencialismo: ['federativo', 'emergencia'],
+  plutocracia: ['judiciario', 'emergencia'],
+  meritocracia: ['legislativo', 'federativo'],
+  cleptocracia: ['legislativo', 'judiciario', 'federativo', 'emergencia'],
+  partido_estado: ['legislativo', 'judiciario', 'federativo', 'emergencia', 'control', 'merito'],
+  partido_masas: ['legislativo', 'judiciario', 'federativo', 'emergencia'],
+  partido_fachada: ['legislativo', 'judiciario', 'federativo', 'emergencia', 'control'],
+  democracia_vigilada: ['judiciario', 'federativo', 'emergencia'],
+  republica_sorteo: ['judiciario', 'federativo'],
+  gobierno_mixto: ['judiciario', 'federativo', 'emergencia'],
+  etnocracia: ['legislativo', 'judiciario', 'federativo', 'emergencia'],
 };
 // Los que una partida puede apagar: todos menos el Ejecutivo.
 export const PODERES_ELEGIBLES = Object.keys(PODERES).filter(p => p !== 'ejecutivo');
@@ -803,13 +864,30 @@ export const RESPETO = {
   autoritarismo: { pueblo: -5, lideres: 5 },
   regencia: { lideres: 5 },
   totalitarismo: { pueblo: -20, lideres: -10, militares: 15 },
+  gerontocracia: { lideres: 10, pueblo: 5 },
+  junta_personalista: { militares: 10, pueblo: -5 },
+  junta_colegial: { militares: 15 },
+  junta_civico_militar: { militares: 10, lideres: 5 },
+  monarquia_semiconstitucional: { pueblo: 10, lideres: 5 },
+  monarquia_parlamentaria: { pueblo: 10, lideres: 10 },
+  semipresidencialismo: { pueblo: 5, lideres: 5 },
+  plutocracia: { lideres: 10, pueblo: -5 },
+  meritocracia: { pueblo: 5 },
+  cleptocracia: { lideres: 10, pueblo: -15 },
+  partido_estado: { militares: 10, pueblo: -10 },
+  partido_masas: { pueblo: 5, lideres: 5 },
+  partido_fachada: { lideres: 5 },
+  democracia_vigilada: { militares: 10, pueblo: 5 },
+  republica_sorteo: { pueblo: 10 },
+  gobierno_mixto: { pueblo: 5, lideres: 5, militares: 5 },
+  etnocracia: { militares: 10, pueblo: -10 },
 };
 // Que tanto prefiere cada grupo cada gobierno (0 a 100). En una votacion pesa
 // la DIFERENCIA entre el propuesto y el actual.
 export const PREFERENCIAS = {
-  pueblo: { despotismo: 20, monarquia: 30, estratocracia: 25, teocracia: 40, oligarquia: 20, tecnocracia: 45, aristocracia: 35, tirania: 10, parlamentarismo: 60, presidencialismo: 65, dictadura: 15, absolutismo: 25, autoritarismo: 20, regencia: 40, totalitarismo: 5, republica_indirecta: 60, republica_semidirecta: 70, republica_directa: 80 },
-  lideres: { despotismo: 40, monarquia: 70, estratocracia: 30, teocracia: 85, oligarquia: 90, tecnocracia: 70, aristocracia: 95, tirania: 20, parlamentarismo: 80, presidencialismo: 55, dictadura: 30, absolutismo: 75, autoritarismo: 50, regencia: 65, totalitarismo: 25, republica_indirecta: 75, republica_semidirecta: 65, republica_directa: 25 },
-  militares: { despotismo: 50, monarquia: 55, estratocracia: 90, teocracia: 40, oligarquia: 60, tecnocracia: 35, aristocracia: 55, tirania: 85, parlamentarismo: 30, presidencialismo: 45, dictadura: 80, absolutismo: 55, autoritarismo: 65, regencia: 40, totalitarismo: 85, republica_indirecta: 30, republica_semidirecta: 30, republica_directa: 30 },
+  pueblo: { despotismo: 20, monarquia: 30, estratocracia: 25, teocracia: 40, oligarquia: 20, tecnocracia: 45, aristocracia: 35, tirania: 10, parlamentarismo: 60, presidencialismo: 65, dictadura: 15, absolutismo: 25, autoritarismo: 20, regencia: 40, totalitarismo: 5, republica_indirecta: 60, republica_semidirecta: 70, republica_directa: 80, gerontocracia: 35, junta_personalista: 10, junta_colegial: 15, junta_civico_militar: 25, monarquia_semiconstitucional: 45, monarquia_parlamentaria: 60, semipresidencialismo: 62, plutocracia: 15, meritocracia: 55, cleptocracia: 5, partido_estado: 10, partido_masas: 35, partido_fachada: 25, democracia_vigilada: 50, republica_sorteo: 75, gobierno_mixto: 65, etnocracia: 10 },
+  lideres: { despotismo: 40, monarquia: 70, estratocracia: 30, teocracia: 85, oligarquia: 90, tecnocracia: 70, aristocracia: 95, tirania: 20, parlamentarismo: 80, presidencialismo: 55, dictadura: 30, absolutismo: 75, autoritarismo: 50, regencia: 65, totalitarismo: 25, republica_indirecta: 75, republica_semidirecta: 65, republica_directa: 25, gerontocracia: 75, junta_personalista: 25, junta_colegial: 30, junta_civico_militar: 45, monarquia_semiconstitucional: 70, monarquia_parlamentaria: 80, semipresidencialismo: 70, plutocracia: 90, meritocracia: 45, cleptocracia: 60, partido_estado: 30, partido_masas: 50, partido_fachada: 50, democracia_vigilada: 60, republica_sorteo: 20, gobierno_mixto: 65, etnocracia: 35 },
+  militares: { despotismo: 50, monarquia: 55, estratocracia: 90, teocracia: 40, oligarquia: 60, tecnocracia: 35, aristocracia: 55, tirania: 85, parlamentarismo: 30, presidencialismo: 45, dictadura: 80, absolutismo: 55, autoritarismo: 65, regencia: 40, totalitarismo: 85, republica_indirecta: 30, republica_semidirecta: 30, republica_directa: 30, gerontocracia: 35, junta_personalista: 85, junta_colegial: 90, junta_civico_militar: 80, monarquia_semiconstitucional: 55, monarquia_parlamentaria: 40, semipresidencialismo: 45, plutocracia: 45, meritocracia: 50, cleptocracia: 50, partido_estado: 80, partido_masas: 60, partido_fachada: 65, democracia_vigilada: 80, republica_sorteo: 30, gobierno_mixto: 55, etnocracia: 75 },
 };
 export const PESO_PREFERENCIA = 0.6; // "principalmente" lo que prefieren
 export const PESO_APOYO = 0.4;
@@ -852,6 +930,22 @@ export const BONO_PRODUCCION_GOBIERNO = {
   autoritarismo: { gold: 0.1, food: 0.1 },
   regencia: { culture: 0.1 },
   totalitarismo: { gold: 0.15, food: 0.15, wood: 0.15, stone: 0.15 },
+  gerontocracia: { culture: 0.1, food: 0.1 },
+  junta_personalista: { stone: 0.15, wood: 0.1 },
+  junta_colegial: { stone: 0.1, science: 0.1 },
+  junta_civico_militar: { gold: 0.1, stone: 0.1 },
+  monarquia_semiconstitucional: { gold: 0.15, food: 0.1 },
+  monarquia_parlamentaria: { gold: 0.1, culture: 0.1 },
+  semipresidencialismo: { gold: 0.1, science: 0.1 },
+  plutocracia: { gold: 0.15, science: 0.1 },
+  meritocracia: { science: 0.1, food: 0.1 },
+  cleptocracia: { gold: 0.25 },
+  partido_estado: { gold: 0.1, food: 0.1, culture: 0.05 },
+  partido_masas: { food: 0.1, culture: 0.1 },
+  partido_fachada: { gold: 0.1, wood: 0.1 },
+  democracia_vigilada: { food: 0.1, stone: 0.1 },
+  gobierno_mixto: { gold: 0.1, food: 0.1, culture: 0.1 },
+  etnocracia: { food: 0.1, wood: 0.1, stone: 0.1 },
 };
 // Hasta que nivel mejora ciudades SOLA el Estado federal (el jugador puede
 // seguir subiendolas a mano): sin tope vaciaba la ciencia y el oro.
