@@ -24,7 +24,11 @@ function vistaTile(tile, videntes, capitales, conNiebla) {
   if (conNiebla && !videntes.some(id => tile.descubiertoPor.includes(id))) {
     return { x: tile.x, y: tile.y, descubierto: false };
   }
-  const { descubiertoPor: _descubiertoPor, ...resto } = structuredClone(tile);
+  // Copia superficial: solo ciudad y ejercito se modifican/viajan anidados; clonar
+  // la casilla entera por cada casilla descubierta era el mayor costo de la vista.
+  const { descubiertoPor: _descubiertoPor, ...resto } = tile;
+  if (resto.ciudad) resto.ciudad = structuredClone(resto.ciudad);
+  if (resto.ejercito) resto.ejercito = structuredClone(resto.ejercito);
   // La interfaz muestra "70/100": el maximo sale de aca, no se recalcula en el cliente.
   if (resto.ciudad) {
     resto.ciudad.salud = saludDeCiudad(resto.ciudad);

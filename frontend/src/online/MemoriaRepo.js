@@ -1,5 +1,7 @@
 import { hashToken } from './crypto-navegador.js'
 
+const RONDAS_CONSERVADAS = 2
+
 // Repositorio en memoria con la misma interfaz que backend/src/db/MapGameRepo.js.
 // Lo usa el anfitrion del modo online: la partida vive en SU navegador, no en Neon.
 // Se guarda JSON (no el objeto) para que cada lectura sea una copia aislada, igual que con la base.
@@ -7,6 +9,7 @@ export class MemoriaRepo {
   constructor() {
     this.partidas = new Map() // id -> { codigo, json, actualizado }
     this.eventos = new Map() // gameId -> [{ turno, tipo, jugadorId, datos }]
+    this.totales = new Map() // gameId -> cuantos eventos hubo en total (siembra el dado de combate)
     this.narrativas = new Map() // gameId -> Map(turno -> texto)
     this.tokens = new Map() // `${gameId}:${jugadorId}` -> hash
   }
@@ -17,6 +20,7 @@ export class MemoriaRepo {
     return {
       partidas: [...this.partidas].map(([id, f]) => [id, { codigo: f.codigo, json: f.json, actualizado: f.actualizado.toISOString() }]),
       eventos: [...this.eventos],
+      totales: [...this.totales],
       narrativas: [...this.narrativas].map(([id, m]) => [id, [...m]]),
       tokens: [...this.tokens],
     }
@@ -25,6 +29,7 @@ export class MemoriaRepo {
   importar(copia) {
     this.partidas = new Map(copia.partidas.map(([id, f]) => [id, { ...f, actualizado: new Date(f.actualizado) }]))
     this.eventos = new Map(copia.eventos)
+    this.totales = new Map(copia.totales ?? [])
     this.narrativas = new Map(copia.narrativas.map(([id, m]) => [id, new Map(m)]))
     this.tokens = new Map(copia.tokens)
   }
@@ -45,12 +50,17 @@ export class MemoriaRepo {
 
   agregarEventos(gameId, eventos) {
     const lista = this.eventos.get(gameId) ?? []
+    const previos = this.contarEventos(gameId)
     for (const e of eventos) lista.push({ turno: e.turno, tipo: e.tipo, jugadorId: e.jugadorId ?? null, datos: structuredClone(e.datos) })
-    this.eventos.set(gameId, lista)
+    this.totales.set(gameId, previos + eventos.length)
+    // Solo se releen los eventos de la ronda recien cerrada (para narrarla): el resto
+    // solo engordaba la copia de respaldo (MBs) que se guarda y se manda a los amigos.
+    const desde = (lista.at(-1)?.turno ?? 0) - RONDAS_CONSERVADAS
+    this.eventos.set(gameId, lista.filter(e => e.turno >= desde))
   }
 
   contarEventos(gameId) {
-    return (this.eventos.get(gameId) ?? []).length
+    return this.totales.get(gameId) ?? (this.eventos.get(gameId) ?? []).length
   }
 
   eventosDeRonda(gameId, turno) {

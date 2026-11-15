@@ -1108,7 +1108,7 @@ onUnmounted(() => {
   }
 })
 
-watch(() => props.vista, actualizarDesdeVista, { deep: true })
+watch(() => props.vista, actualizarDesdeVista)
 watch(() => [props.seleccion, props.alcanzables], dibujarOverlay, { deep: true })
 watch(() => props.constantes, dibujarPiezas, { deep: true })
 

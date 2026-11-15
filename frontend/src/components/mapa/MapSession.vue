@@ -1,6 +1,6 @@
 <!-- frontend/src/components/mapa/MapSession.vue -->
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useMapApi } from '../../composables/useMapApi.js'
 import { useMapSocket } from '../../composables/useMapSocket.js'
 import MapCanvas from './MapCanvas.vue'
@@ -35,7 +35,7 @@ const { seguirPartida, desconectar } = useMapSocket()
 const id = props.partidaInicial.id
 const jugadorId = props.partidaInicial.jugadorId
 const token = props.partidaInicial.token
-const vista = ref(props.partidaInicial.vista)
+const vista = shallowRef(props.partidaInicial.vista)
 
 // La narrativa llega por dos caminos: el evento 'narrativa' (apenas se genera)
 // y el campo 'narrativas' que viaja en el payload de 'estado' y en la vista

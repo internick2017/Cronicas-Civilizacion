@@ -262,25 +262,48 @@ const clave = (x, y) => `${x},${y}`;
  * Las dos brujulas de abajo son el mismo algoritmo con distinto objetivo, asi
  * que comparten esto en vez de duplicarlo.
  */
+// Trabaja con indices enteros (el mapa es y*ancho+x, ver tileEn) y arrays
+// tipados: es el punto mas caliente de la IA. Solo al final arma el Map "x,y".
+const clavesPorMapa = new WeakMap();
+function clavesDe(mapa) {
+  let claves = clavesPorMapa.get(mapa);
+  if (!claves || claves.length !== mapa.length) {
+    claves = mapa.map((t) => clave(t.x, t.y));
+    clavesPorMapa.set(mapa, claves);
+  }
+  return claves;
+}
+
 function distanciaHasta(estado, esOrigen, esCamino) {
+  const mapa = estado.mapa;
+  const n = mapa.length;
+  const ancho = estado.config.tamanoMapa;
+  const claves = clavesDe(mapa);
+  const dist = new Int32Array(n).fill(-1);
+  const cola = new Int32Array(n);
+  let fin = 0;
+  for (let i = 0; i < n; i++) {
+    if (esOrigen(mapa[i])) {
+      dist[i] = 0;
+      cola[fin++] = i;
+    }
+  }
+  const visitar = (j, d) => {
+    if (dist[j] !== -1 || !esCamino(mapa[j])) return;
+    dist[j] = d + 1;
+    cola[fin++] = j;
+  };
+  for (let h = 0; h < fin; h++) {
+    const i = cola[h];
+    const d = dist[i];
+    const x = i % ancho;
+    if (i >= ancho) visitar(i - ancho, d);
+    if (i < n - ancho) visitar(i + ancho, d);
+    if (x > 0) visitar(i - 1, d);
+    if (x < ancho - 1) visitar(i + 1, d);
+  }
   const distancia = new Map();
-  const cola = [];
-  for (const tile of estado.mapa) {
-    if (esOrigen(tile)) {
-      distancia.set(clave(tile.x, tile.y), 0);
-      cola.push(tile);
-    }
-  }
-  for (let i = 0; i < cola.length; i++) {
-    const actual = cola[i];
-    const d = distancia.get(clave(actual.x, actual.y));
-    for (const vecino of vecinosOrtogonales(estado, actual.x, actual.y)) {
-      const k = clave(vecino.x, vecino.y);
-      if (distancia.has(k) || !esCamino(vecino)) continue;
-      distancia.set(k, d + 1);
-      cola.push(vecino);
-    }
-  }
+  for (let h = 0; h < fin; h++) distancia.set(claves[cola[h]], dist[cola[h]]);
   return distancia;
 }
 
