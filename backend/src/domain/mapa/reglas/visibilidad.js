@@ -1,3 +1,4 @@
+import { cronicaFinal } from '../cronicaFinal.js';
 import { jugadorPorId } from '../MapGame.js';
 import { ReglaError } from '../errores.js';
 import { producirParaJugador } from './turnos.js';
@@ -88,6 +89,8 @@ function vistaJugadorPublica(jugador, jugadorId, estado) {
       enPoder: estaEnPoder(jugador),
       impuestos: impuestosDe(jugador),
       mandato: mandatoDe(estado, jugador),
+      // Evento de ronda esperando respuesta (solo el propio jugador lo ve).
+      eventoPendiente: jugador.eventoPendiente ?? null,
       emergenciaHasta: jugador.emergenciaHasta ?? null,
       emergenciaBloqueadaHasta: jugador.emergenciaBloqueadaHasta ?? 0,
       // Apoyo EFECTIVO (con el respeto del gobierno ya sumado): es lo que
@@ -149,6 +152,8 @@ export function vistaJugador(estado, jugadorId) {
     // Que existe en este modo (tecnologias, rasgos, mejoras, recursos): la interfaz pregunta por esto, no por el nombre del modo.
     reglas: reglasDelModo(estado),
     ganador: estado.ganador,
+    // El relato de toda la partida: solo existe cuando ya terminó.
+    cronicaFinal: cronicaFinal(estado),
     // Tabla de poder: con niebla solo trae la del propio jugador (ver reglas/poder.js).
     clasificacion: clasificacionPara(estado, jugadorId),
     jugadores: estado.jugadores.map(j => vistaJugadorPublica(j, jugadorId, estado)),

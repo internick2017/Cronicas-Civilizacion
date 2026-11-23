@@ -1,7 +1,7 @@
 import { tileEn, jugadorPorId, puedePagar } from '../MapGame.js';
 import { COSTO_CIUDAD, EDIFICIOS, COSTO_MEJORA_CIUDAD } from '../constantes.js';
 import { ReglaError } from '../errores.js';
-import { validarTurno, evento, radio1, esCostera } from './comun.js';
+import { validarTurno, evento, radio1, esCostera, maravillaConstruida } from './comun.js';
 import { tieneTecnologiaRequerida } from './tecnologia.js';
 import { edificioApagado, exigirMecanica } from './modo.js';
 import { escalarCosto, multiplicadorCostos } from './efectosProblemas.js';
@@ -67,6 +67,9 @@ export function construir(estado, jugadorId, { x, y, edificio }) {
     throw new ReglaError('REQUIERE_COSTA', 'Ese edificio requiere una ciudad con mar adyacente');
   }
 
+  if (definicion.maravilla && maravillaConstruida(estado, edificio)) {
+    throw new ReglaError('MARAVILLA_YA_CONSTRUIDA', 'Esa maravilla ya existe en esta partida');
+  }
   if (edificioApagado(estado, definicion)) {
     throw new ReglaError('MECANICA_APAGADA', 'En esta partida no hay ese edificio');
   }

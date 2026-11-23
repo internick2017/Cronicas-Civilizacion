@@ -20,6 +20,7 @@ import MapVictory from './MapVictory.vue'
 import MapDialogo from './MapDialogo.vue'
 import MapCiudadMenu from './MapCiudadMenu.vue'
 import MapAyuda from './MapAyuda.vue'
+import MapEvento from './MapEvento.vue'
 import MapCultura from './MapCultura.vue'
 import MapCiencia from './MapCiencia.vue'
 import MapGobiernoPanel from './MapGobiernoPanel.vue'
@@ -319,6 +320,8 @@ const detenerVigilancia = () => {
     pollEspera = null
   }
 }
+
+const miEvento = computed(() => vista.value?.jugadores.find(j => j.id === jugadorId)?.eventoPendiente ?? null)
 
 const ejecutarAccion = async (datosAccion) => {
   try {
@@ -769,6 +772,14 @@ onUnmounted(() => {
     </p>
 
     <MapActionBar :vista="vista" :jugador-id="jugadorId" @terminar-turno="onTerminarTurno" />
+
+    <MapEvento
+      v-if="vista.estado === 'jugando' && miEvento"
+      :evento="miEvento"
+      :eventos-ronda="constantes.eventosRonda || []"
+      :recursos="vista.jugadores.find(j => j.id === jugadorId).recursos"
+      @responder="(opcion) => ejecutarAccion({ tipo: 'responderEvento', opcion })"
+    />
 
     <MapVictory
       v-if="vista.estado === 'terminado'"

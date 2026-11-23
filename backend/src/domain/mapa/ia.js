@@ -20,7 +20,7 @@ import {
   bonoDefensa, defensaCiudad, BONO_DEFENSA_CIUDAD, esNaval, esTransporte, CAPACIDAD_DE,
   DIFICULTADES_IA, DIFICULTAD_IA_DEFAULT, NIVEL_MAXIMO_ADMINISTRADO
 } from './constantes.js';
-import { marAdyacente } from './reglas/comun.js';
+import { marAdyacente, maravillaConstruida } from './reglas/comun.js';
 import { amigosDe } from './reglas/bandos.js';
 import { aplicar } from './aplicar.js';
 import { fundarCiudad, construir, mejorarCiudad } from './reglas/ciudades.js';
@@ -28,6 +28,7 @@ import { organizarSubdivisionesIA } from './iaSubdivisiones.js';
 import { escalarCosto, multiplicadorCostos } from './reglas/efectosProblemas.js';
 import { IA_ORGANIZA_SUBDIVISIONES } from './constantes.js';
 import { reclutar } from './reglas/militar.js';
+import { responderEvento } from './reglas/eventosRonda.js';
 import { moverEjercito } from './reglas/movimiento.js';
 import { atacar } from './reglas/combate.js';
 import { embarcar, desembarcar } from './reglas/transporte.js';
@@ -539,6 +540,7 @@ function decidirConstruccion(estado, jugadorId, perfil) {
     const faltantes = perfil.ordenEdificios.filter((tipo) =>
       !tile.ciudad.edificios.includes(tipo) &&
       !edificioApagado(estado, EDIFICIOS[tipo]) &&
+      !(EDIFICIOS[tipo].maravilla && maravillaConstruida(estado, tipo)) &&
       tieneTecnologiaRequerida(estado, jugador, EDIFICIOS[tipo].requiereTecnologia) &&
       (!EDIFICIOS[tipo].requiereCosta || puertoUtil(estado, tile.x, tile.y)));
     for (const tipo of faltantes) {
@@ -1059,8 +1061,24 @@ function organizarSubdivisiones(estado, jugadorId) {
   return organizacion;
 }
 
+// La maquina paga la solucion del evento de ronda si le alcanza; si no, lo acepta.
+function responderEventoIA(estado, jugadorId) {
+  if (!jugadorPorId(estado, jugadorId)?.eventoPendiente) return [];
+  for (const opcion of ['pagar', 'aceptar']) {
+    try {
+      const ev = responderEvento(estado, jugadorId, { opcion });
+      aplicar(estado, ev);
+      return ev;
+    } catch (e) {
+      if (!(e instanceof ReglaError)) throw e;
+    }
+  }
+  return [];
+}
+
 export function jugarTurnoIA(estado, jugadorId, rng) {
-  const eventos = jugarPasosIA(estado, jugadorId, rng, null);
+  const eventos = responderEventoIA(estado, jugadorId);
+  eventos.push(...jugarPasosIA(estado, jugadorId, rng, null));
   eventos.push(...organizarSubdivisiones(estado, jugadorId));
   const cierre = terminarTurno(estado, jugadorId);
   aplicar(estado, cierre);

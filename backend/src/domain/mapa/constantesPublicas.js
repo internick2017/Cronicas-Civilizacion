@@ -1,5 +1,6 @@
 // Reglas publicas del juego (sin estado de ninguna partida). Las usan la ruta
 // GET /api/map/constantes y el anfitrion del modo online, que corre en el navegador.
+import { EVENTOS_RONDA } from './reglas/eventosRonda.js';
 import { PRIORIDADES } from './reglas/subdivisiones.js';
 import {
   TIPOS_SUBDIVISION, PROBLEMAS, RESOLUCION_POR_NIVEL, LIMITE_SENAL, LIMITE_PROBLEMA, GRAVEDAD_MAXIMA,
@@ -27,7 +28,11 @@ import {
 const NOMBRE_EDIFICIO = {
   granary: 'Granero', market: 'Mercado', library: 'Biblioteca',
   barracks: 'Cuartel', sawmill: 'Aserradero', quarry: 'Cantera', university: 'Universidad',
-  port: 'Puerto'
+  port: 'Puerto',
+  jardines_colgantes: 'Jardines Colgantes', coloso: 'Coloso', piramide: 'Pirámide', gran_biblioteca: 'Gran Biblioteca'
+};
+const NOMBRE_EVENTO = {
+  peste: 'Peste', sequia: 'Sequía', hambruna: 'Hambruna', terremoto: 'Terremoto', hallazgo_ruinas: 'Hallazgo de ruinas'
 };
 const NOMBRE_UNIDAD = {
   warrior: 'Guerrero', archer: 'Arquero', spearman: 'Lancero', cavalry: 'Caballería',
@@ -49,6 +54,7 @@ const DIFICULTAD_IA_INFO = {
 
 export function constantesPublicas() {
   return {
+    eventosRonda: Object.entries(EVENTOS_RONDA).map(([tipo, o]) => ({ tipo, nombre: NOMBRE_EVENTO[tipo], pagar: o.pagar, aceptar: o.aceptar })),
     costoCiudad: COSTO_CIUDAD,
     minJugadores: MIN_JUGADORES,
     edificios: Object.entries(EDIFICIOS).map(([tipo, datos]) => ({
@@ -57,6 +63,7 @@ export function constantesPublicas() {
       costo: datos.costo,
       produccion: datos.produccion,
       requiereTecnologia: datos.requiereTecnologia ?? null,
+      maravilla: datos.maravilla ?? false,
       // El puerto es el unico edificio con una condicion de geografia. La
       // vista lo necesita para poder decir "requiere costa" en vez de
       // ofrecer un boton que el backend va a rechazar.

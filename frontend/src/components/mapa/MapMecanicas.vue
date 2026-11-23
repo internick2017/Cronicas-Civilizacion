@@ -14,6 +14,7 @@ const MECANICAS = [
   { clave: 'levantamientos', icono: '✊', nombre: 'Golpes y revoluciones', ayuda: 'Con poco apoyo, un grupo se puede alzar e imponer otro gobierno.', requiere: 'gobierno' },
   { clave: 'razas', icono: '🧝', nombre: 'Razas', ayuda: 'Cada jugador elige una raza con sus ventajas y desventajas.' },
   { clave: 'fronteras', icono: '🧱', nombre: 'Fronteras que se recuperan', ayuda: 'Las ciudades recuperan al cerrar la ronda la tierra que les tomaron alrededor.' },
+  { clave: 'eventos', icono: '🌪️', nombre: 'Eventos de ronda', ayuda: 'Peste, sequía, hambruna, terremoto o ruinas: a veces te toca decidir si pagar para enfrentarlo.' },
   { clave: 'niebla', icono: '🌫️', nombre: 'Niebla', ayuda: 'Apagada, todos ven el mapa entero desde el principio.' },
 ]
 

@@ -1,6 +1,6 @@
 <!-- frontend/src/components/mapa/MapVictory.vue -->
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps({
   vista: { type: Object, required: true },
@@ -34,6 +34,18 @@ const motivoVictoria = computed(() => {
   const tipo = props.vista.ganador?.tipoVictoria
   return NOMBRE_VICTORIA[tipo] || tipo || 'una victoria decisiva'
 })
+
+// Relato de toda la partida (lo arma el dominio al terminar); se puede copiar para guardarlo.
+const cronica = computed(() => props.vista.cronicaFinal ?? [])
+const copiado = ref(false)
+async function copiarCronica() {
+  const texto = cronica.value.map(c => `${c.titulo}\n${c.texto}`).join('\n\n')
+  try {
+    await navigator.clipboard.writeText(texto)
+    copiado.value = true
+    setTimeout(() => { copiado.value = false }, 2000)
+  } catch { /* sin permiso del portapapeles: el texto sigue a la vista para copiarlo a mano */ }
+}
 </script>
 
 <template>
@@ -58,6 +70,15 @@ const motivoVictoria = computed(() => {
         </li>
       </ul>
 
+      <section v-if="cronica.length" class="cronica">
+        <h3>Crónica de la partida</h3>
+        <div v-for="c in cronica" :key="c.titulo" class="capitulo">
+          <h4>{{ c.titulo }}</h4>
+          <p>{{ c.texto }}</p>
+        </div>
+        <button class="btn-copiar" @click="copiarCronica">{{ copiado ? 'Copiada' : 'Copiar crónica' }}</button>
+      </section>
+
       <button class="btn-primary" @click="$emit('salir')">Volver al inicio</button>
     </div>
   </div>
@@ -71,7 +92,7 @@ const motivoVictoria = computed(() => {
 }
 .victoria {
   background: rgb(var(--t-panel)); border-radius: calc(var(--t-radio) * 12px); padding: 2rem;
-  min-width: 320px; text-align: center; color: rgb(var(--t-texto));
+  min-width: 320px; max-width: min(560px, 92vw); max-height: 90vh; overflow-y: auto; text-align: center; color: rgb(var(--t-texto));
 }
 .victoria h2 { margin: 0 0 0.5rem; font-size: 2rem; }
 .detalle { opacity: 0.85; }
@@ -79,6 +100,11 @@ const motivoVictoria = computed(() => {
 .jugadores li { padding: 0.3rem 0; border-bottom: 1px solid rgb(var(--t-tinta) / 0.08); }
 .eliminado { opacity: 0.5; font-size: 0.8rem; margin-left: 0.4rem; }
 .corona { color: rgb(var(--t-aviso)); font-size: 0.8rem; margin-left: 0.4rem; }
+.cronica { text-align: left; margin: 1rem 0; }
+.cronica h3 { margin: 0 0 0.4rem; font-size: 1.1rem; }
+.capitulo h4 { margin: 0.6rem 0 0.1rem; font-size: 0.95rem; opacity: 0.8; }
+.capitulo p { margin: 0; font-size: 0.9rem; line-height: 1.4; }
+.btn-copiar { margin-top: 0.6rem; background: transparent; color: rgb(var(--t-texto)); border: 1px solid rgb(var(--t-tinta) / 0.3); border-radius: calc(var(--t-radio) * 6px); padding: 0.3rem 0.8rem; cursor: pointer; }
 .btn-primary {
   background: rgb(var(--t-cta)); color: rgb(var(--t-sobre-cta)); border: 0; border-radius: calc(var(--t-radio) * 6px);
   padding: 0.6rem 1.2rem; cursor: pointer; font-size: 1rem;

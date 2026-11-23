@@ -47,7 +47,7 @@ const codigo = (fn) => { try { fn(); } catch (err) { return err.codigo ?? err.co
 
 describe('mecanicas: la config', () => {
   it('por defecto todas prendidas', () => {
-    expect(mecanicasDe(partida())).toEqual({ ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true, razas: true, problemas: true, levantamientos: true, fronteras: true, niebla: true });
+    expect(mecanicasDe(partida())).toEqual({ ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true, razas: true, problemas: true, levantamientos: true, fronteras: true, niebla: true, eventos: false });
   });
   it('una config parcial completa lo que falta con true', () => {
     expect(mecanicasDe(partida({ mecanicas: { armada: false } })).ciencia).toBe(true);
@@ -63,12 +63,14 @@ describe('mecanicas: la config', () => {
     const vieja = partida();
     delete vieja.config.mecanicas;
     vieja.config.guerraPura = true;
-    expect(mecanicasDe(vieja)).toEqual({ ciencia: false, cultura: false, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true, razas: true, problemas: true, levantamientos: true, fronteras: true, niebla: true });
+    expect(mecanicasDe(vieja)).toEqual({ ciencia: false, cultura: false, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true, razas: true, problemas: true, levantamientos: true, fronteras: true, niebla: true, eventos: false });
   });
-  it('partida vieja sin ninguno de los dos campos: todo prendido', () => {
+  it('partida vieja sin ninguno de los dos campos: todo prendido salvo los eventos de ronda', () => {
     const vieja = partida();
     delete vieja.config.mecanicas;
-    expect(Object.values(mecanicasDe(vieja)).every(Boolean)).toBe(true);
+    const { eventos, ...resto } = mecanicasDe(vieja);
+    expect(eventos).toBe(false);
+    expect(Object.values(resto).every(Boolean)).toBe(true);
   });
 });
 
@@ -133,13 +135,13 @@ describe('ciencia y cultura apagadas: lo que le dice el modo a la interfaz', () 
       tecnologias: true, rasgos: true, mejorasCiudad: true,
       recursosActivos: ['food', 'gold', 'wood', 'stone', 'science', 'culture'],
       armada: true, alianzas: true, moneda: true, capital: true, gobierno: true,
-      razas: true, problemas: true, levantamientos: true, niebla: true, poderes: PODERES_ELEGIBLES,
+      razas: true, problemas: true, levantamientos: true, niebla: true, eventos: false, poderes: PODERES_ELEGIBLES,
     });
     expect(reglasDelModo(partida({ mecanicas: { ciencia: false, cultura: false } }))).toEqual({
       tecnologias: false, rasgos: false, mejorasCiudad: false,
       recursosActivos: ['food', 'gold', 'wood', 'stone'],
       armada: true, alianzas: true, moneda: true, capital: true, gobierno: true,
-      razas: true, problemas: true, levantamientos: true, niebla: true, poderes: PODERES_ELEGIBLES,
+      razas: true, problemas: true, levantamientos: true, niebla: true, eventos: false, poderes: PODERES_ELEGIBLES,
     });
   });
 

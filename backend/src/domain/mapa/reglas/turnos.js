@@ -14,6 +14,7 @@ import { recuperarFronteras } from './fronteras.js';
 import { estaSaqueada } from './saqueo.js';
 import { capitalDe, estaEnMudanza } from './capital.js';
 import { crearRng } from '../rng.js';
+import { cerrarRondaEventos } from './eventosRonda.js';
 import { aplicar } from '../aplicar.js';
 import { cerrarRondaGobierno, multiplicadorProduccion } from './gobierno.js';
 import { administrarSubdivisiones, ciudadesConBonoCabecera } from './subdivisiones.js';
@@ -281,6 +282,8 @@ function cerrarRonda(estado, jugadorId, { terminaJugador = false } = {}) {
     const estadoDelCierre = structuredClone(estado);
     aplicar(estadoDelCierre, [...eventosAdmin, ...eventosProduccion]);
     eventos.push(...cerrarRondaProblemas(estadoDelCierre, crearRng(`problemas:${estado.semilla}:${estado.turno}`)));
+
+    eventos.push(...cerrarRondaEventos(estado, jugadorId, crearRng(`eventos:${estado.semilla}:${estado.turno}`)));
 
     eventos.push(evento('RondaCompletada', estado, jugadorId, {}));
 

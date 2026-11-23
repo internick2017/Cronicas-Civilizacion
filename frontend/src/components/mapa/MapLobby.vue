@@ -63,6 +63,7 @@ const islas = ref(false)
 const mecanicas = ref({
   ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true,
   razas: true, problemas: true, levantamientos: true, fronteras: true, niebla: true,
+  eventos: false, // opcionales: empiezan apagados
 })
 // Vacio = todos: el backend completa lo que falta. La lista llega con las constantes.
 const poderes = ref({})

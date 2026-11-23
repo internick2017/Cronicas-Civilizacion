@@ -28,6 +28,7 @@ import { moverEjercito } from '../domain/mapa/reglas/movimiento.js';
 import { embarcar, desembarcar } from '../domain/mapa/reglas/transporte.js';
 import { atacar } from '../domain/mapa/reglas/combate.js';
 import { terminarTurno, terminarSinHumanos } from '../domain/mapa/reglas/turnos.js';
+import { responderEvento } from '../domain/mapa/reglas/eventosRonda.js';
 import { vistaJugador } from '../domain/mapa/reglas/visibilidad.js';
 import { esSimultaneo, listosDe } from '../domain/mapa/reglas/comun.js';
 import logger from '../utils/logger.js';
@@ -134,6 +135,7 @@ const REGLAS_POR_TIPO = {
   nombrarMoneda: (estado, jugadorId, accion) => nombrarMoneda(estado, jugadorId, accion),
   acunarMoneda: (estado, jugadorId, accion) => acunarMoneda(estado, jugadorId, accion),
   abandonar: (estado, jugadorId) => abandonar(estado, jugadorId),
+  responderEvento: (estado, jugadorId, accion) => responderEvento(estado, jugadorId, accion),
   terminarTurno: (estado, jugadorId) => terminarTurno(estado, jugadorId),
 };
 

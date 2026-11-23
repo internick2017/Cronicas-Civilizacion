@@ -7,6 +7,7 @@ import { vecinosOrtogonales } from './reglas/comun.js';
 import { poderesApagadosDe } from './reglas/modo.js';
 import { acunadoEnRonda, inflacionAcunadaDe, inflacionTrasRonda } from './reglas/moneda.js';
 import { ReglaError } from './errores.js';
+import { anotar } from './cronicaFinal.js';
 
 function quitarPropuestasEntre(estado, a, b) {
   estado.propuestasAlianza = (estado.propuestasAlianza ?? [])
@@ -24,6 +25,7 @@ function sacarDeAlianzas(estado, jugadorId) {
 export function aplicar(estado, eventos) {
   for (const evento of eventos) {
     const { tipo, jugadorId, datos, turno: evento_turno } = evento;
+    anotar(estado, evento);
     switch (tipo) {
       case 'JugadorUnido': {
         const poderesApagados = poderesApagadosDe(estado);
@@ -573,6 +575,18 @@ export function aplicar(estado, eventos) {
         for (const t of estado.mapa) {
           if (t.dueno === datos.jugadorId && !t.ciudad) t.dueno = null;
         }
+        break;
+      }
+
+      case 'EventoDeRonda': {
+        jugadorPorId(estado, datos.jugadorId).eventoPendiente = { tipo: datos.evento, ronda: estado.turno };
+        break;
+      }
+
+      case 'EventoResuelto': {
+        const j = jugadorPorId(estado, datos.jugadorId);
+        for (const [r, c] of Object.entries(datos.cambio)) j.recursos[r] = Math.max(0, (j.recursos[r] ?? 0) + c);
+        delete j.eventoPendiente;
         break;
       }
 

@@ -1,5 +1,5 @@
 import { ReglaError } from '../errores.js';
-import { PROBLEMAS, RECURSOS, MECANICAS, PODERES_ELEGIBLES } from '../constantes.js';
+import { PROBLEMAS, RECURSOS, MECANICAS, MECANICAS_APAGADAS_POR_DEFECTO, PODERES_ELEGIBLES } from '../constantes.js';
 
 // Que existe en la partida segun las mecanicas elegidas al crearla (config.mecanicas). Es el
 // UNICO lugar que lee esa config (y la vieja config.guerraPura): las reglas, la IA y la vista
@@ -10,7 +10,7 @@ import { PROBLEMAS, RECURSOS, MECANICAS, PODERES_ELEGIBLES } from '../constantes
 // campos, todo esta prendido.
 export function mecanicasDe(estado) {
   const config = estado?.config;
-  const prendidas = Object.fromEntries(MECANICAS.map(m => [m, true]));
+  const prendidas = Object.fromEntries(MECANICAS.map(m => [m, !MECANICAS_APAGADAS_POR_DEFECTO.includes(m)]));
   if (config?.mecanicas) return { ...prendidas, ...config.mecanicas };
   if (config?.guerraPura === true) return { ...prendidas, ciencia: false, cultura: false };
   return prendidas;
@@ -57,6 +57,7 @@ export function reglasDelModo(estado) {
     moneda: m.moneda,
     capital: m.capital,
     gobierno: m.gobierno,
+    eventos: m.eventos,
     razas: m.razas,
     problemas: m.problemas,
     levantamientos: m.levantamientos,

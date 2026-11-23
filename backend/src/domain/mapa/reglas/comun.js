@@ -4,6 +4,10 @@ import { tileEn } from '../MapGame.js';
 // Turno simultaneo: todos juegan la misma ronda a la vez y la ronda cierra
 // cuando todos terminaron. `estado.listos` guarda quienes ya terminaron ESTA
 // ronda; una partida secuencial (o guardada antes de que existiera) no lo trae.
+// Una maravilla es unica por partida: vale que este en cualquier ciudad del mapa.
+export const maravillaConstruida = (estado, edificio) =>
+  estado.mapa.some(t => t.ciudad?.edificios?.includes(edificio));
+
 export const esSimultaneo = (estado) => estado.config.modoTurno === 'simultaneo';
 export const listosDe = (estado) => estado.listos ?? [];
 

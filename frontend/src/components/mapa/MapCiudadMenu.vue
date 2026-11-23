@@ -249,7 +249,7 @@ const motivoCapital = computed(() => falta(costoCapital.value))
         :disabled="motivoEdificio(ed) !== null"
         @click="pedir(`Construir: ${ed.nombre}`, escalar(ed.costo), () => emit('construir', ed.tipo))"
       >
-        <strong>{{ ed.nombre }}</strong>
+        <strong>{{ ed.nombre }}<span v-if="ed.maravilla"> ★ maravilla única</span></strong>
         <small>{{ textoCosto(escalar(ed.costo)) }}</small>
         <em v-if="motivoEdificio(ed)">{{ motivoEdificio(ed) }}</em>
       </button>

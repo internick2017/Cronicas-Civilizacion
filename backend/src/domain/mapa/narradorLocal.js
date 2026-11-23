@@ -10,7 +10,11 @@ const NOMBRE_EDIFICIO = {
   sawmill: 'un aserradero',
   quarry: 'una cantera',
   university: 'una universidad',
-  port: 'un puerto'
+  port: 'un puerto',
+  jardines_colgantes: 'los Jardines Colgantes, una maravilla del mundo',
+  coloso: 'el Coloso, una maravilla del mundo',
+  piramide: 'la Piramide, una maravilla del mundo',
+  gran_biblioteca: 'la Gran Biblioteca, una maravilla del mundo'
 };
 
 const NOMBRE_RASGO = {
@@ -147,6 +151,19 @@ export function narrarRonda(eventos, jugadores = []) {
       case 'EdificioConstruido': {
         const edificio = NOMBRE_EDIFICIO[datos.edificio] ?? textoSeguro(datos.edificio) ?? 'una construccion';
         frases.push(`${quien} construyo ${edificio}.`);
+        break;
+      }
+
+      case 'EventoDeRonda': {
+        const nombreEvento = { peste: 'una peste', sequia: 'una sequia', hambruna: 'una hambruna', terremoto: 'un terremoto', hallazgo_ruinas: 'el hallazgo de unas ruinas antiguas' }[datos.evento] ?? 'un suceso inesperado';
+        frases.push(`${nombreDe(jugadores, datos.jugadorId)} se vio sacudido por ${nombreEvento}.`);
+        break;
+      }
+
+      case 'EventoResuelto': {
+        frases.push(datos.opcion === 'pagar'
+          ? `${nombreDe(jugadores, datos.jugadorId)} puso su tesoro a trabajar para enfrentar lo ocurrido.`
+          : `${nombreDe(jugadores, datos.jugadorId)} dejo que el destino siguiera su curso.`);
         break;
       }
 

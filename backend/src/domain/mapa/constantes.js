@@ -24,8 +24,10 @@ export const RECURSOS_CIVILES = ['science', 'culture'];
 // Las mecanicas que se eligen al crear la partida (config.mecanicas). Todas prendidas por defecto.
 export const MECANICAS = [
   'ciencia', 'cultura', 'armada', 'alianzas', 'moneda', 'capital', 'gobierno',
-  'razas', 'problemas', 'levantamientos', 'fronteras', 'niebla',
+  'razas', 'problemas', 'levantamientos', 'fronteras', 'niebla', 'eventos',
 ];
+// Prendidas por defecto salvo estas: los eventos de ronda son opcionales y empiezan apagados.
+export const MECANICAS_APAGADAS_POR_DEFECTO = ['eventos'];
 
 export const RECURSOS_INICIALES = {
   food: 100,
@@ -105,6 +107,32 @@ export const EDIFICIOS = {
     costo: { wood: 40, stone: 30 },
     produccion: { gold: 3 },
     requiereCosta: true
+  },
+  // MARAVILLAS: construcciones unicas, UNA de cada una por partida entera (la
+  // primera que se levanta gana; ver reglas/ciudades.js). Cuestan mucho y rinden
+  // varias veces lo que un edificio comun, asi que una ciudad que tiene una es un
+  // premio por el que conviene pelear: se la lleva quien la captura (el edificio
+  // vive en la ciudad). `maravilla: true` es lo unico que las distingue.
+  jardines_colgantes: {
+    costo: { food: 150, gold: 250, stone: 100 },
+    produccion: { food: 10 },
+    maravilla: true
+  },
+  coloso: {
+    costo: { gold: 300, wood: 100, stone: 150 },
+    produccion: { gold: 14 },
+    maravilla: true
+  },
+  piramide: {
+    costo: { gold: 250, wood: 150, stone: 250 },
+    produccion: { wood: 8, stone: 8 },
+    maravilla: true
+  },
+  gran_biblioteca: {
+    costo: { gold: 250, wood: 100, stone: 200 },
+    produccion: { science: 12 },
+    requiereTecnologia: 'filosofia',
+    maravilla: true
   }
 };
 

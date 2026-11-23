@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { generarMapa } from './generarMapa.js';
-import { RECURSOS, MECANICAS, PODERES_ELEGIBLES, CRITERIOS_FINALES } from './constantes.js';
+import { RECURSOS, MECANICAS, MECANICAS_APAGADAS_POR_DEFECTO, PODERES_ELEGIBLES, CRITERIOS_FINALES } from './constantes.js';
 import { ReglaError } from './errores.js';
 
 const CONFIG_DEFAULT = {
@@ -33,7 +33,7 @@ const CONFIG_DEFAULT = {
   // cultura apagadas: ni se producen ni se gastan, sin tecnologias, rasgos ni mejoras de
   // ciudad. Gobierno apagado: nadie tiene apoyo, elecciones, impuestos ni Estado federal.
   // Todas prendidas por defecto: una partida sin tocar nada se juega como siempre.
-  mecanicas: Object.fromEntries(MECANICAS.map(m => [m, true])),
+  mecanicas: Object.fromEntries(MECANICAS.map(m => [m, !MECANICAS_APAGADAS_POR_DEFECTO.includes(m)])),
   // Que poderes existen en la partida (ver reglas/modo.js#poderesApagadosDe).
   poderes: Object.fromEntries(PODERES_ELEGIBLES.map(p => [p, true])),
 };

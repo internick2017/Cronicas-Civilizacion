@@ -23,7 +23,7 @@ describe('crearEstado', () => {
       criterioFinal: 'territorio', // se sumo con las condiciones de final de partida
       porcentajeVictoria: 60, limiteRondas: null, islas: false,
       rondasEntreElecciones: 8, // se sumó con el gobierno: solo lo usan las repúblicas
-      mecanicas: { ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true, razas: true, problemas: true, levantamientos: true, fronteras: true, niebla: true }, // se apagan en el lobby; todas prendidas por defecto
+      mecanicas: { ciencia: true, cultura: true, armada: true, alianzas: true, moneda: true, capital: true, gobierno: true, razas: true, problemas: true, levantamientos: true, fronteras: true, niebla: true, eventos: false }, // se apagan en el lobby; todas prendidas por defecto
       poderes: Object.fromEntries(PODERES_ELEGIBLES.map(p => [p, true])), // ídem, por poder
     });
     expect(e.ganador).toBeNull();
