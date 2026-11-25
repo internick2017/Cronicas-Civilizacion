@@ -17,6 +17,7 @@ const emit = defineEmits(['elegir-modo'])
         <p>Estrategia por turnos sobre un mapa de casillas.</p>
       </button>
     </div>
+    <a class="volver" href="https://juegos-nick.vercel.app">Volver a los juegos</a>
   </div>
 </template>
 
@@ -71,6 +72,10 @@ const emit = defineEmits(['elegir-modo'])
   margin: 0;
   color: #bdc3c7;
   font-size: 0.9rem;
+}
+
+.volver {
+  color: #3498db;
 }
 
 .beta {
