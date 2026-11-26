@@ -23,7 +23,7 @@
           <h3>👥 Jugadores ({{ hostedSession?.players?.length || 0 }}/{{ hostedSession?.maxPlayers }})</h3>
           <div class="waiting-players-list">
             <div
-              v-for="(player, idx) in hostedSession?.players"
+              v-for="player in hostedSession?.players"
               :key="player.id"
               class="waiting-player-card"
               :class="{ 'is-host': player.id === hostedPlayer?.id }"

@@ -108,7 +108,7 @@ export function resumirTerritorio(eventos) {
   const porClave = new Map();
   for (const evento of eventos ?? []) {
     const datos = evento.datos || {};
-    let casillas = 0;
+    let casillas;
     if (evento.tipo === 'TerritorioReclamado') casillas = 1;
     else if (evento.tipo === 'TerritorioAnexado') casillas = (datos.tiles ?? []).length;
     else continue;
