@@ -775,4 +775,6 @@ table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
 th, td { text-align: left; padding: 0.25rem 0.4rem; border-bottom: 1px solid rgb(var(--t-tinta) / 0.1); }
 th { color: rgb(var(--t-texto-suave)); font-weight: 600; }
 td small { opacity: 0.6; }
+/* En celular una tabla ancha se desliza de costado en vez de salirse del cuadro. */
+@media (max-width: 600px) { table { display: block; overflow-x: auto; } }
 </style>

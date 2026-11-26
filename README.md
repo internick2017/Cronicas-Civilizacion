@@ -1,8 +1,10 @@
-# 📚 Crónicas de Civilización - Modo Narrativo
+# 📚 Crónicas de Civilización
 
 Una experiencia de narración colaborativa donde tú y tu familia crean historias épicas juntos, con la IA como narrador maestro.
 
 ## 🎯 ¿Qué es?
+
+El juego tiene dos modos: el **modo narrativo**, que se describe a continuación, y el [**modo mapa** (beta)](#️-modo-mapa-beta), de estrategia por turnos.
 
 **Crónicas de Civilización** es ahora una plataforma de narración colaborativa que permite a familias crear historias épicas juntas. Cada miembro de la familia escribe una acción, y la IA genera una narrativa continua que mantiene la historia fluyendo.
 
@@ -187,9 +189,17 @@ const actionResponse = await fetch('/api/narrative/sessions/session-id/action', 
 })
 ```
 
-## 🗺️ Modo mapa (beta, solo API)
+## 🗺️ Modo mapa (beta)
 
-Además del modo narrativo, el backend incluye un modo de estrategia por turnos sobre un mapa de casillas ("modo mapa"). Por ahora **sólo existe como API REST**: no tiene interfaz en el frontend todavía. Las reglas de balance (unidades, edificios, combate, condiciones de victoria) están documentadas en detalle en [`docs/reglas-modo-mapa.md`](docs/reglas-modo-mapa.md).
+Además del modo narrativo, el juego tiene un modo de estrategia por turnos sobre un mapa de casillas. Se elige en la pantalla de inicio, en **Modo mapa**.
+
+Formas de jugar:
+
+- **Jugar solo**: contra una o más máquinas, con dificultad a elegir.
+- **Crear partida** y **Unirse**: varias personas, cada una en su dispositivo.
+- **Online con amigos**: un jugador hace de anfitrión y su navegador corre la partida (PeerJS), o se juega sin conexión en el mismo navegador.
+
+Las reglas de balance (unidades, edificios, combate, condiciones de victoria) están en [`docs/reglas-modo-mapa.md`](docs/reglas-modo-mapa.md). Dentro del juego, el botón ℹ️ abre el manual.
 
 ### Endpoints
 

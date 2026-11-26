@@ -1,6 +1,7 @@
 # Modo mapa: deuda conocida y próximos pasos
 
-Estado al 2026-08-08, tras completar la nueva capa de dominio.
+Escrito el 2026-08-08, tras completar la nueva capa de dominio. Puntos 2, 4 y 5 actualizados el 2026-11-26;
+el resto no se volvió a revisar, salvo que el punto 3 sigue sin un test del repositorio contra Postgres.
 
 El modo mapa está completo a nivel backend: dominio puro, persistencia, servicio, API REST y
 sockets. 235 tests en verde. Esta página lista lo que quedó afuera a propósito, para que no se
@@ -28,18 +29,9 @@ verificaron cerrados con un probe real contra base de datos, no solo con tests:
 única vez por `unirse`); `POST /:id/accion` y `GET /:id` exigen el header
 `X-Jugador-Token`.
 
-### 2. Los dos lockfiles se contradicen
+### 2. Los dos lockfiles se contradicen — ✅ resuelto
 
-`backend/package.json` fija `better-sqlite3` en `12.11.1`, pero `backend/package-lock.json`
-todavía dice `^11.5.0`, y ahora convive con un `backend/yarn.lock` nuevo. El CI corre
-`npm install` (no `npm ci`), así que resuelve bien y no rompe, pero el lockfile no está dando
-ninguna garantía de reproducibilidad. Hay que elegir un gestor: o se regenera
-`package-lock.json` y se borra el `yarn.lock`, o el CI pasa a `yarn install --frozen-lockfile`
-y se borra el `package-lock.json`.
-
-Contexto: el salto de major fue necesario, no opcional. La 11.x no tiene binario precompilado
-para Node 24 en Windows y `node-gyp` está roto en la máquina de desarrollo, así que sin ese
-cambio no corre ningún test. La API usada no cambió entre majors.
+Quedó solo `backend/yarn.lock`.
 
 ### 3. La ruta Postgres del repositorio no tiene tests
 
@@ -49,17 +41,13 @@ Todo `test/mapa/repo.test.js` corre sobre SQLite en memoria. La mitad Postgres d
 corre en producción. Lo barato: testear `adaptarPlaceholders` en aislamiento y correr la suite
 del repo contra un `db.query` falso que registre SQL y parámetros.
 
-### 4. Borrar el sistema legacy
+### 4. Borrar el sistema legacy — ✅ resuelto
 
-`Game.js`, `GameService.js`, `CityService.js`, `MilitaryService.js`, `ResourceService.js`, sus
-rutas y los componentes Vue muertos siguen en pie y sin tocar. El borrado es un PR aparte, a
-hacer cuando el frontend del modo mapa esté andando. Las reglas que valía la pena rescatar ya
-están en `docs/reglas-modo-mapa.md`.
+En `backend/src/models` y `backend/src/routes` ya no están el modelo ni los servicios viejos.
 
-### 5. Frontend del modo mapa
+### 5. Frontend del modo mapa — ✅ resuelto
 
-No existe todavía. El plan ejecutado fue explícitamente solo backend. Hace falta un selector de
-modo en `App.vue` y revivir `GameMap.vue` adaptado al estado nuevo.
+Existe en `frontend/src/components/mapa/`.
 
 ## Detalles menores anotados
 
