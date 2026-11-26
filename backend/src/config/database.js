@@ -58,8 +58,8 @@ const pool = new Pool({
   ...config,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-  // Add connection retry logic
+  // Neon se duerme sin uso y despertarlo tarda mas de 2 s: con menos margen el despliegue en Render falla al arrancar.
+  connectionTimeoutMillis: 15000,
   allowExitOnIdle: false,
   // Keep connections alive longer
   keepAlive: true,
